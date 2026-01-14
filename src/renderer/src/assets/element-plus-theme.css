@@ -1,0 +1,461 @@
+/* Element Plus 主题适配 */
+
+/* 全局背景和文本颜色 */
+.el-table {
+  --el-table-bg-color: var(--bg-soft) !important;
+  --el-table-tr-bg-color: var(--bg-soft) !important;
+  --el-table-header-bg-color: var(--bg-mute) !important;
+  --el-table-row-hover-bg-color: var(--bg-primary) !important;
+  --el-table-text-color: var(--text-base) !important;
+  --el-table-header-text-color: var(--text-base) !important;
+  --el-table-border-color: var(--border-color) !important;
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-table th.el-table__cell {
+  background-color: var(--bg-mute) !important;
+  color: var(--text-base) !important;
+}
+
+.el-table tr {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-table__body tr:hover > td {
+  background-color: var(--bg-primary) !important;
+}
+
+.el-table__empty-block {
+  background-color: var(--bg-soft) !important;
+}
+
+.el-table__empty-text {
+  color: var(--text-gray) !important;
+}
+
+/* Dialog 对话框 */
+.el-dialog {
+  --el-dialog-bg-color: var(--bg-soft) !important;
+  --el-dialog-text-color: var(--text-base) !important;
+  background-color: var(--bg-soft) !important;
+}
+
+
+.el-dialog__header {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-dialog__body {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-dialog__footer {
+  background-color: var(--bg-soft) !important;
+}
+
+.el-dialog__title {
+  color: var(--text-base) !important;
+}
+
+/* Form 表单 */
+.el-form-item__label {
+  color: var(--text-base) !important;
+}
+
+/* Input 输入框 */
+.el-input {
+  --el-input-bg-color: var(--bg-primary) !important;
+  --el-input-text-color: var(--text-base) !important;
+  --el-input-border-color: var(--border-color) !important;
+  --el-input-hover-border-color: var(--accent-color) !important;
+  --el-input-focus-border-color: var(--accent-color) !important;
+}
+
+.el-input__wrapper {
+  background-color: var(--bg-primary) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--accent-color) inset !important;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--accent-color) inset !important;
+}
+
+.el-input__inner {
+  color: var(--text-base) !important;
+  background-color: transparent !important;
+}
+
+/* Textarea 文本域 */
+.el-textarea {
+  --el-input-bg-color: var(--bg-primary) !important;
+  --el-input-text-color: var(--text-base) !important;
+  --el-input-border-color: var(--border-color) !important;
+}
+
+.el-textarea__inner {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-base) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-textarea__inner:hover {
+  border-color: var(--accent-color) !important;
+}
+
+.el-textarea__inner:focus {
+  border-color: var(--accent-color) !important;
+}
+
+/* Select 选择器 */
+.el-select {
+  --el-select-input-focus-border-color: var(--accent-color) !important;
+}
+
+.el-select-dropdown {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-select-dropdown__item {
+  color: var(--text-base) !important;
+}
+
+.el-select-dropdown__item:hover {
+  background-color: var(--bg-mute) !important;
+}
+
+.el-select-dropdown__item.selected {
+  color: var(--accent-color) !important;
+  font-weight: 600;
+}
+
+/* Tree Select 树形选择器 */
+.el-tree-select {
+  --el-select-input-focus-border-color: var(--accent-color) !important;
+}
+
+.el-tree-select-dropdown {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-tree-node__content {
+  color: var(--text-base) !important;
+}
+
+.el-tree-node__content:hover {
+  background-color: var(--bg-mute) !important;
+}
+
+/* Button 按钮 */
+.el-button {
+  --el-button-bg-color: var(--bg-mute) !important;
+  --el-button-text-color: var(--text-base) !important;
+  --el-button-border-color: var(--border-color) !important;
+  --el-button-hover-bg-color: var(--bg-primary) !important;
+  --el-button-hover-text-color: var(--text-base) !important;
+  --el-button-hover-border-color: var(--accent-color) !important;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--accent-color) !important;
+  --el-button-border-color: var(--accent-color) !important;
+  --el-button-hover-bg-color: var(--accent-color) !important;
+  --el-button-hover-border-color: var(--accent-color) !important;
+  filter: brightness(1);
+}
+
+.el-button--primary:hover {
+  filter: brightness(1.1);
+}
+
+.el-button--danger {
+  --el-color-danger: #f56c6c !important;
+}
+
+/* Message Box 消息框 */
+.el-message-box {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-message-box__header {
+  background-color: var(--bg-soft) !important;
+}
+
+.el-message-box__title {
+  color: var(--text-base) !important;
+}
+
+.el-message-box__content {
+  color: var(--text-base) !important;
+}
+
+.el-message-box__message {
+  color: var(--text-base) !important;
+}
+
+/* Popover 弹出框 */
+.el-popover {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-base) !important;
+}
+
+.el-popper {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-base) !important;
+}
+
+/* Dropdown 下拉菜单 */
+.el-dropdown-menu {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-dropdown-menu__item {
+  color: var(--text-base) !important;
+}
+
+.el-dropdown-menu__item:hover {
+  background-color: var(--bg-mute) !important;
+  color: var(--accent-color) !important;
+}
+
+/* Tooltip 提示框 */
+.el-tooltip__popper {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-tooltip__popper.is-dark {
+  background-color: var(--bg-mute) !important;
+}
+
+/* Loading 加载 */
+.el-loading-mask {
+  background-color: var(--bg-primary-a7) !important;
+}
+
+.el-loading-spinner .path {
+  stroke: var(--accent-color) !important;
+}
+
+.el-loading-text {
+  color: var(--text-base) !important;
+}
+
+/* Pagination 分页 */
+.el-pagination {
+  --el-pagination-bg-color: var(--bg-soft) !important;
+  --el-pagination-text-color: var(--text-base) !important;
+  --el-pagination-button-bg-color: var(--bg-mute) !important;
+  --el-pagination-hover-color: var(--accent-color) !important;
+}
+
+.el-pagination button {
+  background-color: var(--bg-mute) !important;
+  color: var(--text-base) !important;
+}
+
+.el-pagination button:hover {
+  color: var(--accent-color) !important;
+}
+
+/* Radio 单选框 */
+.el-radio {
+  --el-radio-text-color: var(--text-base) !important;
+}
+
+.el-radio__label {
+  color: var(--text-base) !important;
+}
+
+/* Checkbox 复选框 */
+.el-checkbox {
+  --el-checkbox-text-color: var(--text-base) !important;
+}
+
+.el-checkbox__label {
+  color: var(--text-base) !important;
+}
+
+/* Switch 开关 */
+.el-switch__label {
+  color: var(--text-base) !important;
+}
+
+/* Timeline 时间线 */
+.el-timeline {
+  color: var(--text-base) !important;
+}
+
+.el-timeline-item__timestamp {
+  color: var(--text-gray) !important;
+}
+
+.el-timeline-item__content {
+  color: var(--text-base) !important;
+}
+
+/* Card 卡片 */
+.el-card {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-base) !important;
+}
+
+.el-card__header {
+  background-color: var(--bg-mute) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-base) !important;
+}
+
+.el-card__body {
+  color: var(--text-base) !important;
+}
+
+/* Empty 空状态 */
+.el-empty__description {
+  color: var(--text-gray) !important;
+}
+
+/* Scrollbar 滚动条 */
+.el-scrollbar__thumb {
+  background-color: var(--text-gray-light) !important;
+}
+
+.el-scrollbar__thumb:hover {
+  background-color: var(--text-gray) !important;
+}
+
+/* Upload 上传 */
+.el-upload {
+  border-color: var(--border-color) !important;
+  color: var(--text-base) !important;
+}
+
+.el-upload:hover {
+  border-color: var(--accent-color) !important;
+}
+
+.el-upload-dragger {
+  background-color: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-upload-dragger:hover {
+  border-color: var(--accent-color) !important;
+}
+
+.el-upload__text {
+  color: var(--text-base) !important;
+}
+
+/* Tabs 标签页 */
+.el-tabs__header {
+  background-color: var(--bg-soft) !important;
+}
+
+.el-tabs__item {
+  color: var(--text-gray) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--accent-color) !important;
+}
+
+.el-tabs__item:hover {
+  color: var(--accent-color) !important;
+}
+
+/* Badge 徽章 */
+.el-badge__content {
+  background-color: var(--accent-color) !important;
+}
+
+/* Tag 标签 */
+.el-tag {
+  background-color: var(--bg-mute) !important;
+  color: var(--text-base) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Progress 进度条 */
+.el-progress__text {
+  color: var(--text-base) !important;
+}
+
+/* Steps 步骤条 */
+.el-step__title {
+  color: var(--text-base) !important;
+}
+
+.el-step__description {
+  color: var(--text-gray) !important;
+}
+
+/* Menu 菜单 */
+.el-menu {
+  background-color: var(--bg-soft) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-menu-item {
+  color: var(--text-base) !important;
+}
+
+.el-menu-item:hover {
+  background-color: var(--bg-mute) !important;
+  color: var(--accent-color) !important;
+}
+
+.el-menu-item.is-active {
+  color: var(--accent-color) !important;
+}
+
+/* Drawer 抽屉 */
+.el-drawer {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-drawer__header {
+  color: var(--text-base) !important;
+}
+
+/* Collapse 折叠面板 */
+.el-collapse {
+  border-color: var(--border-color) !important;
+}
+
+.el-collapse-item__header {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+  border-color: var(--border-color) !important;
+}
+
+.el-collapse-item__content {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+/* Divider 分割线 */
+.el-divider {
+  background-color: var(--border-color) !important;
+}
+
+.el-divider__text {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
