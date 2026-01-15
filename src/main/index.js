@@ -5,6 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import Store from 'electron-store'
 import dayjs from 'dayjs'
+import crypto from 'crypto'
 
 // macOS 图标获取函数
 // 注意：nativeImage 只支持 PNG 和 JPEG 格式，不支持 .icns
@@ -76,6 +77,162 @@ ipcMain.handle('store:set', async (_, key, value) => {
 ipcMain.handle('store:delete', async (_, key) => {
   store.delete(key)
   return true
+})
+
+// ========== 书架密码加密处理 ==========
+
+// 加密算法：使用 AES-256-CBC
+const ENCRYPTION_KEY = 'youziwrite-shelf-password-key-2024' // 32字符密钥
+const IV_LENGTH = 16
+
+// 加密函数
+function encryptPassword(password) {
+  try {
+    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+    const iv = crypto.randomBytes(IV_LENGTH)
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
+    
+    let encrypted = cipher.update(password, 'utf8', 'hex')
+    encrypted += cipher.final('hex')
+    
+    // 返回 iv:encrypted 格式
+    return iv.toString('hex') + ':' + encrypted
+  } catch (error) {
+    console.error('加密密码失败:', error)
+    return null
+  }
+}
+
+// 解密函数
+function decryptPassword(encryptedData) {
+  try {
+    const parts = encryptedData.split(':')
+    if (parts.length !== 2) {
+      throw new Error('加密数据格式错误')
+    }
+    
+    const iv = Buffer.from(parts[0], 'hex')
+    const encrypted = parts[1]
+    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32)
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    
+    return decrypted
+  } catch (error) {
+    console.error('解密密码失败:', error)
+    return null
+  }
+}
+
+// 获取书架密码配置文件路径
+function getShelfPasswordConfigPath() {
+  const booksDir = store.get('booksDir')
+  if (!booksDir) {
+    return null
+  }
+  return join(booksDir, '.shelf_config.json')
+}
+
+// 设置书架密码（加密存储）
+ipcMain.handle('set-shelf-password', async (_, { password, hint }) => {
+  try {
+    const configPath = getShelfPasswordConfigPath()
+    if (!configPath) {
+      return { success: false, message: '未设置书籍目录' }
+    }
+
+    let config = {}
+    
+    if (password) {
+      // 加密密码
+      const encryptedPassword = encryptPassword(password)
+      if (!encryptedPassword) {
+        return { success: false, message: '密码加密失败' }
+      }
+      
+      config = {
+        encryptedPassword,
+        hint: hint || null,
+        updatedAt: new Date().toISOString()
+      }
+    } else {
+      // 清除密码
+      config = {
+        encryptedPassword: null,
+        hint: null,
+        updatedAt: new Date().toISOString()
+      }
+    }
+
+    // 写入配置文件
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
+    
+    // 同时保存提示到 electron-store（用于快速访问）
+    store.set('shelfPasswordHint', hint || null)
+    
+    return { success: true }
+  } catch (error) {
+    console.error('设置书架密码失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// 获取书架密码信息（不返回密码本身）
+ipcMain.handle('get-shelf-password', async () => {
+  try {
+    const configPath = getShelfPasswordConfigPath()
+    if (!configPath || !fs.existsSync(configPath)) {
+      return { success: true, hasPassword: false, hint: null }
+    }
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    
+    return {
+      success: true,
+      hasPassword: !!config.encryptedPassword,
+      hint: config.hint || null
+    }
+  } catch (error) {
+    console.error('获取书架密码信息失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// 验证书架密码
+ipcMain.handle('verify-shelf-password', async (_, password) => {
+  try {
+    const configPath = getShelfPasswordConfigPath()
+    if (!configPath || !fs.existsSync(configPath)) {
+      return { success: true, valid: true } // 没有设置密码，验证通过
+    }
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    
+    if (!config.encryptedPassword) {
+      return { success: true, valid: true } // 没有设置密码，验证通过
+    }
+
+    // 解密存储的密码
+    const decryptedPassword = decryptPassword(config.encryptedPassword)
+    if (!decryptedPassword) {
+      return { success: false, message: '密码解密失败' }
+    }
+
+    // 比对密码
+    const valid = password === decryptedPassword
+    
+    return { success: true, valid }
+  } catch (error) {
+    console.error('验证书架密码失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// 退出应用程序
+ipcMain.handle('quit-app', () => {
+  app.quit()
 })
 
 // AI 模型 API 测试处理
@@ -175,6 +332,11 @@ ipcMain.handle('test-ai-model', async (_, { endpoint, apiKey, modelId, providerI
         }
         if (apiKey && apiKey.trim()) {
           headers['Authorization'] = `Bearer ${apiKey}`
+
+          // // 添加小米的Mimo请求头
+          // if (modelId.includes("mimo")){
+          //   headers['api-key'] = apiKey
+          // }
         }
         break
     }
@@ -186,7 +348,27 @@ ipcMain.handle('test-ai-model', async (_, { endpoint, apiKey, modelId, providerI
       body: JSON.stringify(requestBody)
     })
 
-    const data = await response.json()
+    // 检查响应的Content-Type
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      // 返回的不是JSON，可能是HTML错误页面
+      const text = await response.text()
+      return {
+        success: false,
+        error: `API返回了非JSON格式的响应 (${response.status}): ${text.substring(0, 200)}...`
+      }
+    }
+
+    let data
+    try {
+      data = await response.json()
+    } catch (parseError) {
+      // JSON解析失败
+      return {
+        success: false,
+        error: `无法解析API响应: ${parseError.message}`
+      }
+    }
 
     if (!response.ok) {
       // 请求失败，返回错误信息

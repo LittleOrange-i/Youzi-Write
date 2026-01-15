@@ -4,3 +4,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 书架密码验证弹窗 - 白色遮罩背景 */
+.el-overlay.white-modal-overlay {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}

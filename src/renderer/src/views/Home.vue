@@ -33,6 +33,13 @@
           <span class="font-medium">系统设置</span>
         </div>
 
+        <div class="menu-item-modern group" @click="showShelfPasswordDialog = true">
+          <svg class="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <span class="font-medium">书架密码</span>
+        </div>
+
         <div class="menu-item-modern group" @click="goToUserGuide">
           <svg class="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -103,6 +110,76 @@
       <div class="flex flex-col items-center">
         <img :src="rewardQrcode" alt="赞助二维码" class="w-128 max-w-full rounded-xl shadow-lg" />
       </div>
+    </el-dialog>
+
+    <!-- 书架密码设置弹框 -->
+    <el-dialog v-model="showShelfPasswordDialog" title="书架密码" width="500px" align-center>
+      <div class="space-y-4">
+        <!-- 显示当前密码状态 -->
+        <el-alert
+          :title="hasShelfPassword ? '已设置书架密码' : '未设置书架密码'"
+          :type="hasShelfPassword ? 'success' : 'info'"
+          :closable="false"
+        />
+        
+        <el-form ref="shelfPasswordFormRef" :model="shelfPasswordForm" :rules="shelfPasswordRules" label-width="100px">
+          <!-- 如果已有密码，需要先验证原密码 -->
+          <el-form-item v-if="hasShelfPassword" prop="oldPassword" label="原密码">
+            <el-input
+              v-model="shelfPasswordForm.oldPassword"
+              type="password"
+              placeholder="请输入原密码"
+              maxlength="8"
+              show-password
+              clearable
+            />
+          </el-form-item>
+          
+          <el-form-item prop="password" :label="hasShelfPassword ? '新密码' : '设置密码'">
+            <el-input
+              v-model="shelfPasswordForm.password"
+              type="password"
+              :placeholder="hasShelfPassword ? '请输入新密码（留空表示关闭密码）' : '请输入4-8位数字或字母组合'"
+              maxlength="8"
+              show-password
+              clearable
+            />
+          </el-form-item>
+          
+          <el-form-item prop="confirmPassword" label="确认密码">
+            <el-input
+              v-model="shelfPasswordForm.confirmPassword"
+              type="password"
+              :placeholder="hasShelfPassword ? '请再次输入新密码' : '请再次输入密码'"
+              maxlength="8"
+              show-password
+              clearable
+            />
+          </el-form-item>
+          
+          <el-form-item prop="hint" label="密码提示">
+            <el-input
+              v-model="shelfPasswordForm.hint"
+              placeholder="请输入密码提示（选填，忘记密码时查看）"
+              maxlength="50"
+              clearable
+            />
+          </el-form-item>
+        </el-form>
+        
+        <el-alert
+          v-if="currentShelfPasswordHint"
+          :title="`当前密码提示: ${currentShelfPasswordHint}`"
+          type="info"
+          :closable="false"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="showShelfPasswordDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveShelfPassword">
+          {{ hasShelfPassword ? (shelfPasswordForm.password ? '修改密码' : '关闭密码') : '设置密码' }}
+        </el-button>
+      </template>
     </el-dialog>
 
     <!-- 系统设置弹框 -->
@@ -206,6 +283,121 @@ const qqGroupQrcode = new URL('../../../../static/qq_chart.jpg', import.meta.url
 const rewardQrcode = new URL('../../../../static/wx_reward_qrcode.jpg', import.meta.url).href
 const contactEmail = '3026408975@qq.com'
 
+// 书架密码设置相关
+const showShelfPasswordDialog = ref(false)
+const shelfPasswordFormRef = ref(null)
+const shelfPasswordForm = ref({
+  oldPassword: '',
+  password: '',
+  confirmPassword: '',
+  hint: ''
+})
+const currentShelfPasswordHint = ref('')
+const hasShelfPassword = ref(false) // 标记是否已设置密码
+
+const shelfPasswordRules = ref({
+  oldPassword: [
+    {
+      validator: (rule, value, callback) => {
+        if (hasShelfPassword.value && !value) {
+          callback(new Error('请输入原密码'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  password: [
+    {
+      validator: (rule, value, callback) => {
+        if (value && !/^[a-zA-Z0-9]{4,8}$/.test(value)) {
+          callback(new Error('密码必须是4-8位数字或字母组合'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  confirmPassword: [
+    {
+      validator: (rule, value, callback) => {
+        if (shelfPasswordForm.value.password && value !== shelfPasswordForm.value.password) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+})
+
+// 加载书架密码提示和状态
+async function loadShelfPasswordHint() {
+  try {
+    const result = await window.electron?.getShelfPassword()
+    if (result?.success) {
+      hasShelfPassword.value = result.hasPassword
+      currentShelfPasswordHint.value = result.hint || ''
+    }
+  } catch (error) {
+    console.error('加载书架密码提示失败:', error)
+  }
+}
+
+// 保存书架密码
+async function handleSaveShelfPassword() {
+  try {
+    await shelfPasswordFormRef.value.validate()
+    
+    const oldPassword = shelfPasswordForm.value.oldPassword
+    const password = shelfPasswordForm.value.password
+    const hint = shelfPasswordForm.value.hint
+
+    // 如果已有密码，需要先验证原密码
+    if (hasShelfPassword.value) {
+      const verifyResult = await window.electron?.verifyShelfPassword(oldPassword)
+      
+      if (!verifyResult?.success || !verifyResult.valid) {
+        ElMessage.error('原密码错误')
+        return
+      }
+    }
+
+    // 调用主进程保存加密密码
+    const result = await window.electron?.setShelfPassword({
+      password: password || null,
+      hint: hint || null
+    })
+
+    if (result?.success) {
+      if (hasShelfPassword.value) {
+        ElMessage.success(password ? '书架密码修改成功' : '书架密码已关闭')
+      } else {
+        ElMessage.success('书架密码设置成功')
+      }
+      
+      showShelfPasswordDialog.value = false
+      
+      // 更新密码状态和提示
+      hasShelfPassword.value = !!password
+      currentShelfPasswordHint.value = hint || ''
+      
+      // 重置表单
+      shelfPasswordForm.value.oldPassword = ''
+      shelfPasswordForm.value.password = ''
+      shelfPasswordForm.value.confirmPassword = ''
+      shelfPasswordForm.value.hint = ''
+    } else {
+      ElMessage.error(result?.message || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存书架密码失败:', error)
+  }
+}
+
 // 检查本地存储是否有bookDir
 onMounted(async () => {
   const dir = await window.electronStore?.get('booksDir')
@@ -216,6 +408,8 @@ onMounted(async () => {
   }
   // 初始化主题
   await themeStore.initTheme()
+  // 加载书架密码提示
+  await loadShelfPasswordHint()
 })
 
 // 选择目录

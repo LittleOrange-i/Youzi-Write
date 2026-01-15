@@ -224,7 +224,17 @@ if (process.contextIsolated) {
       // 测试 AI 模型配置
       testAIModel: (config) => ipcRenderer.invoke('test-ai-model', config),
       // 调用 AI 进行文本处理
-      callAI: (params) => ipcRenderer.invoke('call-ai', params)
+      callAI: (params) => ipcRenderer.invoke('call-ai', params),
+
+      // --------- 书架密码相关 ---------
+      // 设置书架密码（加密存储）
+      setShelfPassword: (data) => ipcRenderer.invoke('set-shelf-password', data),
+      // 获取书架密码信息（不返回密码本身）
+      getShelfPassword: () => ipcRenderer.invoke('get-shelf-password'),
+      // 验证书架密码
+      verifyShelfPassword: (password) => ipcRenderer.invoke('verify-shelf-password', password),
+      // 退出应用程序
+      quitApp: () => ipcRenderer.invoke('quit-app')
     })
     contextBridge.exposeInMainWorld('api', api)
     // 存储
