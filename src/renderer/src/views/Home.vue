@@ -33,6 +33,13 @@
           <span class="font-medium">系统设置</span>
         </div>
 
+        <div class="menu-item-modern group" @click="showShortcutDialog = true">
+          <svg class="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+          <span class="font-medium">快捷键设置</span>
+        </div>
+
         <div class="menu-item-modern group" @click="showShelfPasswordDialog = true">
           <svg class="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -262,11 +269,89 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 快捷键设置弹框 -->
+    <el-dialog v-model="showShortcutDialog" title="快捷键设置" width="700px" align-center>
+      <div class="space-y-4">
+        <!-- 提示信息 -->
+        <el-alert
+          title="提示：点击快捷键输入框，按下键盘组合键即可设置。系统会自动检测冲突。"
+          type="info"
+          :closable="false"
+        />
+
+        <!-- 快捷键列表 -->
+        <div class="shortcut-list space-y-3">
+          <div
+            v-for="(shortcut, index) in shortcuts"
+            :key="shortcut.id"
+            class="shortcut-item p-4 rounded-lg border transition-all"
+            :class="{
+              'border-red-500 bg-red-50 dark:bg-red-900/20': shortcut.conflict,
+              'border-gray-200 dark:border-gray-700': !shortcut.conflict
+            }"
+          >
+            <div class="flex items-center justify-between gap-4">
+              <!-- 功能名称和描述 -->
+              <div class="flex-1">
+                <div class="font-medium text-gray-900 dark:text-white">
+                  {{ shortcut.name }}
+                </div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {{ shortcut.description }}
+                </div>
+              </div>
+
+              <!-- 快捷键输入 -->
+              <div class="flex items-center gap-2">
+                <input
+                  :value="shortcut.key"
+                  @keydown.prevent="handleKeyDown($event, index)"
+                  @focus="handleInputFocus(index)"
+                  placeholder="按下快捷键"
+                  readonly
+                  class="shortcut-input px-3 py-2 rounded border text-center cursor-pointer min-w-[180px]"
+                  :class="{
+                    'border-red-500 bg-red-50 dark:bg-red-900/20': shortcut.conflict,
+                    'border-gray-300 dark:border-gray-600 focus:border-primary-500': !shortcut.conflict
+                  }"
+                />
+                <el-button
+                  size="small"
+                  type="danger"
+                  text
+                  @click="handleClearShortcut(index)"
+                >
+                  清除
+                </el-button>
+              </div>
+            </div>
+
+            <!-- 冲突提示 -->
+            <div v-if="shortcut.conflict" class="mt-2 text-sm text-red-600 dark:text-red-400">
+              ⚠️ 该快捷键与"{{ shortcut.conflictWith }}"冲突，请更换其他组合
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-between items-center">
+          <el-button @click="handleResetShortcuts">恢复默认</el-button>
+          <div>
+            <el-button @click="showShortcutDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleSaveShortcuts" :disabled="hasConflict">
+              保存设置
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Bookshelf from '@renderer/components/Bookshelf.vue'
 import { useThemeStore, THEME_CONFIGS } from '@renderer/stores/theme'
@@ -282,6 +367,92 @@ const themeStore = useThemeStore()
 const qqGroupQrcode = new URL('../../../../static/qq_chart.jpg', import.meta.url).href
 const rewardQrcode = new URL('../../../../static/wx_reward_qrcode.jpg', import.meta.url).href
 const contactEmail = '3026408975@qq.com'
+
+// 快捷键设置相关
+const showShortcutDialog = ref(false)
+const currentFocusIndex = ref(-1)
+
+// 默认快捷键配置
+const DEFAULT_SHORTCUTS = [
+  {
+    id: 'random-name',
+    name: '随机起名',
+    description: '随机生成人物名称',
+    key: 'Alt+Q',
+    defaultKey: 'Alt+Q'
+  },
+  {
+    id: 'world-map',
+    name: '设计地图',
+    description: '打开世界地图设计工具',
+    key: 'Alt+A',
+    defaultKey: 'Alt+A'
+  },
+  {
+    id: 'timeline',
+    name: '时间线',
+    description: '打开时间线管理',
+    key: 'Alt+Z',
+    defaultKey: 'Alt+Z'
+  },
+  {
+    id: 'dictionary',
+    name: '词条字典',
+    description: '打开词条字典管理',
+    key: 'Alt+W',
+    defaultKey: 'Alt+W'
+  },
+  {
+    id: 'character-profile',
+    name: '人物谱',
+    description: '打开人物谱管理',
+    key: 'Alt+S',
+    defaultKey: 'Alt+S'
+  },
+  {
+    id: 'relationship-map',
+    name: '关系图',
+    description: '打开人物关系图',
+    key: 'Alt+X',
+    defaultKey: 'Alt+X'
+  },
+  {
+    id: 'events-sequence',
+    name: '事序图',
+    description: '打开事件序列图',
+    key: 'Alt+E',
+    defaultKey: 'Alt+E'
+  },
+  {
+    id: 'organization',
+    name: '组织架构',
+    description: '打开组织架构图',
+    key: 'Alt+D',
+    defaultKey: 'Alt+D'
+  },
+  {
+    id: 'banned-words',
+    name: '禁词管理',
+    description: '打开禁词管理工具',
+    key: 'Alt+C',
+    defaultKey: 'Alt+C'
+  },
+  {
+    id: 'paragraph-settings',
+    name: '字数设置',
+    description: '设置段落字数相关参数',
+    key: 'Alt+R',
+    defaultKey: 'Alt+R'
+  }
+]
+
+// 快捷键列表
+const shortcuts = ref(JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS)))
+
+// 检查是否有冲突
+const hasConflict = computed(() => {
+  return shortcuts.value.some(s => s.conflict)
+})
 
 // 书架密码设置相关
 const showShelfPasswordDialog = ref(false)
@@ -410,6 +581,8 @@ onMounted(async () => {
   await themeStore.initTheme()
   // 加载书架密码提示
   await loadShelfPasswordHint()
+  // 加载快捷键设置
+  await loadShortcuts()
 })
 
 // 选择目录
@@ -458,6 +631,154 @@ function handleThemeChange(themeKey) {
   themeStore.setTheme(themeKey)
   // ElMessage.success(`已切换到 ${THEME_CONFIGS[themeKey]?.name} 主题`)
 }
+
+// 加载保存的快捷键设置
+async function loadShortcuts() {
+  try {
+    const savedShortcuts = await window.electronStore?.get('shortcuts')
+    if (savedShortcuts) {
+      shortcuts.value = savedShortcuts.map(saved => {
+        const defaultShortcut = DEFAULT_SHORTCUTS.find(d => d.id === saved.id)
+        return {
+          ...defaultShortcut,
+          ...saved,
+          conflict: false,
+          conflictWith: ''
+        }
+      })
+    }
+  } catch (error) {
+    console.error('加载快捷键设置失败:', error)
+  }
+}
+
+// 处理键盘按下事件
+function handleKeyDown(event, index) {
+  const keys = []
+  
+  // 修饰键
+  if (event.ctrlKey) keys.push('Ctrl')
+  if (event.altKey) keys.push('Alt')
+  if (event.shiftKey) keys.push('Shift')
+  if (event.metaKey) keys.push('Meta')
+  
+  // 主键
+  const mainKey = event.key
+  if (mainKey && !['Control', 'Alt', 'Shift', 'Meta'].includes(mainKey)) {
+    // 规范化按键名称
+    let normalizedKey = mainKey
+    if (mainKey.length === 1) {
+      normalizedKey = mainKey.toUpperCase()
+    }
+    keys.push(normalizedKey)
+  }
+  
+  // 至少需要一个修饰键和一个主键
+  if (keys.length >= 2) {
+    const keyCombo = keys.join('+')
+    shortcuts.value[index].key = keyCombo
+    
+    // 检查冲突
+    checkConflicts(index)
+  }
+}
+
+// 检查快捷键冲突
+async function checkConflicts(currentIndex) {
+  const currentShortcut = shortcuts.value[currentIndex]
+  
+  // 重置当前快捷键的冲突状态
+  currentShortcut.conflict = false
+  currentShortcut.conflictWith = ''
+  
+  // 检查与其他快捷键的冲突
+  shortcuts.value.forEach((shortcut, index) => {
+    if (index !== currentIndex) {
+      // 重置其他快捷键的冲突状态
+      shortcut.conflict = false
+      shortcut.conflictWith = ''
+      
+      // 检查是否与当前快捷键冲突
+      if (shortcut.key === currentShortcut.key && currentShortcut.key) {
+        currentShortcut.conflict = true
+        currentShortcut.conflictWith = shortcut.name
+        shortcut.conflict = true
+        shortcut.conflictWith = currentShortcut.name
+      }
+    }
+  })
+  
+  // 检查系统快捷键占用
+  if (currentShortcut.key && !currentShortcut.conflict && window.electron?.checkShortcutAvailable) {
+    try {
+      const result = await window.electron.checkShortcutAvailable(currentShortcut.key)
+      if (!result.available) {
+        currentShortcut.conflict = true
+        currentShortcut.conflictWith = '系统或其他应用'
+      }
+    } catch (error) {
+      console.error('检查快捷键可用性失败:', error)
+    }
+  }
+}
+
+// 处理输入框聚焦
+function handleInputFocus(index) {
+  currentFocusIndex.value = index
+}
+
+// 清除快捷键
+function handleClearShortcut(index) {
+  shortcuts.value[index].key = ''
+  checkConflicts(index)
+}
+
+// 恢复默认快捷键
+function handleResetShortcuts() {
+  shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))
+  ElMessage.success('已恢复默认快捷键设置')
+}
+
+// 保存快捷键设置
+async function handleSaveShortcuts() {
+  if (hasConflict.value) {
+    ElMessage.error('存在快捷键冲突，请先解决冲突')
+    return
+  }
+  
+  try {
+    // 将响应式对象转换为纯对象数组（避免克隆错误）
+    const plainShortcuts = shortcuts.value.map(s => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      key: s.key,
+      defaultKey: s.defaultKey
+    }))
+    
+    // 保存到本地存储
+    await window.electronStore?.set('shortcuts', plainShortcuts)
+    
+    // 通知主进程注册快捷键
+    if (window.electron?.registerShortcuts) {
+      const shortcutMap = {}
+      shortcuts.value.forEach(s => {
+        if (s.key) {
+          shortcutMap[s.id] = s.key
+        }
+      })
+      await window.electron.registerShortcuts(shortcutMap)
+    }
+    
+    ElMessage.success('快捷键设置保存成功')
+    showShortcutDialog.value = false
+  } catch (error) {
+    console.error('保存快捷键设置失败:', error)
+    ElMessage.error('保存失败，请重试')
+  }
+}
+
+
 
 </script>
 
@@ -569,6 +890,39 @@ function handleThemeChange(themeKey) {
   margin-right: 0;
   height: 32px;
 }
+
+/* 快捷键设置相关样式 */
+.shortcut-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.shortcut-item {
+  transition: all 0.2s ease;
+  background-color: var(--bg-soft);
+}
+
+.shortcut-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.shortcut-input {
+  background-color: var(--bg-primary);
+  color: var(--text-base);
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.875rem;
+}
+
+.shortcut-input:focus {
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.shortcut-input::placeholder {
+  color: var(--text-muted);
+}
+
 </style>
 
 

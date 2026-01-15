@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, globalShortcut } from 'electron'
 import { join } from 'path'
 import path from 'path'
 import fs from 'fs'
@@ -235,6 +235,170 @@ ipcMain.handle('verify-shelf-password', async (_, password) => {
 ipcMain.handle('quit-app', () => {
   app.quit()
 })
+
+// ========== 快捷键管理 ==========
+
+// 存储当前注册的快捷键
+let registeredShortcuts = {}
+
+// 存储各窗口的快捷键启用状态（true表示可以触发快捷键，false表示在其他页面不可触发）
+const windowShortcutStates = new Map()
+
+// 注册快捷键
+ipcMain.handle('register-shortcuts', async (event, shortcutMap) => {
+  try {
+    // 先注销所有已注册的快捷键
+    globalShortcut.unregisterAll()
+    registeredShortcuts = {}
+
+    // 注册新的快捷键
+    for (const [actionId, accelerator] of Object.entries(shortcutMap)) {
+      if (accelerator && accelerator.trim()) {
+        try {
+          const success = globalShortcut.register(accelerator, () => {
+            // 发送快捷键触发事件到渲染进程（只有启用状态的窗口才会响应）
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const windowId = focusedWindow.id
+              const isEnabled = windowShortcutStates.get(windowId)
+              
+              console.log(`[主进程] 快捷键触发: ${actionId}, 窗口ID: ${windowId}, 启用状态: ${isEnabled}`)
+              
+              // 只有当窗口的快捷键状态为启用时才发送事件
+              if (isEnabled) {
+                focusedWindow.webContents.send('shortcut-triggered', actionId)
+              } else {
+                console.log(`[主进程] 窗口快捷键未启用，忽略快捷键: ${actionId}`)
+              }
+            }
+          })
+
+          if (success) {
+            registeredShortcuts[actionId] = accelerator
+          } else {
+            console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
+          }
+        } catch (error) {
+          console.error(`注册快捷键出错: ${actionId} - ${accelerator}`, error)
+        }
+      }
+    }
+
+    return { success: true, registered: registeredShortcuts }
+  } catch (error) {
+    console.error('注册快捷键失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// 设置窗口的快捷键启用状态
+ipcMain.handle('set-shortcut-enabled', async (event, enabled) => {
+  try {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      windowShortcutStates.set(window.id, enabled)
+      console.log(`[主进程] 设置窗口 ${window.id} 快捷键状态: ${enabled}`)
+      return { success: true }
+    }
+    return { success: false, message: '未找到窗口' }
+  } catch (error) {
+    console.error('设置快捷键状态失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// 检查快捷键是否已被占用
+ipcMain.handle('check-shortcut-available', async (event, accelerator) => {
+  try {
+    // 检查快捷键格式是否有效
+    if (!accelerator || !accelerator.trim()) {
+      return { available: false, message: '快捷键不能为空' }
+    }
+    
+    // 检查是否已被当前应用注册
+    if (globalShortcut.isRegistered(accelerator)) {
+      // 检查是否是当前应用注册的
+      const isOwnShortcut = Object.values(registeredShortcuts).includes(accelerator)
+      if (isOwnShortcut) {
+        // 是自己应用注册的，返回可用（允许重新分配）
+        return { available: true }
+      } else {
+        // 被系统或其他应用占用
+        return { available: false, message: '快捷键已被系统或其他应用占用' }
+      }
+    }
+
+    // 尝试临时注册以测试可用性
+    const success = globalShortcut.register(accelerator, () => {})
+    
+    if (success) {
+      // 注册成功，立即注销（只是测试）
+      globalShortcut.unregister(accelerator)
+      return { available: true }
+    } else {
+      return { available: false, message: '快捷键无法注册（可能被系统保留）' }
+    }
+  } catch (error) {
+    return { available: false, message: `检查失败: ${error.message}` }
+  }
+})
+
+// 应用退出时注销所有快捷键
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
+
+// 加载并注册保存的快捷键（应用启动时调用）
+async function loadAndRegisterShortcuts() {
+  try {
+    const savedShortcuts = store.get('shortcuts')
+    if (savedShortcuts && Array.isArray(savedShortcuts)) {
+      const shortcutMap = {}
+      savedShortcuts.forEach(s => {
+        if (s.key && s.id) {
+          shortcutMap[s.id] = s.key
+        }
+      })
+      
+      // 注册快捷键
+      for (const [actionId, accelerator] of Object.entries(shortcutMap)) {
+        if (accelerator && accelerator.trim()) {
+          try {
+            const success = globalShortcut.register(accelerator, () => {
+              // 发送快捷键触发事件到渲染进程（只有启用状态的窗口才会响应）
+              const focusedWindow = BrowserWindow.getFocusedWindow()
+              if (focusedWindow) {
+                const windowId = focusedWindow.id
+                const isEnabled = windowShortcutStates.get(windowId)
+                
+                console.log(`[主进程] 快捷键触发: ${actionId}, 窗口ID: ${windowId}, 启用状态: ${isEnabled}`)
+                
+                // 只有当窗口的快捷键状态为启用时才发送事件
+                if (isEnabled) {
+                  focusedWindow.webContents.send('shortcut-triggered', actionId)
+                } else {
+                  console.log(`[主进程] 窗口快捷键未启用，忽略快捷键: ${actionId}`)
+                }
+              }
+            })
+            
+            if (success) {
+              registeredShortcuts[actionId] = accelerator
+              console.log(`快捷键注册成功: ${actionId} - ${accelerator}`)
+            } else {
+              console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
+            }
+          } catch (error) {
+            console.error(`注册快捷键出错: ${actionId} - ${accelerator}`, error)
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('加载快捷键设置失败:', error)
+  }
+}
+
 
 // AI 模型 API 测试处理
 ipcMain.handle('test-ai-model', async (_, { endpoint, apiKey, modelId, providerId }) => {
@@ -606,7 +770,19 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    // 默认启用主窗口的快捷键（主窗口是书架页面，默认启用）
+    windowShortcutStates.set(mainWindow.id, true)
   })
+
+  // 阻止 Alt 键激活菜单栏（仅 Windows）
+  if (process.platform === 'win32') {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      // 阻止单独按下 Alt 键激活菜单栏
+      if (input.key === 'Alt' && !input.control && !input.meta && !input.shift) {
+        event.preventDefault()
+      }
+    })
+  }
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -686,6 +862,9 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
+  
+  // 加载并注册保存的快捷键
+  loadAndRegisterShortcuts()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -986,10 +1165,25 @@ ipcMain.handle('open-book-editor-window', async (event, { id, name }) => {
   bookEditorWindows.set(id, editorWindow)
   editorWindow.on('ready-to-show', () => {
     editorWindow.show()
+    // 编辑器窗口默认启用快捷键
+    windowShortcutStates.set(editorWindow.id, true)
   })
   editorWindow.on('closed', () => {
     bookEditorWindows.delete(id)
+    // 清理窗口的快捷键状态
+    windowShortcutStates.delete(editorWindow.id)
   })
+
+  // 阻止 Alt 键激活菜单栏（仅 Windows）
+  if (process.platform === 'win32') {
+    editorWindow.webContents.on('before-input-event', (event, input) => {
+      // 阻止单独按下 Alt 键激活菜单栏
+      if (input.key === 'Alt' && !input.control && !input.meta && !input.shift) {
+        event.preventDefault()
+      }
+    })
+  }
+
   // 页面加载完成后，确保窗口标题正确显示书籍名称
   editorWindow.webContents.on('did-finish-load', () => {
     editorWindow.setTitle(`${name} - 柚子写作`)

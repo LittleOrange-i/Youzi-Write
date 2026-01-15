@@ -233,6 +233,19 @@ if (process.contextIsolated) {
       getShelfPassword: () => ipcRenderer.invoke('get-shelf-password'),
       // 验证书架密码
       verifyShelfPassword: (password) => ipcRenderer.invoke('verify-shelf-password', password),
+
+      // --------- 快捷键管理相关 ---------
+      // 注册快捷键
+      registerShortcuts: (shortcutMap) => ipcRenderer.invoke('register-shortcuts', shortcutMap),
+      // 检查快捷键是否可用
+      checkShortcutAvailable: (accelerator) => ipcRenderer.invoke('check-shortcut-available', accelerator),
+      // 设置快捷键启用状态（true=启用，false=禁用）
+      setShortcutEnabled: (enabled) => ipcRenderer.invoke('set-shortcut-enabled', enabled),
+      // 监听快捷键触发事件
+      onShortcutTriggered: (callback) => {
+        ipcRenderer.on('shortcut-triggered', (event, actionId) => callback(actionId))
+      },
+      
       // 退出应用程序
       quitApp: () => ipcRenderer.invoke('quit-app')
     })

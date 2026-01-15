@@ -152,45 +152,73 @@ const saveParagraphMaxLength = async () => {
 }
 
 const handleWorldMap = () => {
-  // 跳转到地图列表页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/map-list', query: { name: bookName } })
+  // 如果已经在地图列表页面，返回编辑器；否则跳转到地图列表
+  if (route.path === '/map-list') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/map-list', query: { name: bookName } })
+  }
 }
 
 const handleTimeline = () => {
-  // 跳转到时间线页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/timeline', query: { name: bookName } })
+  // 如果已经在时间线页面，返回编辑器；否则跳转到时间线
+  if (route.path === '/timeline') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/timeline', query: { name: bookName } })
+  }
 }
 
 const handleEntryDictionary = () => {
-  // 跳转到词条字典页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/dictionary', query: { name: bookName } })
+  // 如果已经在词条字典页面，返回编辑器；否则跳转到词条字典
+  if (route.path === '/dictionary') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/dictionary', query: { name: bookName } })
+  }
 }
 
 const handleCharacterProfile = () => {
-  // 跳转到人物谱页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/character-profile', query: { name: bookName } })
+  // 如果已经在人物谱页面，返回编辑器；否则跳转到人物谱
+  if (route.path === '/character-profile') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/character-profile', query: { name: bookName } })
+  }
 }
 
 const handleRelationshipMap = () => {
-  // 跳转到关系图列表页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/relationship-list', query: { name: bookName } })
+  // 如果已经在关系图列表页面，返回编辑器；否则跳转到关系图列表
+  if (route.path === '/relationship-list') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/relationship-list', query: { name: bookName } })
+  }
 }
 
 const handleEventsSequence = () => {
-  // 跳转到事序图页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/events-sequence', query: { name: bookName } })
+  // 如果已经在事序图页面，返回编辑器；否则跳转到事序图
+  if (route.path === '/events-sequence') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/events-sequence', query: { name: bookName } })
+  }
 }
 
 const handleOrganization = () => {
-  // 跳转到组织架构列表页面，带上当前书籍名
   const bookName = route.query.name
-  router.push({ path: '/organization-list', query: { name: bookName } })
+  // 如果已经在组织架构列表页面，返回编辑器；否则跳转到组织架构列表
+  if (route.path === '/organization-list') {
+    router.push({ path: '/editor', query: { name: bookName } })
+  } else {
+    router.push({ path: '/organization-list', query: { name: bookName } })
+  }
 }
 
 const handleBannedWords = () => {
@@ -201,36 +229,74 @@ const handleBannedWords = () => {
   }
 }
 
-// 快捷键处理
-const handleKeydown = (e) => {
-  // Alt key (Option on Mac)
-  if (e.altKey) {
-    switch (e.key.toLowerCase()) {
-      case 'q':
-        e.preventDefault()
-        e.stopPropagation()
-        handleRandomName()
-        break
-      case 'c':
-        e.preventDefault()
-        e.stopPropagation()
-        handleBannedWords()
-        break
-      case 'r':
-        e.preventDefault()
-        e.stopPropagation()
-        handleParagraphSettings()
-        break
+// 快捷键处理函数映射
+const shortcutHandlers = {
+  'random-name': handleRandomName,
+  'world-map': handleWorldMap,
+  'timeline': handleTimeline,
+  'dictionary': handleEntryDictionary,
+  'character-profile': handleCharacterProfile,
+  'relationship-map': handleRelationshipMap,
+  'events-sequence': handleEventsSequence,
+  'organization': handleOrganization,
+  'banned-words': handleBannedWords,
+  'paragraph-settings': handleParagraphSettings
+}
+
+// 快捷键与路由的映射关系
+const shortcutRouteMap = {
+  'world-map': '/map-list',
+  'timeline': '/timeline',
+  'dictionary': '/dictionary',
+  'character-profile': '/character-profile',
+  'relationship-map': '/relationship-list',
+  'events-sequence': '/events-sequence',
+  'organization': '/organization-list'
+}
+
+// 监听主进程发来的快捷键触发事件
+const handleShortcutTriggered = (actionId) => {
+  console.log(`[快捷键] 收到快捷键: ${actionId}, 当前路由: ${route.path}`)
+  
+  // 如果在编辑器页面，允许所有快捷键
+  if (route.path === '/editor') {
+    console.log(`[快捷键] 在编辑器页面，允许执行快捷键: ${actionId}`)
+    const handler = shortcutHandlers[actionId]
+    if (handler) {
+      handler()
     }
+    return
+  }
+  
+  // 如果不在编辑器页面，检查当前路由是否对应该快捷键
+  // 只有当前路由对应的快捷键才能触发（用于返回编辑器）
+  const expectedRoute = shortcutRouteMap[actionId]
+  if (expectedRoute && route.path === expectedRoute) {
+    console.log(`[快捷键] 当前在 ${route.path}，允许快捷键 ${actionId} 返回编辑器`)
+    const handler = shortcutHandlers[actionId]
+    if (handler) {
+      handler()
+    }
+  } else {
+    console.log(`[快捷键] 当前在 ${route.path}，只能使用对应的快捷键返回，快捷键 ${actionId} 被忽略`)
   }
 }
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown, true)
+  // 监听全局快捷键事件
+  if (window.electron?.onShortcutTriggered) {
+    window.electron.onShortcutTriggered(handleShortcutTriggered)
+  }
+  
+  // 始终启用全局快捷键监听（在渲染进程中过滤）
+  if (window.electron?.setShortcutEnabled) {
+    window.electron.setShortcutEnabled(true)
+  }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown, true)
+  // 注意：electron的事件监听器会在主进程中持续存在
+  // 如果需要清理，可以在preload中添加removeListener方法
 })
 </script>
 
