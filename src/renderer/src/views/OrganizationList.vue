@@ -1,15 +1,23 @@
 <template>
   <LayoutTool title="组织架构列表">
     <template #headrAction>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        <span>创建组织架构</span>
-      </el-button>
+      <div class="header-actions">
+        <el-input
+          v-model="searchQuery"
+          class="search-input"
+          clearable
+          placeholder="搜索关键词"
+        />
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          <span>创建组织架构</span>
+        </el-button>
+      </div>
     </template>
     <template #default>
       <div class="organization-flex">
         <el-dropdown
-          v-for="organization in organizations"
+          v-for="organization in filteredOrganizations"
           :key="organization.id"
           trigger="contextmenu"
           @command="handleCommand($event, organization)"
@@ -34,7 +42,7 @@
           </template>
         </el-dropdown>
       </div>
-      <el-empty v-if="organizations.length === 0" :image-size="200" description="暂无组织架构" />
+      <el-empty v-if="filteredOrganizations.length === 0" :image-size="200" description="暂无组织架构" />
     </template>
   </LayoutTool>
 
@@ -94,7 +102,7 @@
 
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -105,6 +113,23 @@ const route = useRoute()
 const bookName = route.query.name
 
 const organizations = ref([])
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算过滤后的组织架构列表（根据搜索关键词）
+const filteredOrganizations = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return organizations.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return organizations.value.filter((organization) => {
+    const name = (organization.name || '').toLowerCase()
+    const description = (organization.description || '').toLowerCase()
+    return name.includes(query) || description.includes(query)
+  })
+})
+
 const showCreateDialog = ref(false)
 const creating = ref(false)
 const createFormRef = ref(null)
@@ -278,6 +303,16 @@ const confirmDelete = async () => {
 </script>
 
 <style scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input {
+  width: 135px;
+}
+
 .organization-flex {
   display: flex;
   flex-wrap: wrap;

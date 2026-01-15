@@ -1,48 +1,56 @@
 <template>
   <LayoutTool title="时间线管理">
     <template #headrAction>
-      <el-button type="primary" @click="addTimeline">
-        <el-icon><Plus /></el-icon>
-        <span>新增时间线</span>
-      </el-button>
+      <div class="header-actions">
+        <el-input
+          v-model="searchQuery"
+          class="search-input"
+          clearable
+          placeholder="搜索关键词"
+        />
+        <el-button type="primary" @click="addTimeline">
+          <el-icon><Plus /></el-icon>
+          <span>新增时间线</span>
+        </el-button>
+      </div>
     </template>
     <template #default>
-      <el-empty v-if="timelines.length === 0" :image-size="200" description="暂无时间线" />
+      <el-empty v-if="filteredTimelines.length === 0" :image-size="200" description="暂无时间线" />
       <div v-else class="timeline-main">
         <div class="timeline-list">
-          <div v-for="(timeline, idx) in timelines" :key="timeline.id" class="timeline-column">
+          <div v-for="timeline in filteredTimelines" :key="timeline.id" class="timeline-column">
             <div class="timeline-title-wrap">
               <h3
-                v-show="editTitleIdx !== idx"
+                v-show="editTitleIdx !== timeline._idx"
                 class="timeline-title"
-                @mouseenter="hoverTitleIdx = idx"
+                @mouseenter="hoverTitleIdx = timeline._idx"
                 @mouseleave="hoverTitleIdx = -1"
                 @click="
                   () => {
-                    editTitleIdx = idx
+                    editTitleIdx = timeline._idx
                     editTitleValue = timeline.title
                   }
                 "
               >
                 {{ timeline.title }}
-                <el-icon v-show="hoverTitleIdx === idx" class="edit-title-icon"
+                <el-icon v-show="hoverTitleIdx === timeline._idx" class="edit-title-icon"
                   ><EditPen
                 /></el-icon>
               </h3>
               <el-input
-                v-show="editTitleIdx === idx"
+                v-show="editTitleIdx === timeline._idx"
                 v-model="editTitleValue"
                 placeholder="时间线标题"
                 :maxlength="20"
                 :autofocus="true"
                 input-style="text-align: center"
-                @keyup.enter="confirmEditTitle(idx)"
+                @keyup.enter="confirmEditTitle(timeline._idx)"
                 @blur="cancelEditTitle"
               />
             </div>
             <el-timeline>
               <el-timeline-item
-                v-for="(node, nidx) in timeline.nodes"
+                v-for="node in timeline._nodes"
                 :key="node.id"
                 :timestamp="node.title"
                 placement="top"
@@ -50,15 +58,19 @@
                 <div class="timeline-node-content">
                   <p>{{ node.desc }}</p>
                   <div class="timeline-node-actions">
-                    <el-icon @click="addNode(idx, nidx)"><EditPen /></el-icon>
-                    <el-icon @click="removeNode(idx, nidx)"><Delete /></el-icon>
+                    <el-icon @click="addNode(timeline._idx, node._nidx)"><EditPen /></el-icon>
+                    <el-icon @click="removeNode(timeline._idx, node._nidx)"><Delete /></el-icon>
                   </div>
                 </div>
               </el-timeline-item>
             </el-timeline>
             <div class="timeline-actions">
-              <el-button class="add-node-btn" @click="addNode(idx)">新增节点</el-button>
-              <el-button class="remove-timeline-btn" type="danger" @click="removeTimeline(idx)">
+              <el-button class="add-node-btn" @click="addNode(timeline._idx)">新增节点</el-button>
+              <el-button
+                class="remove-timeline-btn"
+                type="danger"
+                @click="removeTimeline(timeline._idx)"
+              >
                 删除时间线
               </el-button>
             </div>
@@ -96,7 +108,7 @@
 
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
-import { ref, onMounted, watch, reactive, toRaw } from 'vue'
+import { ref, onMounted, watch, reactive, toRaw, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { EditPen, Delete, Plus } from '@element-plus/icons-vue'
@@ -110,6 +122,66 @@ const nodeInfo = reactive({
   desc: ''
 })
 const timelines = ref([])
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算过滤后的时间线列表（根据搜索关键词）
+// 注意：这里保留原始索引，避免过滤后编辑/删除错位
+const filteredTimelines = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return (timelines.value || []).map((timeline, idx) => ({
+      ...timeline,
+      _idx: idx,
+      _nodes: (timeline.nodes || []).map((node, nidx) => ({
+        ...node,
+        _nidx: nidx
+      }))
+    }))
+  }
+
+  const query = searchQuery.value.toLowerCase()
+  const result = []
+
+  ;(timelines.value || []).forEach((timeline, idx) => {
+    const title = (timeline.title || '').toLowerCase()
+    const titleMatched = title.includes(query)
+
+    const nodes = Array.isArray(timeline.nodes) ? timeline.nodes : []
+    const mappedNodes = nodes.map((node, nidx) => ({
+      ...node,
+      _nidx: nidx
+    }))
+
+    // 标题匹配：展示该时间线全部节点
+    if (titleMatched) {
+      result.push({
+        ...timeline,
+        _idx: idx,
+        _nodes: mappedNodes
+      })
+      return
+    }
+
+    // 节点匹配：展示匹配到的节点
+    const filteredNodes = mappedNodes.filter((node) => {
+      const nodeTitle = (node.title || '').toLowerCase()
+      const nodeDesc = (node.desc || '').toLowerCase()
+      return nodeTitle.includes(query) || nodeDesc.includes(query)
+    })
+
+    if (filteredNodes.length > 0) {
+      result.push({
+        ...timeline,
+        _idx: idx,
+        _nodes: filteredNodes
+      })
+    }
+  })
+
+  return result
+})
+
 const bookName = route.query.name || ''
 const currentTimelineIdx = ref(-1)
 const currentNodeIdx = ref(-1)
@@ -225,6 +297,16 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input {
+  width: 135px;
+}
+
 .timeline-main {
   flex: 1;
   width: 100%;

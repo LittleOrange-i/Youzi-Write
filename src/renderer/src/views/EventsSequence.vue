@@ -1,16 +1,24 @@
 <template>
   <LayoutTool :title="`事序图 - ${bookName}`">
     <template #headrAction>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        <span>创建事序图</span>
-      </el-button>
+      <div class="header-actions">
+        <el-input
+          v-model="searchQuery"
+          class="search-input"
+          clearable
+          placeholder="搜索关键词"
+        />
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          <span>创建事序图</span>
+        </el-button>
+      </div>
     </template>
     <template #default>
       <div class="events-sequence-content">
         <!-- 事序图列表 -->
-        <div v-if="sequenceCharts.length > 0" class="sequence-charts">
-          <div v-for="chart in sequenceCharts" :key="chart.id" class="sequence-chart">
+        <div v-if="filteredSequenceCharts.length > 0" class="sequence-charts">
+          <div v-for="chart in filteredSequenceCharts" :key="chart.id" class="sequence-chart">
             <!-- 甘特图表格 -->
             <div class="gantt-table">
               <!-- 表格头部 -->
@@ -258,7 +266,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, toRaw } from 'vue'
+import { ref, onMounted, watch, toRaw, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
@@ -274,6 +282,45 @@ const showCreateDialog = ref(false)
 const showExpandDialog = ref(false)
 const currentChartId = ref('')
 const sequenceCharts = ref([])
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算过滤后的事序图列表（根据搜索关键词）
+// - 匹配图表标题：显示该图表全部事件
+// - 匹配事件简介/详情：仅显示匹配到的事件行
+const filteredSequenceCharts = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return sequenceCharts.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return (sequenceCharts.value || [])
+    .map((chart) => {
+      const title = (chart.title || '').toLowerCase()
+      const titleMatched = title.includes(query)
+      if (titleMatched) {
+        return chart
+      }
+
+      const events = Array.isArray(chart.events) ? chart.events : []
+      const filteredEvents = events.filter((event) => {
+        const intro = (event.introduction || '').toLowerCase()
+        const detail = (event.detail || '').toLowerCase()
+        return intro.includes(query) || detail.includes(query)
+      })
+
+      if (filteredEvents.length === 0) {
+        return null
+      }
+
+      return {
+        ...chart,
+        events: filteredEvents
+      }
+    })
+    .filter(Boolean)
+})
+
 const chartForm = ref({
   title: ''
 })
@@ -966,6 +1013,16 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input {
+  width: 135px;
+}
+
 .events-sequence-content {
   height: 100%;
   display: flex;

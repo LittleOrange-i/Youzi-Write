@@ -1,15 +1,23 @@
 <template>
   <LayoutTool title="地图列表">
     <template #headrAction>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        <span>创建地图</span>
-      </el-button>
+      <div class="header-actions">
+        <el-input
+          v-model="searchQuery"
+          class="search-input"
+          clearable
+          placeholder="搜索关键词"
+        />
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          <span>创建地图</span>
+        </el-button>
+      </div>
     </template>
     <template #default>
       <div class="map-grid">
         <el-dropdown
-          v-for="map in maps"
+          v-for="map in filteredMaps"
           :key="map.id"
           trigger="contextmenu"
           @command="handleCommand($event, map)"
@@ -30,7 +38,7 @@
           </template>
         </el-dropdown>
       </div>
-      <el-empty v-if="maps.length === 0" :image-size="200" description="暂无地图" />
+      <el-empty v-if="filteredMaps.length === 0" :image-size="200" description="暂无地图" />
     </template>
   </LayoutTool>
 
@@ -83,7 +91,7 @@
 
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -93,6 +101,23 @@ const route = useRoute()
 const bookName = route.query.name
 
 const maps = ref([])
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算过滤后的地图列表（根据搜索关键词）
+const filteredMaps = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return maps.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return maps.value.filter((map) => {
+    const name = (map.name || '').toLowerCase()
+    const description = (map.description || '').toLowerCase()
+    return name.includes(query) || description.includes(query)
+  })
+})
+
 const showCreateDialog = ref(false)
 const creating = ref(false)
 const createFormRef = ref(null)
@@ -227,6 +252,16 @@ const confirmDelete = async () => {
 </script>
 
 <style lang="scss" scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input {
+  width: 135px;
+}
+
 .map-grid {
   display: flex;
   flex-wrap: wrap;

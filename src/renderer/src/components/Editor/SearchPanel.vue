@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
 .search-input-wrapper,
 .replace-input-wrapper {
   // flex: 1;
-  width: 200px;
+  width: 135px;
 }
 
 .search-input,

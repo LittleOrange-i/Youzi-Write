@@ -1,15 +1,23 @@
 <template>
   <LayoutTool title="关系图列表">
     <template #headrAction>
-      <el-button type="primary" @click="showCreateDialog = true">
-        <el-icon><Plus /></el-icon>
-        <span>创建关系图</span>
-      </el-button>
+      <div class="header-actions">
+        <el-input
+          v-model="searchQuery"
+          class="search-input"
+          clearable
+          placeholder="搜索关键词"
+        />
+        <el-button type="primary" @click="showCreateDialog = true">
+          <el-icon><Plus /></el-icon>
+          <span>创建关系图</span>
+        </el-button>
+      </div>
     </template>
     <template #default>
       <div class="relationship-flex">
         <el-dropdown
-          v-for="relationship in relationships"
+          v-for="relationship in filteredRelationships"
           :key="relationship.id"
           trigger="contextmenu"
           @command="handleCommand($event, relationship)"
@@ -34,7 +42,7 @@
           </template>
         </el-dropdown>
       </div>
-      <el-empty v-if="relationships.length === 0" :image-size="200" description="暂无关系图" />
+      <el-empty v-if="filteredRelationships.length === 0" :image-size="200" description="暂无关系图" />
     </template>
   </LayoutTool>
 
@@ -94,7 +102,7 @@
 
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -105,6 +113,23 @@ const route = useRoute()
 const bookName = route.query.name
 
 const relationships = ref([])
+
+// 搜索关键词
+const searchQuery = ref('')
+
+// 计算过滤后的关系图列表（根据搜索关键词）
+const filteredRelationships = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return relationships.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return relationships.value.filter((relationship) => {
+    const name = (relationship.name || '').toLowerCase()
+    const description = (relationship.description || '').toLowerCase()
+    return name.includes(query) || description.includes(query)
+  })
+})
+
 const showCreateDialog = ref(false)
 const creating = ref(false)
 const createFormRef = ref(null)
@@ -261,6 +286,16 @@ const getDefaultImage = () => {
 </script>
 
 <style scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input {
+  width: 135px;
+}
+
 .relationship-flex {
   display: flex;
   flex-wrap: wrap;

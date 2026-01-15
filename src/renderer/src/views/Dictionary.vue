@@ -7,6 +7,18 @@
       </el-button>
     </template>
     <template #default>
+      <div style="margin-bottom: 10px;  display: flex; justify-content: flex-end;">
+        <el-input 
+          v-model="searchQuery" 
+          placeholder="搜索词条名称" 
+          clearable 
+          style="width: 240px; "
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+      </div>
       <el-table
         ref="tableRef"
         :key="tableKey"
@@ -87,7 +99,7 @@
 import { ref, reactive, onMounted, watch, toRaw, computed, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Search } from '@element-plus/icons-vue'
 import { genId } from '@renderer/utils/utils'
 import Sortable from 'sortablejs'
 
@@ -101,6 +113,7 @@ const tableRef = ref(null)
 const sortableInstances = ref([]) // 存储 SortableJS 实例
 const isDragging = ref(false) // 标记是否正在拖拽，用于防止 watch 重复保存
 const tableKey = ref(0) // 用于强制表格重新渲染
+const searchQuery = ref('') // 搜索关键词
 
 // 表单数据
 const entryForm = reactive({
@@ -184,9 +197,44 @@ function treeToArray(treeData) {
   return result
 }
 
+// 递归过滤树形数据
+function filterTree(nodes, query) {
+  // 使用 reduce 方法遍历节点数组并累积符合条件的结果
+  return nodes.reduce((acc, node) => {
+    // 检查当前节点的名称是否包含查询字符串（转换为小写以忽略大小写）
+    const matches = node.name.toLowerCase().includes(query.toLowerCase())
+    // 如果存在子节点，则递归调用 filterTree 进行过滤，否则返回空数组
+    const filteredChildren = node.children ? filterTree(node.children, query) : []
+
+    // 如果当前节点名称匹配，或者其子节点中有匹配项
+    if (matches || filteredChildren.length > 0) {
+      // 将当前节点添加到结果数组中
+      acc.push({
+        // 复制当前节点的所有属性
+        ...node,
+        // 使用过滤后的子节点数组覆盖原有的子节点
+        children: filteredChildren
+      })
+    }
+    // 返回累积的结果数组
+    return acc
+  }, [])
+}
+
+// 计算过滤后的字典数据
+const filteredDictionary = computed(() => {
+  // 如果搜索关键词为空或只包含空白字符
+  if (!searchQuery.value.trim()) {
+    // 直接返回原始的字典数据
+    return dictionary.value
+  }
+  // 否则调用 filterTree 函数根据搜索关键词过滤字典数据
+  return filterTree(dictionary.value, searchQuery.value)
+})
+
 // 计算表格数据（直接使用树结构）
 const tableData = computed(() => {
-  return dictionary.value.map((item) => ({
+  return filteredDictionary.value.map((item) => ({
     ...item,
     parentName: getParentName(item.id)
   }))

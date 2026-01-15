@@ -9,7 +9,7 @@
         <el-button class="refresh-btn" :icon="Refresh" circle @click="handleRefresh" />
         <slot name="headrAction"></slot>
       </div>
-    </div>
+    </div>  
     <div class="layout-tool-main">
       <slot></slot>
     </div>
@@ -89,6 +89,8 @@ function handleRefresh() {
   .header-action {
     display: flex;
     align-items: center;
+    // 顶部操作区按钮之间保持间距，避免“刷新”与页面自定义操作区（如搜索框）贴在一起
+    gap: 12px;
   }
 }
 .layout-tool-main {
