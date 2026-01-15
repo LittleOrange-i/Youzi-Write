@@ -461,6 +461,33 @@ async function confirmEdit(node) {
         }
       }
 
+      // 如果修改的是章节名，且当前打开的文件正是这个章节，需要更新 editorStore.file 和 chapterTitle
+      if (editingNode.value.type === 'chapter') {
+        const currentFile = editorStore.file
+        if (
+          currentFile &&
+          currentFile.type === 'chapter' &&
+          currentFile.name === editingNode.value.name &&
+          currentFile.volume === node.parent.data.name
+        ) {
+          // 当前打开的文件正是被重命名的章节，需要更新章节名、路径和标题
+          const parentVolume = chaptersTree.value.find((v) => v.name === node.parent.data.name)
+          if (parentVolume && parentVolume.children) {
+            const updatedChapter = parentVolume.children.find((c) => c.name === newName)
+            if (updatedChapter) {
+              // 更新 editorStore.file 中的章节名和路径
+              editorStore.setFile({
+                ...currentFile,
+                name: newName,
+                path: updatedChapter.path
+              })
+              // 同步更新章节标题显示
+              editorStore.setChapterTitle(newName)
+            }
+          }
+        }
+      }
+
       // 恢复选中状态：如果之前选中的是被编辑的节点，则选中新名称对应的节点
       await nextTick()
       if (wasSelected && editingNode.value.type === 'volume') {
@@ -627,6 +654,33 @@ async function confirmEditNote(node) {
 
     // 重新加载笔记数据
     notesTree.value = await window.electron.loadNotes(props.bookName)
+
+    // 如果修改的是笔记名，且当前打开的文件正是这个笔记，需要更新 editorStore.file 和 chapterTitle
+    if (editingNoteNode.value.type === 'note') {
+      const currentFile = editorStore.file
+      if (
+        currentFile &&
+        currentFile.type === 'note' &&
+        currentFile.name === editingNoteNode.value.name &&
+        currentFile.notebook === node.parent.data.name
+      ) {
+        // 当前打开的文件正是被重命名的笔记，需要更新笔记名、路径和标题
+        const parentNotebook = notesTree.value.find((nb) => nb.name === node.parent.data.name)
+        if (parentNotebook && parentNotebook.children) {
+          const updatedNote = parentNotebook.children.find((n) => n.name === newName)
+          if (updatedNote) {
+            // 更新 editorStore.file 中的笔记名和路径
+            editorStore.setFile({
+              ...currentFile,
+              name: newName,
+              path: updatedNote.path
+            })
+            // 同步更新笔记标题显示
+            editorStore.setChapterTitle(newName)
+          }
+        }
+      }
+    }
   } else {
     ElMessage.error(result?.message || '重命名失败')
   }
