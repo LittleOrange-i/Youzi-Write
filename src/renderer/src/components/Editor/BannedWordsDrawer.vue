@@ -50,6 +50,10 @@ const open = () => {
   loadBannedWords()
 }
 
+const close = () => {
+  visible.value = false
+}
+
 // 加载禁词列表
 const loadBannedWords = async () => {
   if (!props.bookName) return
@@ -125,7 +129,9 @@ watch(
 
 // 暴露方法给父组件
 defineExpose({
-  open
+  open,
+  close,
+  visible
 })
 </script>
 

@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, net } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol } from 'electron'
 import { join } from 'path'
 import path from 'path'
 import fs from 'fs'

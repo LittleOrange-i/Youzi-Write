@@ -1,46 +1,46 @@
 <template>
   <div class="editor-toolbar">
     <div class="toolbar-buttons">
-      <el-button class="tool-btn" @click="handleRandomName">
+      <el-button class="tool-btn" @click="handleRandomName" title="随机起名 (Alt+Q)">
         <SvgIcon name="naming" :size="16" />
         <span>随机起名</span>
       </el-button>
       <RandomName ref="randomNameRef" />
-      <el-button class="tool-btn" @click="handleWorldMap">
+      <el-button class="tool-btn" @click="handleWorldMap" title="设计地图 (Alt+A)">
         <SvgIcon name="map" :size="16" />
         <span>设计地图</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleTimeline">
+      <el-button class="tool-btn" @click="handleTimeline" title="时间线 (Alt+Z)">
         <SvgIcon name="timeline" :size="16" />
         <span>时间线</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleEntryDictionary">
+      <el-button class="tool-btn" @click="handleEntryDictionary" title="词条字典 (Alt+W)">
         <SvgIcon name="dictionary" :size="16" />
         <span>词条字典</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleCharacterProfile">
+      <el-button class="tool-btn" @click="handleCharacterProfile" title="人物谱 (Alt+S)">
         <SvgIcon name="character" :size="16" />
         <span>人物谱</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleRelationshipMap">
+      <el-button class="tool-btn" @click="handleRelationshipMap" title="关系图 (Alt+X)">
         <SvgIcon name="relationship" :size="16" />
         <span>关系图</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleEventsSequence">
+      <el-button class="tool-btn" @click="handleEventsSequence" title="事序图 (Alt+E)">
         <SvgIcon name="gantt" :size="16" />
         <span>事序图</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleOrganization">
+      <el-button class="tool-btn" @click="handleOrganization" title="组织架构 (Alt+D)">
         <SvgIcon name="organization" :size="16" />
         <span>组织架构</span>
       </el-button>
-      <el-button class="tool-btn" @click="handleBannedWords">
+      <el-button class="tool-btn" @click="handleBannedWords" title="禁词管理 (Alt+C)">
         <SvgIcon name="banned-words" :size="16" />
         <span>禁词管理</span>
       </el-button>
       <BannedWordsDrawer ref="bannedWordsRef" :book-name="route.query.name" />
       
-      <el-button class="tool-btn" @click="handleParagraphSettings">
+      <el-button class="tool-btn" @click="handleParagraphSettings" title="字数设置 (Alt+R)">
         <el-icon><Setting /></el-icon>
         <span>字数设置</span>
       </el-button>
@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import RandomName from '@renderer/components/RandomName.vue'
 import BannedWordsDrawer from './BannedWordsDrawer.vue'
 import ThemeSelector from '@renderer/components/ThemeSelector.vue'
@@ -119,12 +119,20 @@ watch(
 
 // 工具栏功能处理函数
 const handleRandomName = () => {
-  randomNameRef.value.open()
+  if (randomNameRef.value?.visible) {
+    randomNameRef.value.close()
+  } else {
+    randomNameRef.value?.open()
+  }
 }
 
 const handleParagraphSettings = () => {
-  tempParagraphMaxLength.value = editorStore.paragraphMaxLength
-  paragraphLengthDialogVisible.value = true
+  if (paragraphLengthDialogVisible.value) {
+    paragraphLengthDialogVisible.value = false
+  } else {
+    tempParagraphMaxLength.value = editorStore.paragraphMaxLength
+    paragraphLengthDialogVisible.value = true
+  }
 }
 
 const saveParagraphMaxLength = async () => {
@@ -186,8 +194,44 @@ const handleOrganization = () => {
 }
 
 const handleBannedWords = () => {
-  bannedWordsRef.value.open()
+  if (bannedWordsRef.value?.visible) {
+    bannedWordsRef.value.close()
+  } else {
+    bannedWordsRef.value?.open()
+  }
 }
+
+// 快捷键处理
+const handleKeydown = (e) => {
+  // Alt key (Option on Mac)
+  if (e.altKey) {
+    switch (e.key.toLowerCase()) {
+      case 'q':
+        e.preventDefault()
+        e.stopPropagation()
+        handleRandomName()
+        break
+      case 'c':
+        e.preventDefault()
+        e.stopPropagation()
+        handleBannedWords()
+        break
+      case 'r':
+        e.preventDefault()
+        e.stopPropagation()
+        handleParagraphSettings()
+        break
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown, true)
+})
 </script>
 
 <style lang="scss" scoped>

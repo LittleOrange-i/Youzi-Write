@@ -1412,7 +1412,7 @@ onBeforeUnmount(() => {
 
       .alias-display-tag {
         margin: 0;
-        font-size: 12px;
+        font-size: 10px;
         border-radius: 4px;
         white-space: nowrap; // 标签不换行
         overflow: hidden;
@@ -1422,7 +1422,7 @@ onBeforeUnmount(() => {
 
       .alias-more-tag {
         margin: 0;
-        font-size: 12px;
+        font-size: 10px;
         border-radius: 4px;
         background: var(--el-color-info-light-9) !important;
         border-color: var(--el-color-info-light-7) !important;
@@ -1461,7 +1461,7 @@ onBeforeUnmount(() => {
 
       .tag-item {
         margin: 0;
-        font-size: 12px;
+        font-size: 10px;
         border-radius: 4px;
         white-space: nowrap; // 标签不换行
         overflow: hidden;
@@ -1471,7 +1471,7 @@ onBeforeUnmount(() => {
 
       .tag-more-tag {
         margin: 0;
-        font-size: 12px;
+        font-size: 10px;
         border-radius: 4px;
         background: var(--el-color-info-light-9) !important;
         border-color: var(--el-color-info-light-7) !important;
@@ -1525,15 +1525,15 @@ onBeforeUnmount(() => {
     margin: 0;
     text-align: left;
     word-break: break-word;
-    padding: 8px;
+    padding: 4px;
     background: var(--bg-soft);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     flex: 1; // 占据剩余空间
     overflow: hidden; // 超出隐藏
     display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 10; // 最多显示10行
+    // -webkit-box-orient: vertical;
+    // -webkit-line-clamp: 10; // 最多显示10行
     text-overflow: ellipsis;
   }
 

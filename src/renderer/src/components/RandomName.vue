@@ -117,6 +117,9 @@ const customSuffix = ref('')
 function open() {
   visible.value = true
 }
+function close() {
+  visible.value = false
+}
 function onClose() {
   names.value = []
   customSuffix.value = ''
@@ -264,7 +267,11 @@ function copyName(name) {
   ElMessage.success('已复制：' + name)
 }
 
-defineExpose({ open })
+defineExpose({
+  open,
+  close,
+  visible
+})
 </script>
 
 <style scoped>
