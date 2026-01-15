@@ -85,7 +85,7 @@
               <div class="section-label">别名：</div>
               <div class="aliases-display">
                 <el-tag
-                  v-for="(alias, index) in character.aliases"
+                  v-for="(alias, index) in character.aliases.slice(0, 5)"
                   :key="index"
                   size="small"
                   type="info"
@@ -93,13 +93,36 @@
                 >
                   {{ alias }}
                 </el-tag>
+                <el-tag
+                  v-if="character.aliases.length > 5"
+                  size="small"
+                  type="info"
+                  class="alias-more-tag"
+                >
+                  +{{ character.aliases.length - 5 }}
+                </el-tag>
               </div>
             </div>
             <!-- 标签显示区域 -->
             <div v-if="character.tags && character.tags.length > 0" class="character-tags">
-              <el-tag v-for="tag in character.tags" :key="tag" size="small" class="tag-item">
-                {{ tag }}
-              </el-tag>
+              <div class="section-label">标签：</div>
+              <div class="tags-display">
+                <el-tag 
+                  v-for="(tag, index) in character.tags.slice(0, 5)" 
+                  :key="index" 
+                  size="small" 
+                  class="tag-item"
+                >
+                  {{ tag }}
+                </el-tag>
+                <el-tag
+                  v-if="character.tags.length > 5"
+                  size="small"
+                  class="tag-more-tag"
+                >
+                  +{{ character.tags.length - 5 }}
+                </el-tag>
+              </div>
             </div>
             <!-- 形象介绍 -->
             <div v-if="character.appearance" class="character-section">
@@ -252,8 +275,10 @@
     width="700px"
     align-center
     @close="resetForm"
+    class="edit-dialog"
   >
-    <el-form ref="formRef" :model="characterForm" :rules="formRules" label-width="80px">
+    <div ref="editScrollContainer" class="edit-scroll-container">
+      <el-form ref="formRef" :model="characterForm" :rules="formRules" label-width="80px">
       <!-- 头像操作区域 -->
       <el-form-item label="头像" class="avatar-form-item">
         <div class="avatar-form-section">
@@ -354,22 +379,26 @@
         </el-col>
       </el-row>
       <el-form-item label="形象介绍" prop="appearance">
-        <el-input
-          v-model="characterForm.appearance"
-          placeholder="请输入人物形象介绍（外貌、气质、穿着等）"
-          type="textarea"
-          :rows="3"
-          clearable
-        />
+        <div class="text-field-trigger" @click="openTextEditor('appearance')">
+          <div v-if="characterForm.appearance" class="text-field-preview">
+            {{ characterForm.appearance }}
+          </div>
+          <div v-else class="text-field-placeholder">
+            点击编辑人物形象介绍（外貌、气质、穿着等）
+          </div>
+          <el-icon class="text-field-icon"><Edit /></el-icon>
+        </div>
       </el-form-item>
       <el-form-item label="生平介绍" prop="biography">
-        <el-input
-          v-model="characterForm.biography"
-          placeholder="请输入人物生平介绍（经历、性格、背景故事等）"
-          type="textarea"
-          :rows="4"
-          clearable
-        />
+        <div class="text-field-trigger" @click="openTextEditor('biography')">
+          <div v-if="characterForm.biography" class="text-field-preview">
+            {{ characterForm.biography }}
+          </div>
+          <div v-else class="text-field-placeholder">
+            点击编辑人物生平介绍（经历、性格、背景故事等）
+          </div>
+          <el-icon class="text-field-icon"><Edit /></el-icon>
+        </div>
       </el-form-item>
       <el-form-item label="标签" prop="tags">
         <el-tree-select
@@ -412,7 +441,8 @@
           />
         </div>
       </el-form-item>
-    </el-form>
+      </el-form>
+    </div>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" @click="confirmSave">确认</el-button>
@@ -427,6 +457,29 @@
     @close="imageViewerVisible = false"
   />
 
+  <!-- 文本编辑器弹窗 -->
+  <el-dialog
+    v-model="textEditorVisible"
+    :title="textEditorTitle"
+    width="700px"
+    align-center
+    class="text-editor-dialog"
+  >
+    <el-input
+      v-model="textEditorContent"
+      type="textarea"
+      :placeholder="textEditorPlaceholder"
+      :rows="20"
+      :maxlength="textEditorMaxLength"
+      show-word-limit
+      resize="none"
+    />
+    <template #footer>
+      <el-button @click="textEditorVisible = false">取消</el-button>
+      <el-button type="primary" @click="saveTextEditor">确认</el-button>
+    </template>
+  </el-dialog>
+
   <!-- 人物预览弹框 -->
   <el-dialog
     v-model="previewDialogVisible"
@@ -436,7 +489,7 @@
     class="preview-dialog"
   >
     <div v-if="previewCharacter" class="preview-content">
-      <div class="preview-scroll-container">
+      <div ref="previewScrollContainer" class="preview-scroll-container">
         <div class="preview-header">
           <div class="preview-avatar" @click="previewCharacterAvatar(previewCharacter)">
             <el-image
@@ -574,6 +627,19 @@ const colorPickerPredefine = presetMarkerColors.filter((color) => !!color)
 const imageViewerVisible = ref(false)
 const imageViewerSrcList = ref([])
 const imageViewerInitialIndex = ref(0)
+
+// 预览弹框滚动容器ref
+const previewScrollContainer = ref(null)
+// 编辑弹框滚动容器ref
+const editScrollContainer = ref(null)
+
+// 文本编辑器弹窗相关
+const textEditorVisible = ref(false) // 文本编辑器弹窗可见性
+const textEditorContent = ref('') // 当前编辑的文本内容
+const textEditorField = ref('') // 当前编辑的字段名 'appearance' 或 'biography'
+const textEditorTitle = ref('') // 弹窗标题
+const textEditorPlaceholder = ref('') // 占位提示
+const textEditorMaxLength = ref(500) // 最大字符数
 
 // 表单数据
 const characterForm = reactive({
@@ -717,20 +783,39 @@ function handleCreateCharacter() {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
+  // 使用 nextTick 确保 DOM 更新后再重置滚动位置
+  nextTick(() => {
+    if (editScrollContainer.value) {
+      editScrollContainer.value.scrollTop = 0
+    }
+  })
 }
 
-// 编辑人物
+// 编辑人物 - 使用深拷贝避免直接修改原数据
 function handleEditCharacter(character) {
   isEdit.value = true
-  Object.assign(characterForm, character)
+  // 深拷贝人物数据,避免直接修改原对象
+  Object.assign(characterForm, JSON.parse(JSON.stringify(character)))
   previewDialogVisible.value = false // 关闭预览弹框
   dialogVisible.value = true
+  // 使用 nextTick 确保 DOM 更新后再重置滚动位置
+  nextTick(() => {
+    if (editScrollContainer.value) {
+      editScrollContainer.value.scrollTop = 0
+    }
+  })
 }
 
 // 预览人物详情
 function handlePreviewCharacter(character) {
   previewCharacter.value = { ...character }
   previewDialogVisible.value = true
+  // 使用 nextTick 确保 DOM 更新后再重置滚动位置
+  nextTick(() => {
+    if (previewScrollContainer.value) {
+      previewScrollContainer.value.scrollTop = 0
+    }
+  })
 }
 
 // 删除人物
@@ -805,6 +890,32 @@ function addAlias() {
 // 删除别名
 function removeAlias(index) {
   characterForm.aliases.splice(index, 1)
+}
+
+// 打开文本编辑器弹窗
+function openTextEditor(field) {
+  textEditorField.value = field
+  textEditorContent.value = characterForm[field] || ''
+  
+  if (field === 'appearance') {
+    textEditorTitle.value = '编辑形象介绍'
+    textEditorPlaceholder.value = '请输入人物形象介绍（外貌、气质、穿着等）'
+    textEditorMaxLength.value = 500
+  } else if (field === 'biography') {
+    textEditorTitle.value = '编辑生平介绍'
+    textEditorPlaceholder.value = '请输入人物生平介绍（经历、性格、背景故事等）'
+    textEditorMaxLength.value = 1000
+  }
+  
+  textEditorVisible.value = true
+}
+
+// 保存文本编辑器内容
+function saveTextEditor() {
+  if (textEditorField.value) {
+    characterForm[textEditorField.value] = textEditorContent.value
+  }
+  textEditorVisible.value = false
 }
 
 // 重置表单
@@ -1120,6 +1231,9 @@ onBeforeUnmount(() => {
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  height: 260px; // 固定卡片高度
+  display: flex;
+  flex-direction: column;
 
   &:hover {
     transform: translateY(-2px);
@@ -1173,6 +1287,10 @@ onBeforeUnmount(() => {
 
 .character-info {
   padding: 5px 0px 5px 6px; // 左侧增加6px间距避开颜色条
+  height: 100%; // 占满卡片高度
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; // 防止内容溢出
 
   .character-header {
     display: flex;
@@ -1181,6 +1299,7 @@ onBeforeUnmount(() => {
     gap: 12px;
     padding: 0 10px;
     margin-bottom: 8px;
+    flex-shrink: 0; // 头部不缩小
   }
 
   .character-avatar {
@@ -1277,16 +1396,20 @@ onBeforeUnmount(() => {
   // 别名显示样式
   .character-aliases {
     padding: 0 10px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
+    flex-shrink: 0; // 不缩小
+    max-height: 50px; // 限制最大高度
+    overflow: hidden; // 超出隐藏
 
     .section-label {
       font-size: 12px;
       color: var(--text-secondary);
       font-weight: 500;
       flex-shrink: 0;
+      padding-top: 2px; // 对齐标签
     }
 
     .aliases-display {
@@ -1294,40 +1417,101 @@ onBeforeUnmount(() => {
       flex-wrap: wrap;
       gap: 4px;
       flex: 1;
+      overflow: hidden; // 超出隐藏
+      max-height: 50px; // 与父容器一致
 
       .alias-display-tag {
         margin: 0;
         font-size: 12px;
         border-radius: 4px;
+        white-space: nowrap; // 标签不换行
+        overflow: hidden;
+        text-overflow: ellipsis; // 超长省略
+        max-width: 120px; // 单个标签最大宽度
+      }
+
+      .alias-more-tag {
+        margin: 0;
+        font-size: 12px;
+        border-radius: 4px;
+        background: var(--el-color-info-light-9) !important;
+        border-color: var(--el-color-info-light-7) !important;
+        color: var(--el-color-info) !important;
+        font-weight: 600;
       }
     }
   }
 
-  // 标签样式
+  // 标签样式（与别名样式保持一致）
   .character-tags {
     padding: 0 10px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    align-items: flex-start;
+    gap: 6px;
+    flex-shrink: 0; // 不缩小
+    max-height: 50px; // 限制最大高度
+    overflow: hidden; // 超出隐藏
 
-    .tag-item {
-      margin: 0;
+    .section-label {
       font-size: 12px;
-      border-radius: 4px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      flex-shrink: 0;
+      padding-top: 2px; // 对齐标签
+    }
+
+    .tags-display {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      flex: 1;
+      overflow: hidden; // 超出隐藏
+      max-height: 50px; // 与父容器一致
+
+      .tag-item {
+        margin: 0;
+        font-size: 12px;
+        border-radius: 4px;
+        white-space: nowrap; // 标签不换行
+        overflow: hidden;
+        text-overflow: ellipsis; // 超长省略
+        max-width: 120px; // 单个标签最大宽度
+      }
+
+      .tag-more-tag {
+        margin: 0;
+        font-size: 12px;
+        border-radius: 4px;
+        background: var(--el-color-info-light-9) !important;
+        border-color: var(--el-color-info-light-7) !important;
+        color: var(--el-color-info) !important;
+        font-weight: 600;
+      }
     }
   }
 
   // 介绍区域样式
   .character-section {
     padding: 0 10px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    display: flex;
+    flex-direction: column;
+    flex: 1; // 自动占据剩余空间
+    min-height: 0; // 允许flex收缩
+    overflow: hidden; // 防止溢出
+
+    // 最后一个元素不需要下边距
+    &:last-child {
+      margin-bottom: 5px; // 底部留一点间距
+    }
 
     .section-title-wrapper {
       display: flex;
       align-items: center;
       gap: 6px;
       margin-bottom: 6px;
+      flex-shrink: 0; // 标题不缩小
 
       .section-title-bar {
         width: 3px;
@@ -1355,28 +1539,22 @@ onBeforeUnmount(() => {
     background: var(--bg-soft);
     border: 1px solid var(--border-color);
     border-radius: 4px;
+    flex: 1; // 占据剩余空间
+    overflow: hidden; // 超出隐藏
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10; // 最多显示10行
+    text-overflow: ellipsis;
   }
 
-  // 形象介绍：最多显示3行
+  // 形象介绍：根据剩余空间自适应
   .appearance-intro {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-height: 4.5em; // 3行文本 + 行高
+    // 继承父类样式即可
   }
 
-  // 生平介绍：最多显示4行
+  // 生平介绍：根据剩余空间自适应
   .biography-intro {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-height: 6em; // 4行文本 + 行高
+    // 继承父类样式即可
   }
 }
 
@@ -1576,6 +1754,85 @@ onBeforeUnmount(() => {
   }
 }
 
+// 编辑弹框样式
+.edit-dialog {
+  :deep(.el-dialog__body) {
+    padding: 0; // 移除padding，由内部容器控制
+  }
+}
+
+.edit-scroll-container {
+  max-height: 500px; // 固定最大高度500px，与预览弹窗一致
+  overflow-y: auto; // 添加垂直滚动条
+  padding: 20px; // 在滚动容器内添加padding
+  scrollbar-width: none; // 隐藏滚动条
+}
+
+// 文本编辑器弹窗样式
+.text-editor-dialog {
+  :deep(.el-textarea__inner) {
+    font-family: inherit;
+    line-height: 1.6;
+  }
+}
+
+// 文本字段触发器样式
+.text-field-trigger {
+  height: 100px; // 固定高度，确保两个字段一致
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  align-items: flex-start; // 改为顶部对齐
+
+  &:hover {
+    border-color: var(--el-color-primary);
+    background: var(--bg-mute);
+
+    .text-field-icon {
+      opacity: 1;
+    }
+  }
+
+  .text-field-preview {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-base);
+    line-height: 1.6;
+    word-break: break-word;
+    white-space: pre-wrap;
+    max-height: 96px; // 调整为适应固定高度（120px - 24px padding）
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4; // 减少为4行，适应固定高度
+    padding-right: 30px;
+  }
+
+  .text-field-placeholder {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-secondary);
+    padding-right: 30px;
+  }
+
+  .text-field-icon {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    font-size: 18px;
+    color: var(--el-color-primary);
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+}
+
 .preview-content {
   .preview-scroll-container {
     max-height: 500px; // 固定最大高度500px
@@ -1721,6 +1978,19 @@ onBeforeUnmount(() => {
       border: 1px solid var(--border-color);
       border-radius: 6px;
       white-space: pre-wrap; // 保留换行
+    }
+  }
+}
+
+// 深色模式特殊样式
+:global(.dark) {
+  .preview-content {
+    .preview-header {
+      border-bottom-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .preview-text {
+      border-color: rgba(255, 255, 255, 0.3);
     }
   }
 }
