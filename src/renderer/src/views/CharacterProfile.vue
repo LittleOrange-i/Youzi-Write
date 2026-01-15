@@ -8,6 +8,17 @@
     </template>
     <template #default>
       <div class="view-toggle">
+        <el-input 
+          v-model="searchQuery" 
+          placeholder="搜索人物姓名" 
+          clearable 
+          style="width: 240px; margin-right: 10px;"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button value="card">
             <el-icon><Grid /></el-icon>
@@ -22,11 +33,11 @@
       <!-- 卡片模式 -->
       <div v-if="viewMode === 'card'" class="character-grid">
         <div
-          v-for="character in characters"
+          v-for="character in filteredCharacters"
           :key="character.id"
           class="character-card"
           :class="{ male: character.gender === '男', female: character.gender === '女', neutral: character.gender === '无' }"
-          @click="handleEditCharacter(character)"
+          @click="handlePreviewCharacter(character)"
         >
           <div class="character-info">
             <div class="character-header">
@@ -92,16 +103,23 @@
             </div>
             <!-- 形象介绍 -->
             <div v-if="character.appearance" class="character-section">
-              <div class="section-title">形象介绍</div>
+              <div class="section-title-wrapper">
+                <span class="section-title-bar"></span>
+                <div class="section-title">形象介绍</div>
+              </div>
               <p class="character-intro appearance-intro">{{ character.appearance }}</p>
             </div>
             <!-- 生平介绍 -->
             <div v-if="character.biography" class="character-section">
-              <div class="section-title">生平介绍</div>
+              <div class="section-title-wrapper">
+                <span class="section-title-bar"></span>
+                <div class="section-title">生平介绍</div>
+              </div>
               <p class="character-intro biography-intro">{{ character.biography }}</p>
             </div>
           </div>
           <div class="character-actions">
+            <el-icon @click.stop="handleEditCharacter(character)"><Edit /></el-icon>
             <el-icon @click.stop="handleDeleteCharacter(character)"><Delete /></el-icon>
           </div>
         </div>
@@ -111,11 +129,11 @@
       <div v-else-if="viewMode === 'table'" class="character-table">
         <el-table
           ref="tableRef"
-          :data="characters"
+          :data="filteredCharacters"
           row-key="id"
           border
           style="width: 100%"
-          @row-click="handleEditCharacter"
+          @row-click="handlePreviewCharacter"
         >
           <el-table-column label="头像" width="80" align="center">
             <template #default="{ row }">
@@ -187,11 +205,23 @@
               <span v-else class="no-tags">无标签</span>
             </template>
           </el-table-column>
-          <el-table-column prop="appearance" label="形象介绍" min-width="200" align="center" />
-          <el-table-column prop="biography" label="生平介绍" min-width="300" align="center" />
-          <el-table-column label="操作" width="120" fixed="right" align="center">
+          <el-table-column prop="appearance" label="形象介绍" min-width="200" align="center">
+            <template #default="{ row }">
+              <div class="table-text-preview">{{ row.appearance }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="biography" label="生平介绍" min-width="300" align="center">
+            <template #default="{ row }">
+              <div class="table-text-preview">{{ row.biography }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right" align="center">
             <template #default="{ row }">
               <div class="action-buttons">
+                <el-button type="info" size="small" @click.stop="handlePreviewCharacter(row)">
+                  <el-icon><View /></el-icon>
+                  预览
+                </el-button>
                 <el-button type="primary" size="small" @click.stop="handleEditCharacter(row)">
                   <el-icon><Edit /></el-icon>
                   编辑
@@ -207,7 +237,7 @@
       </div>
 
       <el-empty
-        v-if="characters.length === 0"
+        v-if="filteredCharacters.length === 0"
         :image-size="200"
         description="暂无人物"
         class="empty-state"
@@ -328,7 +358,7 @@
           v-model="characterForm.appearance"
           placeholder="请输入人物形象介绍（外貌、气质、穿着等）"
           type="textarea"
-          :rows="4"
+          :rows="3"
           clearable
         />
       </el-form-item>
@@ -337,7 +367,7 @@
           v-model="characterForm.biography"
           placeholder="请输入人物生平介绍（经历、性格、背景故事等）"
           type="textarea"
-          :rows="6"
+          :rows="4"
           clearable
         />
       </el-form-item>
@@ -396,6 +426,107 @@
     :initial-index="imageViewerInitialIndex"
     @close="imageViewerVisible = false"
   />
+
+  <!-- 人物预览弹框 -->
+  <el-dialog
+    v-model="previewDialogVisible"
+    title="人物详情"
+    width="700px"
+    align-center
+    class="preview-dialog"
+  >
+    <div v-if="previewCharacter" class="preview-content">
+      <div class="preview-scroll-container">
+        <div class="preview-header">
+          <div class="preview-avatar" @click="previewCharacterAvatar(previewCharacter)">
+            <el-image
+              v-if="previewCharacter.avatar"
+              :src="getAvatarSrc(previewCharacter.avatar)"
+              alt="头像"
+              class="preview-avatar-image"
+              fit="cover"
+            />
+            <div v-else class="preview-avatar-placeholder">
+              {{ previewCharacter.name.charAt(0) }}
+            </div>
+          </div>
+          <div class="preview-details">
+            <div class="preview-name-row">
+              <span
+                v-if="previewCharacter.markerColor"
+                class="preview-marker"
+                :style="{ backgroundColor: previewCharacter.markerColor }"
+              ></span>
+              <span class="preview-name">{{ previewCharacter.name }}</span>
+            </div>
+            <div class="preview-info-row">
+              <span class="preview-info-item">
+                <span class="preview-info-label">年龄:</span>
+                <span class="preview-info-value">{{ previewCharacter.age }}岁</span>
+              </span>
+              <span class="preview-divider">|</span>
+              <span class="preview-info-item">
+                <span class="preview-info-label">身高:</span>
+                <span class="preview-info-value">{{ previewCharacter.height }}cm</span>
+              </span>
+              <span class="preview-divider">|</span>
+              <span class="preview-info-item">
+                <span class="preview-info-label">性别:</span>
+                <span class="preview-info-value">{{ previewCharacter.gender }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 别名显示区域 -->
+        <div v-if="previewCharacter.aliases && previewCharacter.aliases.length > 0" class="preview-section">
+          <div class="preview-section-title">别名</div>
+          <div class="preview-aliases">
+            <el-tag
+              v-for="(alias, index) in previewCharacter.aliases"
+              :key="index"
+              size="small"
+              type="info"
+              class="preview-alias-tag"
+            >
+              {{ alias }}
+            </el-tag>
+          </div>
+        </div>
+        
+        <!-- 标签显示区域 -->
+        <div v-if="previewCharacter.tags && previewCharacter.tags.length > 0" class="preview-section">
+          <div class="preview-section-title">标签</div>
+          <div class="preview-tags">
+            <el-tag v-for="tag in previewCharacter.tags" :key="tag" size="small" class="preview-tag">
+              {{ tag }}
+            </el-tag>
+          </div>
+        </div>
+        
+        <!-- 形象介绍 -->
+        <div v-if="previewCharacter.appearance" class="preview-section">
+          <div class="preview-section-title">形象介绍</div>
+          <p class="preview-text">{{ previewCharacter.appearance }}</p>
+        </div>
+        
+        <!-- 生平介绍 -->
+        <div v-if="previewCharacter.biography" class="preview-section">
+          <div class="preview-section-title">生平介绍</div>
+          <p class="preview-text">{{ previewCharacter.biography }}</p>
+        </div>
+      </div>
+    </div>
+
+
+    <template #footer>
+      <el-button type="primary" @click="handleEditCharacter(previewCharacter)">
+        <el-icon><Edit /></el-icon>
+        编辑
+      </el-button>
+      <el-button @click="previewDialogVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -403,7 +534,7 @@ import LayoutTool from '@renderer/components/LayoutTool.vue'
 import { ref, reactive, onMounted, watch, toRaw, computed, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Grid, List, Edit } from '@element-plus/icons-vue'
+import { Plus, Delete, Grid, List, Edit, Search, View } from '@element-plus/icons-vue'
 import { genId } from '@renderer/utils/utils'
 import Sortable from 'sortablejs'
 
@@ -416,6 +547,9 @@ const dictionary = ref([]) // 字典数据
 const bookName = route.query.name || ''
 const formRef = ref(null)
 const tableRef = ref(null)
+const searchQuery = ref('') // 搜索关键词
+const previewDialogVisible = ref(false) // 预览弹框可见性
+const previewCharacter = ref(null) // 预览的人物数据
 let sortableInstance = null // 存储 SortableJS 实例
 
 const presetMarkerColors = [
@@ -496,6 +630,22 @@ const tagOptions = computed(() => {
   return processTreeData(cloneDictionary)
 })
 
+// 计算过滤后的人物列表（根据搜索关键词）
+const filteredCharacters = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return characters.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return characters.value.filter(character => 
+    character.name.toLowerCase().includes(query)
+  )
+})
+
+// 处理搜索输入
+function handleSearch() {
+  // 实时搜索，由computed自动处理
+}
+
 // 加载人物数据
 async function loadCharacters() {
   try {
@@ -573,7 +723,14 @@ function handleCreateCharacter() {
 function handleEditCharacter(character) {
   isEdit.value = true
   Object.assign(characterForm, character)
+  previewDialogVisible.value = false // 关闭预览弹框
   dialogVisible.value = true
+}
+
+// 预览人物详情
+function handlePreviewCharacter(character) {
+  previewCharacter.value = { ...character }
+  previewDialogVisible.value = true
 }
 
 // 删除人物
@@ -826,6 +983,7 @@ onBeforeUnmount(() => {
 .view-toggle {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   margin-bottom: 10px;
 }
 .character-table {
@@ -874,6 +1032,20 @@ onBeforeUnmount(() => {
       font-size: 14px;
       font-weight: bold;
     }
+  }
+
+  // 表格内文本预览样式，限制最多显示3行
+  .table-text-preview {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-height: 4.5em;
+    line-height: 1.5;
+    text-align: left;
+    word-break: break-word;
   }
 
   .table-tags {
@@ -947,6 +1119,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
+  overflow: hidden;
 
   &:hover {
     transform: translateY(-2px);
@@ -957,61 +1130,49 @@ onBeforeUnmount(() => {
     }
   }
 
+  // 卡片左侧颜色标识条
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+  }
+
   &.male {
-    background: linear-gradient(135deg, rgba(64, 158, 255, 0.05) 0%, rgba(64, 158, 255, 0.02) 100%);
-    border-left: 3px solid rgba(64, 158, 255, 0.3);
+    &::before {
+      background: #409eff;
+    }
     
-    // 深色模式增强
-    html.dark & {
-      background: linear-gradient(135deg, rgba(64, 158, 255, 0.15) 0%, rgba(64, 158, 255, 0.08) 100%);
-      border: 1px solid rgba(64, 158, 255, 0.2);
-      border-left: 3px solid rgba(64, 158, 255, 0.5);
+    .section-title-bar {
+      background: #409eff;
     }
   }
 
   &.female {
-    background: linear-gradient(
-      135deg,
-      rgba(255, 182, 210, 0.12) 0%,
-      rgba(255, 192, 220, 0.06) 100%
-    );
-    border-left: 3px solid rgba(255, 182, 210, 0.35);
+    &::before {
+      background: #ff86ad;
+    }
     
-    // 深色模式增强
-    html.dark & {
-      background: linear-gradient(
-        135deg,
-        rgba(255, 120, 170, 0.18) 0%,
-        rgba(255, 140, 190, 0.10) 100%
-      );
-      border: 1px solid rgba(255, 120, 170, 0.25);
-      border-left: 3px solid rgba(255, 120, 170, 0.55);
+    .section-title-bar {
+      background: #ff86ad;
     }
   }
 
   &.neutral {
-    background: linear-gradient(
-      135deg,
-      rgba(250, 250, 250, 0.3) 0%,
-      rgba(255, 255, 255, 0.1) 100%
-    );
-    border-left: 3px solid rgba(200, 200, 200, 0.25);
+    &::before {
+      background: #7048a1;
+    }
     
-    // 深色模式增强
-    html.dark & {
-      background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.08) 0%,
-        rgba(255, 255, 255, 0.04) 100%
-      );
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-left: 3px solid rgba(255, 255, 255, 0.25);
+    .section-title-bar {
+      background: #7048a1;
     }
   }
 }
 
 .character-info {
-  padding: 5px 0px;
+  padding: 5px 0px 5px 6px; // 左侧增加6px间距避开颜色条
 
   .character-header {
     display: flex;
@@ -1162,21 +1323,38 @@ onBeforeUnmount(() => {
     padding: 0 10px;
     margin-bottom: 8px;
 
-    .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
+    .section-title-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+
+      .section-title-bar {
+        width: 3px;
+        height: 14px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+
+      .section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-base);
+      }
     }
   }
 
   .character-intro {
     font-size: 12px;
     color: var(--text-base);
-    line-height: 1.2;
+    line-height: 1.5;
     margin: 0;
     text-align: left;
     word-break: break-word;
+    padding: 8px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
   }
 
   // 形象介绍：最多显示3行
@@ -1187,6 +1365,7 @@ onBeforeUnmount(() => {
     line-clamp: 3;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-height: 4.5em; // 3行文本 + 行高
   }
 
   // 生平介绍：最多显示4行
@@ -1197,6 +1376,7 @@ onBeforeUnmount(() => {
     line-clamp: 4;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-height: 6em; // 4行文本 + 行高
   }
 }
 
@@ -1204,11 +1384,13 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 6px;
   opacity: 0;
   transition: opacity 0.3s ease;
 
   .el-icon {
-    font-size: 24px;
+    font-size: 20px;
     color: var(--text-base);
     cursor: pointer;
     padding: 4px;
@@ -1216,7 +1398,14 @@ onBeforeUnmount(() => {
 
     &:hover {
       background: var(--bg-mute);
-      color: #f56c6c;
+    }
+
+    &:first-child:hover {
+      color: #409eff; // 编辑按钮悬浮蓝色
+    }
+
+    &:last-child:hover {
+      color: #f56c6c; // 删除按钮悬浮红色
     }
   }
 }
@@ -1379,4 +1568,161 @@ onBeforeUnmount(() => {
     padding: 4px 0;
   }
 }
+
+// 预览弹框样式
+.preview-dialog {
+  :deep(.el-dialog__body) {
+    padding: 0; // 移除padding，由内部容器控制
+  }
+}
+
+.preview-content {
+  .preview-scroll-container {
+    max-height: 500px; // 固定最大高度500px
+    overflow-y: auto; // 添加垂直滚动条
+    padding: 20px; // 在滚动容器内添加padding
+    scrollbar-width: none;   //隐藏滚动条
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+
+    .preview-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.3s ease;
+
+      &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .preview-avatar-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .preview-avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #409eff 0%, #67c23a 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+      }
+    }
+
+    .preview-details {
+      flex: 1;
+
+      .preview-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+
+        .preview-marker {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          box-shadow: 0 0 0 1px var(--border-color);
+        }
+
+        .preview-name {
+          font-size: 22px;
+          font-weight: 600;
+          color: var(--text-base);
+        }
+      }
+
+      .preview-info-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .preview-info-item {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+
+          .preview-info-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+          }
+
+          .preview-info-value {
+            font-size: 14px;
+            color: var(--text-base);
+            font-weight: 600;
+          }
+        }
+
+        .preview-divider {
+          font-size: 14px;
+          color: var(--border-color);
+        }
+      }
+    }
+  }
+
+  .preview-section {
+    margin-bottom: 16px;
+
+    .preview-section-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-base);
+      margin-bottom: 10px;
+      padding-left: 10px;
+      border-left: 3px solid #409eff;
+    }
+
+    .preview-aliases,
+    .preview-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      background: var(--bg-soft);
+      border-radius: 6px;
+    }
+
+    .preview-alias-tag,
+    .preview-tag {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .preview-text {
+      font-size: 14px;
+      color: var(--text-base);
+      line-height: 1.8;
+      margin: 0;
+      text-align: left;
+      word-break: break-word;
+      padding: 12px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      white-space: pre-wrap; // 保留换行
+    }
+  }
+}
+
 </style>
