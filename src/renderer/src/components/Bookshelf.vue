@@ -578,8 +578,8 @@ async function selectLocalCover() {
     // 调用 Electron API 打开文件选择对话框
     if (window.electron && window.electron.selectImage) {
       const result = await window.electron.selectImage()
-      if (result && result.filePath) {
-        form.value.coverUrl = result.filePath
+      if (result && result.dataUrl) {
+        form.value.coverUrl = result.dataUrl
         ElMessage.success('封面图片已选择')
       }
     } else {

@@ -705,9 +705,9 @@ function selectPresetColor(color) {
 async function selectLocalImage() {
   try {
     const result = await window.electron.selectImage()
-    if (result && result.filePath) {
-      // 将本地文件路径转换为 file:// 协议，以便在浏览器中正确显示
-      infoForm.avatar = `file://${result.filePath}`
+    if (result && result.dataUrl) {
+      // 使用 base64 数据 URL，可以直接在浏览器中显示
+      infoForm.avatar = result.dataUrl
       ElMessage.success('图片选择成功')
     }
   } catch (error) {
@@ -1036,18 +1036,8 @@ function getNodeStyle(node) {
 function getAvatarSrc(avatarPath) {
   if (!avatarPath) return ''
 
-  // 如果已经是完整的URL（包含协议），直接返回
-  if (
-    avatarPath.startsWith('http://') ||
-    avatarPath.startsWith('https://') ||
-    avatarPath.startsWith('file://') ||
-    avatarPath.startsWith('data:')
-  ) {
-    return avatarPath
-  }
-
-  // 如果是本地文件路径，添加 file:// 协议
-  return `file://${avatarPath}`
+  // 直接返回路径（可能是 http/https URL 或 base64 数据 URL）
+  return avatarPath
 }
 
 onMounted(async () => {

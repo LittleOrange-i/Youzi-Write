@@ -1,5 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, net } from 'electron'
 import { join } from 'path'
+import path from 'path'
 import fs from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -724,7 +725,32 @@ ipcMain.handle('select-image', async () => {
   })
 
   if (!result.canceled && result.filePaths.length > 0) {
-    return { filePath: result.filePaths[0] }
+    const filePath = result.filePaths[0]
+    try {
+      // 读取图片文件并转换为 base64
+      const imageBuffer = fs.readFileSync(filePath)
+      const base64Image = imageBuffer.toString('base64')
+      // 根据文件扩展名确定 MIME 类型
+      const ext = path.extname(filePath).toLowerCase()
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.bmp': 'image/bmp',
+        '.webp': 'image/webp'
+      }
+      const mimeType = mimeTypes[ext] || 'image/jpeg'
+      const dataUrl = `data:${mimeType};base64,${base64Image}`
+      
+      return { 
+        filePath: filePath,
+        dataUrl: dataUrl  // 返回 base64 数据URL
+      }
+    } catch (error) {
+      console.error('读取图片文件失败:', error)
+      return { filePath: filePath }
+    }
   }
 
   return null
