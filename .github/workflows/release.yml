@@ -139,6 +139,10 @@ jobs:
           body: |
             ## 🎉 Release ${{ github.ref_name }}
             
+            ### 📋 更新内容
+            
+            ${{ github.event.head_commit.message }}
+            
             ### 📦 下载安装包
             
             - **Windows**: 下载 `.exe` 文件进行安装

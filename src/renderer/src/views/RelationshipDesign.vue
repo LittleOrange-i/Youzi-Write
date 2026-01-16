@@ -33,7 +33,12 @@
               />
             </template>
             <template #node="{ node }">
-              <div class="custom-node" :style="getNodeStyle(node)">
+              <div
+                class="custom-node"
+                :style="getNodeStyle(node)"
+                @dblclick.stop="handleNodeDoubleClickDirect(node, $event)"
+                @contextmenu.prevent="handleNodeRightClick(node, $event)"
+              >
                 <div class="node-text">
                   {{ node.text }}
                 </div>
@@ -46,14 +51,14 @@
   </LayoutTool>
   <el-dialog
     v-model="infoDialogVisible"
-    :title="isAddMode ? '新增节点' : '编辑节点信息'"
+    :title="isAddMode ? '新增角色' : '编辑角色信息'"
     width="500px"
   >
     <el-form label-width="80px">
-      <el-form-item label="节点文本">
+      <el-form-item label="角色">
         <el-select
           v-model="infoForm.characterId"
-          placeholder="选择人物或输入新名称"
+          placeholder="选择角色或输入新名称"
           style="width: 100%"
           filterable
           allow-create
@@ -74,6 +79,7 @@
         <el-radio-group v-model="infoForm.gender">
           <el-radio value="male">男</el-radio>
           <el-radio value="female">女</el-radio>
+          <el-radio value="none">无</el-radio>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="背景色">
@@ -152,9 +158,9 @@ const saving = ref(false)
 const graphRef = ref(null)
 const selectedNode = ref(null)
 
-// 人物数据
+// 角色数据
 const characters = ref([])
-// 过滤后的人物数据
+// 过滤后的角色数据
 const filteredCharacters = ref([])
 
 // 关系图数据
@@ -183,26 +189,26 @@ const graphOptions = {
   ],
   defaultJunctionPoint: 'border',
   defaultLineFontColor: '#409eff', // 设置默认线条文字颜色为蓝色
-  // 自定义节点渲染
-  defaultNodeShape: 0, // 使用矩形节点
+  // 自定义角色渲染
+  defaultNodeShape: 0, // 使用矩形角色
   defaultNodeWidth: 100,
   defaultNodeHeight: 100,
-  // 节点文字样式
+  // 角色文字样式
   defaultNodeFontColor: '#333333',
   defaultNodeFontSize: 16,
-  // 允许自定义节点HTML
+  // 允许自定义角色HTML
   allowNodeCustomHTML: true
 }
 
-// 加载人物数据
+// 加载角色数据
 const loadCharacters = async () => {
   try {
     const data = await window.electron.readCharacters(bookName)
     characters.value = Array.isArray(data) ? data : []
-    // 初始化过滤后的人物数据
+    // 初始化过滤后的角色数据
     filteredCharacters.value = [...characters.value]
   } catch (error) {
-    console.error('加载人物数据失败:', error)
+    console.error('加载角色数据失败:', error)
     characters.value = []
     filteredCharacters.value = []
   }
@@ -268,7 +274,7 @@ const loadRelationshipData = async () => {
       // const graphInstance = graphRef.value.getInstance()
       // await graphInstance.moveToCenter()
       // await graphInstance.zoomToFit()
-      // applyNodeSizes() // 加载数据后应用节点大小
+      // applyNodeSizes() // 加载数据后应用角色大小
     } else {
       // 保证nodes/edges为数组
       relationshipData.nodes = []
@@ -335,27 +341,97 @@ const nodeMenuPanel = ref({
   y: 0
 })
 
-// 节点点击事件，显示环绕菜单
+// 双击检测相关变量
+let clickTimer = null
+let clickCount = 0
+let lastClickNode = null // 记录上次点击的节点
+const CLICK_DELAY = 250 // 双击检测延迟时间（毫秒），缩短以便更快响应
+
+// 原生双击事件处理（优先级最高）
+function handleNodeDoubleClickDirect(node, event) {
+  console.log('原生双击事件触发，节点ID:', node.id)
+  
+  // 阻止事件冒泡
+  event.stopPropagation()
+  
+  // 清除单击定时器
+  if (clickTimer) {
+    clearTimeout(clickTimer)
+    clickTimer = null
+  }
+  
+  // 重置点击计数
+  clickCount = 0
+  lastClickNode = null
+  
+  // 设置选中的节点
+  selectedNode.value = node
+  
+  // 隐藏环绕菜单
+  showRadialMenu.value = false
+  
+  // 触发新增角色操作
+  handleNodeDoubleClick(node)
+}
+
+// 角色点击事件，显示环绕菜单
 const onNodeClick = (nodeObject) => {
   // 如果在连线模式下，不显示环绕菜单
   if (isLinkMode.value) return
-
-  // 设置选中的节点
+  
+  // 设置选中的角色
   selectedNode.value = nodeObject
-  showRadialMenu.value = false
-  const t = setTimeout(() => {
-    const graphInstance = graphRef.value?.getInstance()
-    if (graphInstance) {
-      const viewCoordinate = graphInstance.getClientCoordinateByCanvasCoordinate({
-        x: nodeObject.x + nodeObject.el.offsetHeight / 2,
-        y: nodeObject.y + nodeObject.el.offsetHeight / 2
-      })
-      nodeMenuPanel.value.x = viewCoordinate.x - graphInstance.options.canvasOffset.x
-      nodeMenuPanel.value.y = viewCoordinate.y - graphInstance.options.canvasOffset.y
-      showRadialMenu.value = true
+
+  // 如果点击的不是同一个节点，重置计数
+  if (lastClickNode !== nodeObject.id) {
+    clickCount = 0
+    lastClickNode = nodeObject.id
+  }
+
+  // 增加点击计数
+  clickCount++
+  
+  console.log('节点点击，当前计数:', clickCount, '节点ID:', nodeObject.id)
+
+  // 清除之前的定时器（但不重置计数）
+  if (clickTimer) {
+    clearTimeout(clickTimer)
+    clickTimer = null
+  }
+
+  // 设置新的定时器
+  clickTimer = setTimeout(() => {
+    console.log('定时器触发，最终计数:', clickCount)
+    
+    if (clickCount === 1) {
+      // 单击：显示环绕菜单
+      console.log('触发单击操作')
+      showRadialMenu.value = false
+      const t = setTimeout(() => {
+        const graphInstance = graphRef.value?.getInstance()
+        if (graphInstance) {
+          const viewCoordinate = graphInstance.getClientCoordinateByCanvasCoordinate({
+            x: nodeObject.x + nodeObject.el.offsetHeight / 2,
+            y: nodeObject.y + nodeObject.el.offsetHeight / 2
+          })
+          nodeMenuPanel.value.x = viewCoordinate.x - graphInstance.options.canvasOffset.x
+          nodeMenuPanel.value.y = viewCoordinate.y - graphInstance.options.canvasOffset.y
+          showRadialMenu.value = true
+        }
+        clearTimeout(t)
+      }, 50) // 缩短延迟
+    } else if (clickCount >= 2) {
+      // 双击：触发新增角色操作（备用方案，一般不会执行到这里）
+      console.log('触发双击操作 - 新增角色')
+      showRadialMenu.value = false
+      handleNodeDoubleClick(nodeObject)
     }
-    clearTimeout(t)
-  }, 100)
+    
+    // 重置点击计数和定时器
+    clickCount = 0
+    lastClickNode = null
+    clickTimer = null
+  }, CLICK_DELAY)
 }
 
 // 连线点击事件处理
@@ -382,7 +458,7 @@ function handleNodeInfo() {
   if (!selectedNode.value) return
   // 初始化表单
   infoForm.text = selectedNode.value.text
-  infoForm.gender = selectedNode.value.data?.gender || 'male' // 如果没有性别信息，默认男性
+  infoForm.gender = selectedNode.value.data?.gender || 'none' // 如果没有性别信息，默认无
   infoForm.color = presetColors.find((c) => c.value === selectedNode.value.color)
     ? selectedNode.value.color
     : ''
@@ -392,11 +468,11 @@ function handleNodeInfo() {
   const avatarPath = selectedNode.value.data?.avatar || ''
   infoForm.avatar = getAvatarSrc(avatarPath)
 
-  // 检查当前节点文本是否对应已存在的人物
+  // 检查当前角色文本是否对应已存在的角色
   const existingCharacter = characters.value.find((c) => c.name === selectedNode.value.text)
   if (existingCharacter) {
     infoForm.characterId = existingCharacter.id
-    // 如果人物有性别信息，使用人物的性别，否则保持当前节点的性别
+    // 如果角色有性别信息，使用角色的性别，否则保持当前角色的性别
     if (existingCharacter.gender) {
       infoForm.gender = existingCharacter.gender
     }
@@ -405,29 +481,29 @@ function handleNodeInfo() {
     infoForm.characterId = selectedNode.value.text
   }
 
-  // 如果节点有保存的 characterId，优先使用，并回填人物信息
+  // 如果角色有保存的 characterId，优先使用，并回填角色信息
   if (selectedNode.value.data?.characterId) {
     infoForm.characterId = selectedNode.value.data.characterId
-    // 根据characterId查找对应的人物，回填头像等信息
+    // 根据characterId查找对应的角色，回填头像等信息
     const matchedCharacter = characters.value.find(
       (c) => c.id === selectedNode.value.data.characterId
     )
     if (matchedCharacter) {
-      // 如果节点没有头像或人物有头像，使用人物的头像
+      // 如果角色没有头像或角色有头像，使用角色的头像
       if (!infoForm.avatar && matchedCharacter.avatar) {
         infoForm.avatar = matchedCharacter.avatar
       }
-      // 同步人物的描述信息（如果节点没有描述）
+      // 同步角色的描述信息（如果角色没有描述）
       if (!infoForm.description && (matchedCharacter.biography || matchedCharacter.introduction)) {
         infoForm.description = matchedCharacter.biography || matchedCharacter.introduction || ''
       }
-      // 同步人物的性别（如果节点没有性别或人物有性别）
+      // 同步角色的性别（如果角色没有性别或角色有性别）
       if (matchedCharacter.gender) {
-        infoForm.gender = matchedCharacter.gender === '女' ? 'female' : 'male'
+        infoForm.gender = matchedCharacter.gender === '女' ? 'female' : matchedCharacter.gender === '男' ? 'male' : 'none'
       }
     }
   } else if (existingCharacter && existingCharacter.avatar) {
-    // 如果通过名称匹配到人物且人物有头像，回填头像
+    // 如果通过名称匹配到角色且角色有头像，回填头像
     if (!infoForm.avatar) {
       infoForm.avatar = existingCharacter.avatar
     }
@@ -440,7 +516,7 @@ function handleNodeInfo() {
   showRadialMenu.value = false
 }
 function handleNodeAdd() {
-  // 新增一个名为“新节点”的节点，并自动连线
+  // 新增一个名为“新角色”的角色，并自动连线
   if (!selectedNode.value) return
   // 重置表单为默认值
   resetForm()
@@ -448,7 +524,7 @@ function handleNodeAdd() {
   // 设置新增模式标识
   isAddMode.value = true
 
-  // 显示节点编辑弹框
+  // 显示角色编辑弹框
   infoDialogVisible.value = true
   showRadialMenu.value = false
 }
@@ -491,7 +567,7 @@ function handleNodeLink() {
             // 重新布局
             // graphInstance.doLayout()
 
-            // 重新计算并应用节点大小（因为连线关系可能改变了层级）
+            // 重新计算并应用角色大小（因为连线关系可能改变了层级）
             applyNodeSizes()
           }
 
@@ -511,9 +587,9 @@ function handleNodeLink() {
       graphInstance.startCreatingLinePlot(null, creatingOptions)
       console.log('Started line creation mode with startCreatingLinePlot')
 
-      // 设置起始节点，这样预览连线就会从当前节点开始
+      // 设置起始角色，这样预览连线就会从当前角色开始
       if (graphInstance.options && graphInstance.options.editingLineController) {
-        // 设置起始节点位置
+        // 设置起始角色位置
         const startNode = graphInstance.getNodeById(selectedNode.value.id)
         if (startNode) {
           graphInstance.options.editingLineController.startPoint = {
@@ -535,15 +611,15 @@ function handleNodeLink() {
   }
 
   // 显示连线模式提示
-  ElMessage.info('连线模式已启动，请点击目标节点完成连线')
+  ElMessage.info('连线模式已启动，请点击目标角色完成连线')
 }
 function handleNodeDelete() {
   if (!selectedNode.value) return
 
-  const nodeName = selectedNode.value.text || '未知节点'
+  const nodeName = selectedNode.value.text || '未知角色'
 
   ElMessageBox.confirm(
-    `确定要删除节点"${nodeName}"吗？\n删除操作将同时删除当前节点和所有子节点，此操作不可恢复！`,
+    `确定要删除角色"${nodeName}"吗？\n删除操作将同时删除当前角色和所有子角色，此操作不可恢复！`,
     '确认删除',
     {
       confirmButtonText: '确认删除',
@@ -556,7 +632,7 @@ function handleNodeDelete() {
       // 用户确认删除
       const nodeId = selectedNode.value.id
 
-      // 递归查找所有子节点id
+      // 递归查找所有子角色id
       function collectDescendants(id, nodes, lines, collected = new Set()) {
         collected.add(id)
         lines.forEach((line) => {
@@ -571,7 +647,7 @@ function handleNodeDelete() {
       const deleteCount = toDeleteIds.size
 
       try {
-        // 删除节点
+        // 删除角色
         relationshipData.nodes = relationshipData.nodes.filter((n) => !toDeleteIds.has(n.id))
         // 删除相关连线
         relationshipData.lines = relationshipData.lines.filter(
@@ -581,7 +657,7 @@ function handleNodeDelete() {
         // 使用增量更新而不是重新设置整个数据
         const graphInstance = graphRef.value?.getInstance()
         if (graphInstance) {
-          // 删除节点和连线
+          // 删除角色和连线
           toDeleteIds.forEach((nodeId) => {
             graphInstance.removeNodeById(nodeId)
           })
@@ -590,22 +666,22 @@ function handleNodeDelete() {
           // graphInstance.doLayout()
           graphInstance.moveToCenter()
 
-          // 重新计算并应用节点大小（因为删除节点可能改变了层级关系）
+          // 重新计算并应用角色大小（因为删除角色可能改变了层级关系）
           applyNodeSizes()
         }
 
-        // 清空选中的节点
+        // 清空选中的角色
         selectedNode.value = null
         showRadialMenu.value = false
 
         // 显示删除结果
         if (deleteCount === 1) {
-          ElMessage.success('节点已删除')
+          ElMessage.success('角色已删除')
         } else {
-          ElMessage.success(`已删除 ${deleteCount} 个节点及其相关连线`)
+          ElMessage.success(`已删除 ${deleteCount} 个角色及其相关连线`)
         }
       } catch (error) {
-        console.error('删除节点失败:', error)
+        console.error('删除角色失败:', error)
         ElMessage.error('删除失败，请重试')
       }
     })
@@ -619,10 +695,10 @@ function handleNodeDelete() {
 const infoDialogVisible = ref(false)
 const infoForm = reactive({
   text: '',
-  gender: 'male', // 默认男性
+  gender: 'none', // 默认无
   color: '',
   description: '',
-  characterId: '', // 选中的人物谱id
+  characterId: '', // 选中的角色谱id
   avatar: '' // 头像路径或链接
 })
 
@@ -647,7 +723,7 @@ const presetColors = [
 ]
 const customColor = ref('')
 
-// 过滤人物数据
+// 过滤角色数据
 function filterCharacters(query) {
   if (query === '') {
     filteredCharacters.value = characters.value
@@ -658,23 +734,23 @@ function filterCharacters(query) {
   }
 }
 
-// 选择人物谱时自动同步性别、描述、背景色、头像
+// 选择角色谱时自动同步性别、描述、背景色、头像
 function onCharacterChange(val) {
-  // 检查是否是已存在的人物ID
+  // 检查是否是已存在的角色ID
   const character = characters.value.find((c) => c.id === val)
   if (character) {
-    // 选择已存在的人物
+    // 选择已存在的角色
     infoForm.text = character.name
-    infoForm.gender = character.gender || 'male' // 如果没有性别信息，默认男性
+    infoForm.gender = character.gender === '女' ? 'female' : character.gender === '男' ? 'male' : 'none' // 性别映射
     infoForm.description = character.introduction || character.biography || ''
-    infoForm.color = character.gender === 'female' ? '#ff5819' : '#409eff'
-    // 如果人物有头像，回填头像信息
+    infoForm.color = character.gender === '女' ? '#ff5819' : '#409eff'
+    // 如果角色有头像，回填头像信息
     infoForm.avatar = character.avatar || ''
     customColor.value = ''
   } else {
     // 输入新名称，设置默认值
     infoForm.text = val
-    infoForm.gender = 'male' // 新名称默认男性
+    infoForm.gender = 'female' // 新名称默认女性
     infoForm.description = ''
     infoForm.color = '#409eff'
     infoForm.avatar = '' // 清空头像
@@ -719,12 +795,60 @@ async function selectLocalImage() {
 // 重置表单到默认值
 function resetForm() {
   infoForm.text = ''
-  infoForm.gender = 'male' // 重置为默认男性
+  infoForm.gender = 'none' // 重置为默认无
   infoForm.color = ''
   infoForm.description = ''
   infoForm.characterId = ''
   infoForm.avatar = ''
   customColor.value = '#409eff'
+}
+
+// 处理节点双击事件（左键双击头像新增角色）
+function handleNodeDoubleClick(node) {
+  // 设置选中的节点
+  selectedNode.value = node
+  
+  // 重置表单为默认值
+  resetForm()
+  
+  // 设置新增模式标识
+  isAddMode.value = true
+  
+  // 隐藏环绕菜单
+  showRadialMenu.value = false
+  
+  // 显示角色编辑弹框
+  infoDialogVisible.value = true
+}
+
+// 处理节点右键点击事件（右键双击进入连线模式）
+let rightClickTimer = null
+let rightClickCount = 0
+
+function handleNodeRightClick(node, event) {
+  // 阻止默认右键菜单
+  event.preventDefault()
+  
+  // 设置选中的节点
+  selectedNode.value = node
+  
+  // 增加右键点击计数
+  rightClickCount++
+  
+  // 清除之前的定时器
+  if (rightClickTimer) {
+    clearTimeout(rightClickTimer)
+  }
+  
+  // 设置新的定时器
+  rightClickTimer = setTimeout(() => {
+    if (rightClickCount === 2) {
+      // 双击右键：进入连线模式
+      handleNodeLink()
+    }
+    // 重置点击计数
+    rightClickCount = 0
+  }, 300) // 300ms内的点击视为双击
 }
 
 // 关闭对话框并重置表单
@@ -741,20 +865,20 @@ function closeEdgeDialog() {
   edgeForm.text = ''
 }
 
-// 保存节点信息
-function saveNodeInfo() {
+// 保存角色信息
+async function saveNodeInfo() {
   if (isAddMode.value) {
-    // 新增模式：创建新节点
+    // 新增模式：创建新角色
     if (!infoForm.characterId.trim()) {
-      ElMessage.warning('请输入节点名称')
+      ElMessage.warning('请输入角色名称')
       return
     }
     const newNodeId = genId()
 
-    // 计算新节点的层级
+    // 计算新角色的层级
     let newNodeLevel = 0
     if (selectedNode.value) {
-      // 如果有选中的父节点，计算新节点的层级
+      // 如果有选中的父角色，计算新角色的层级
       const parentLevel = calculateNodeLevel(
         selectedNode.value.id,
         relationshipData.nodes,
@@ -763,7 +887,7 @@ function saveNodeInfo() {
       newNodeLevel = parentLevel + 1
     }
 
-    // 根据层级计算节点大小
+    // 根据层级计算角色大小
     const nodeSize = calculateNodeSize(
       newNodeId,
       relationshipData.nodes,
@@ -771,14 +895,44 @@ function saveNodeInfo() {
       newNodeLevel
     )
 
-    // 检查是否是已存在的人物ID
+    // 检查是否是已存在的角色ID
     let nodeText = infoForm.characterId.trim()
     let nodeCharacterId = nodeText
     const matchedCharacter = characters.value.find((c) => c.id === nodeText)
     if (matchedCharacter) {
-      // 如果是已存在的人物，使用人物名称作为节点文本，人物ID作为characterId
+      // 如果是已存在的角色，使用角色名称作为角色文本，角色ID作为characterId
       nodeText = matchedCharacter.name
       nodeCharacterId = matchedCharacter.id
+    } else {
+      // 如果是新角色，同步到人物谱
+      try {
+        const newCharacter = {
+          id: genId(), // 生成新的角色ID
+          name: nodeText,
+          gender: infoForm.gender === 'female' ? '女' : infoForm.gender === 'male' ? '男' : '无',
+          avatar: infoForm.avatar ? infoForm.avatar.replace(/^file:\/\//, '') : '',
+          introduction: '',
+          biography: '',
+          relationship: '',
+          abilities: '',
+          tags: []
+        }
+        
+        // 保存到人物谱
+        await window.electron.saveCharacter(bookName, newCharacter)
+        
+        // 更新本地角色列表
+        characters.value.push(newCharacter)
+        filteredCharacters.value = [...characters.value]
+        
+        // 使用生成的角色ID
+        nodeCharacterId = newCharacter.id
+        
+        ElMessage.success('角色已同步到人物谱')
+      } catch (error) {
+        console.error('同步角色到人物谱失败:', error)
+        ElMessage.warning('角色创建成功，但同步到人物谱失败')
+      }
     }
 
     const newNode = {
@@ -790,7 +944,7 @@ function saveNodeInfo() {
       height: nodeSize.height,
       data: {
         description: infoForm.description || '',
-        gender: infoForm.gender || 'male',
+        gender: infoForm.gender || 'none',
         characterId: nodeCharacterId,
         avatar: infoForm.avatar ? infoForm.avatar.replace(/^file:\/\//, '') : '',
         fontSize: nodeSize.fontSize
@@ -811,7 +965,7 @@ function saveNodeInfo() {
     // 使用增量更新而不是重新设置整个数据
     const graphInstance = graphRef.value?.getInstance()
     if (graphInstance) {
-      // 添加新节点
+      // 添加新角色
       graphInstance.addNodes([newNode])
 
       // 如果有连线，也添加连线
@@ -827,29 +981,29 @@ function saveNodeInfo() {
 
     infoDialogVisible.value = false
     isAddMode.value = false
-    ElMessage.success('新节点已创建')
+    ElMessage.success('新角色已创建')
   } else {
-    // 编辑模式：更新现有节点
+    // 编辑模式：更新现有角色
     if (!infoForm.characterId.trim()) {
-      ElMessage.warning('请输入节点名称')
+      ElMessage.warning('请输入角色名称')
       return
     }
 
-    // 检查是否是已存在的人物ID
+    // 检查是否是已存在的角色ID
     const existingCharacter = characters.value.find((c) => c.id === infoForm.characterId)
     if (existingCharacter) {
-      // 选择已存在的人物
+      // 选择已存在的角色
       selectedNode.value.text = existingCharacter.name
       // 确保 data 对象存在
       if (!selectedNode.value.data) {
         selectedNode.value.data = {}
       }
       selectedNode.value.data.characterId = existingCharacter.id
-      // 如果表单中没有头像但人物有头像，使用人物的头像
+      // 如果表单中没有头像但角色有头像，使用角色的头像
       if (!infoForm.avatar && existingCharacter.avatar) {
         infoForm.avatar = existingCharacter.avatar
       }
-      // 如果表单中没有描述但人物有描述，使用人物的描述
+      // 如果表单中没有描述但角色有描述，使用角色的描述
       if (
         !infoForm.description &&
         (existingCharacter.biography || existingCharacter.introduction)
@@ -863,7 +1017,7 @@ function saveNodeInfo() {
       if (!selectedNode.value.data) {
         selectedNode.value.data = {}
       }
-      selectedNode.value.data.characterId = '' // 清空人物ID，表示是新数据
+      selectedNode.value.data.characterId = '' // 清空角色ID，表示是新数据
     }
 
     // 确保 data 对象存在
@@ -883,7 +1037,7 @@ function saveNodeInfo() {
     if (node) {
       node.text = selectedNode.value.text
       node.color = selectedNode.value.color
-      // 确保目标节点的 data 对象存在
+      // 确保目标角色的 data 对象存在
       if (!node.data) {
         node.data = {}
       }
@@ -901,7 +1055,7 @@ function saveNodeInfo() {
     }
 
     infoDialogVisible.value = false
-    ElMessage.success('节点信息已更新')
+    ElMessage.success('角色信息已更新')
   }
 }
 
@@ -944,39 +1098,39 @@ function saveEdgeInfo() {
   }
 }
 
-// 根据节点层级计算节点大小和字体大小
+// 根据角色层级计算角色大小和字体大小
 function calculateNodeSize(nodeId, nodes, lines, level = 0) {
-  // 根节点最大
+  // 根结点最大
   if (level === 0) {
     return { width: 100, height: 100, fontSize: 20 }
   }
-  // 第一级子节点中等
+  // 第一级子角色中等
   else if (level === 1) {
     return { width: 90, height: 90, fontSize: 18 }
   }
-  // 第二级子节点较小
+  // 第二级子角色较小
   else if (level === 2) {
     return { width: 80, height: 80, fontSize: 16 }
   }
-  // 第三级及以后节点最小且一致
+  // 第三级及以后角色最小且一致
   else {
     return { width: 70, height: 70, fontSize: 14 }
   }
 }
 
-// 计算节点的层级
+// 计算角色的层级
 function calculateNodeLevel(nodeId, nodes, lines, visited = new Set()) {
   if (visited.has(nodeId)) return 0
 
   visited.add(nodeId)
 
-  // 找到根节点（没有父节点的节点）
+  // 找到根结点（没有父角色的角色）
   const hasParent = lines.some((line) => line.to === nodeId)
   if (!hasParent) {
     return 0
   }
 
-  // 找到父节点
+  // 找到父角色
   const parentLine = lines.find((line) => line.to === nodeId)
   if (parentLine) {
     const parentLevel = calculateNodeLevel(parentLine.from, nodes, lines, visited)
@@ -986,7 +1140,7 @@ function calculateNodeLevel(nodeId, nodes, lines, visited = new Set()) {
   return 0
 }
 
-// 应用节点大小
+// 应用角色大小
 function applyNodeSizes() {
   const graphInstance = graphRef.value?.getInstance()
   if (!graphInstance) return
@@ -995,7 +1149,7 @@ function applyNodeSizes() {
     const level = calculateNodeLevel(node.id, relationshipData.nodes, relationshipData.lines)
     const size = calculateNodeSize(node.id, relationshipData.nodes, relationshipData.lines, level)
 
-    // 更新节点大小和字体大小
+    // 更新角色大小和字体大小
     node.width = size.width
     node.height = size.height
 
@@ -1005,7 +1159,7 @@ function applyNodeSizes() {
     }
     node.data.fontSize = size.fontSize
 
-    // 更新RelationGraph中的节点
+    // 更新RelationGraph中的角色
     const graphNode = graphInstance.getNodeById(node.id)
     if (graphNode) {
       graphNode.width = size.width
@@ -1021,7 +1175,7 @@ function applyNodeSizes() {
   graphInstance.dataUpdated()
 }
 
-// 获取节点样式
+// 获取角色样式
 function getNodeStyle(node) {
   return {
     width: node.width + 'px',
@@ -1157,7 +1311,7 @@ onMounted(async () => {
   object-fit: cover;
 }
 
-/* 自定义节点样式 */
+/* 自定义角色样式 */
 .custom-node {
   width: 100%;
   height: 100%;
