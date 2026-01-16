@@ -140,17 +140,22 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            ## Release ${{ github.ref_name }}
+            ## 🎉 Release ${{ github.ref_name }}
             
-            ### 下载安装包
+            ### 📦 下载安装包
             
             - **Windows**: 下载 `.exe` 文件进行安装
-            - **macOS**: 下载 `.dmg` 文件进行安装
-            - **Linux**: 下载 `.AppImage`、`.deb` 或 `.snap` 文件
+            - **macOS**: 下载 `.dmg` 文件进行安装（支持 Intel 和 Apple Silicon）
+            - **Linux**: 下载 `.AppImage` 或 `.deb` 文件
             
-            ### 构建信息
-            - 构建时间: ${{ github.event.head_commit.timestamp }}
-            - 提交: ${{ github.sha }}
+            ### 📝 构建信息
+            
+            - **构建时间**: ${{ github.event.head_commit.timestamp }}
+            - **提交哈希**: `${{ github.sha }}`
+            
+            ---
+            
+            感谢使用柚子写作！如有问题请提交 Issue。
           files: |
             dist/**/*.exe
             dist/**/*.dmg
