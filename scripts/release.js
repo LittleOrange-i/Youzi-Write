@@ -212,8 +212,8 @@ function main() {
   console.log('   1. 检测到新的 tag')
   console.log('   2. 在 Windows、macOS、Linux 上构建应用')
   console.log('   3. 创建 GitHub Release 并上传构建产物\n')
-  console.log(`🔗 查看构建状态: https://github.com/xiaoshengxianjun/youziwrite/actions`)
-  console.log(`🔗 查看 Release: https://github.com/xiaoshengxianjun/youziwrite/releases`)
+  console.log(`🔗 查看构建状态: https://github.com/LittleOrange-i/Youzi-Write/actions`)
+  console.log(`🔗 查看 Release: https://github.com/LittleOrange-i/Youzi-Write/releases`)
 }
 
 main()

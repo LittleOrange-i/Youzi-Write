@@ -54,4 +54,3 @@ ls -lh "${BUILD_DIR}/icon."* | awk '{print "   " $9 " (" $5 ")"}'
 echo ""
 echo "💡 提示: electron-builder 会在 Windows 构建时自动从 PNG 生成 .ico 文件"
 echo "💡 下次更新图标时，只需运行: ./scripts/update-icon.sh"
-
