@@ -148,36 +148,75 @@ function main() {
 
   console.log(`✨ 新版本: ${newVersion}\n`)
 
-  // 确认
-  console.log('⚠️  即将执行以下操作:')
-  console.log(`   1. 更新 package.json 版本号: ${currentVersion} -> ${newVersion}`)
-  console.log(`   2. 提交更改`)
-  console.log(`   3. 创建 tag: v${newVersion}`)
-  console.log(`   4. 推送 tag 到远程仓库`)
-  console.log(`   5. GitHub Actions 将自动构建并发布 Release\n`)
+  /**
+   * 判断 tag 是否已存在
+   * - 避免重复发布同一个版本导致流程中途失败
+   */
+  function tagExists(tag) {
+    try {
+      execSync(`git rev-parse -q --verify refs/tags/${tag}`, { cwd: rootDir, stdio: 'ignore' })
+      return true
+    } catch {
+      return false
+    }
+  }
 
-  // 更新 package.json
-  console.log('📝 更新 package.json...')
-  pkg.version = newVersion
-  writePackageJson(pkg)
-  console.log('✅ package.json 已更新\n')
+  /**
+   * 判断暂存区是否有变更
+   * - `git diff --cached --quiet`：无差异返回 0；有差异返回非 0
+   */
+  function hasStagedChanges() {
+    try {
+      execSync('git diff --cached --quiet', { cwd: rootDir, stdio: 'ignore' })
+      return false
+    } catch {
+      return true
+    }
+  }
 
-  // 提交更改
-  console.log('💾 提交更改...')
-  try {
-    execSync(`git add package.json`, { cwd: rootDir, stdio: 'inherit' })
-    execSync(`git commit -m "chore: bump version to ${newVersion}"`, {
-      cwd: rootDir,
-      stdio: 'inherit'
-    })
-    console.log('✅ 更改已提交\n')
-  } catch (error) {
-    console.error('❌ 错误: 提交失败')
+  const tagName = `v${newVersion}`
+  if (tagExists(tagName)) {
+    console.error(`❌ 错误: tag ${tagName} 已存在，请更换版本号或先删除旧 tag`)
     process.exit(1)
   }
 
+  // 确认
+  console.log('⚠️  即将执行以下操作:')
+  console.log(`   1. 更新 package.json 版本号: ${currentVersion} -> ${newVersion}`)
+  console.log(`   2. 提交更改（如有）`)
+  console.log(`   3. 创建 tag: ${tagName}`)
+  console.log(`   4. 推送 tag 到远程仓库`)
+  console.log(`   5. GitHub Actions 将自动构建并发布 Release\n`)
+
+  // 更新 package.json + 提交更改（版本未变化时允许跳过提交，仅用于补打 tag）
+  if (newVersion !== currentVersion) {
+    console.log('📝 更新 package.json...')
+    pkg.version = newVersion
+    writePackageJson(pkg)
+    console.log('✅ package.json 已更新\n')
+
+    console.log('💾 提交更改...')
+    try {
+      execSync(`git add package.json`, { cwd: rootDir, stdio: 'inherit' })
+
+      if (!hasStagedChanges()) {
+        console.log('ℹ️ 未检测到暂存区变更，跳过提交\n')
+      } else {
+        execSync(`git commit -m "chore: bump version to ${newVersion}"`, {
+          cwd: rootDir,
+          stdio: 'inherit'
+        })
+        console.log('✅ 更改已提交\n')
+      }
+    } catch (error) {
+      console.error('❌ 错误: 提交失败')
+      process.exit(1)
+    }
+  } else {
+    console.log('ℹ️ 目标版本与当前版本一致，跳过版本号更新与提交（仅创建/推送 tag）\n')
+  }
+
   // 创建并推送 tag
-  const tagName = `v${newVersion}`
   console.log(`🏷️  创建 tag: ${tagName}...`)
   try {
     execSync(`git tag -a ${tagName} -m "Release ${tagName}"`, {
@@ -189,6 +228,7 @@ function main() {
     console.error(`❌ 错误: 创建 tag 失败`)
     process.exit(1)
   }
+
 
   // 推送代码和 tag
   console.log('📤 推送代码和 tag 到远程仓库...')
