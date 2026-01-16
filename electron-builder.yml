@@ -64,10 +64,9 @@ linux:
 appImage:
   artifactName: ${productName}-${version}.${ext}
 npmRebuild: false
-# 不自动发布，只在 GitHub Actions 中上传文件
-# publish:
-#   provider: github
-#   owner: LittleOrange-i
-#   repo: Youzi-Write
+publish:
+  provider: github
+  owner: LittleOrange-i
+  repo: Youzi-Write
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
