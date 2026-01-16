@@ -7,7 +7,7 @@ files:
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{.env,.env.*,pnpm-lock.yaml}'
   - '!**/.venv/**'
   - '!**/venv/**'
 asarUnpack:
@@ -50,7 +50,6 @@ dmg:
       type: link
       path: /Applications
 linux:
-  icon: build/icon.png
   target:
     - AppImage
     - deb
