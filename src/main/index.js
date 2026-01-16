@@ -808,7 +808,14 @@ app.whenReady().then(() => {
     try {
       // 从 URL 中提取文件路径
       const url = request.url
-      const filePath = decodeURIComponent(url.replace('atom://', ''))
+      // 使用 decodeURI 解码（对应前端的 encodeURI）
+      let filePath = decodeURI(url.replace('atom://', ''))
+      
+      // 将正斜杠转回 Windows 反斜杠（如果在 Windows 系统上）
+      if (process.platform === 'win32') {
+        // 处理 Windows 盘符格式 (C:/path -> C:\path)
+        filePath = filePath.replace(/^([a-zA-Z]):\//, '$1:\\').replace(/\//g, '\\')
+      }
       
       // 检查文件是否存在
       if (!fs.existsSync(filePath)) {

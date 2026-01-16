@@ -43,54 +43,63 @@
               <!-- 预览内容区 -->
               <div class="relative h-full flex">
                 <!-- 左侧信息栏 (75%宽度) - 不使用整体磨砂 -->
-                <div class="w-[75%] flex flex-col justify-between p-1.5">
+                <div class="w-[75%] flex flex-col justify-between p-2 ">
                   <!-- 顶部：类型标签 -->
                   <div class="flex items-start justify-start">
-                    <div class="inline-flex items-center gap-0.5 px-1 py-0.5 bg-gradient-to-r from-amber-500/90 to-orange-500/90 rounded-md shadow-lg">
-                      <svg class="w-2 h-2 text-white flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <div class="inline-flex items-center gap-[0.17rem] px-[0.33rem] py-[0.17rem] bg-gradient-to-r from-amber-500/90 to-orange-500/90 rounded shadow-lg">
+                      <svg class="w-[0.42rem] h-[0.42rem] text-white flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
                       </svg>
-                      <span class="text-[9px] font-bold text-white whitespace-nowrap">{{ form.type ? BOOK_TYPES.find(t => t.value === form.type)?.label : '类型' }}</span>
+                      <span class="text-[8px] font-bold text-white whitespace-nowrap">{{ form.type ? BOOK_TYPES.find(t => t.value === form.type)?.label : '类型' }}</span>
                     </div>
                   </div>
                   
                   <!-- 底部信息区 - 添加磨砂效果 -->
-                  <div class="flex flex-col gap-1 -ml-0.5 p-0.5 rounded-lg bg-black/30 backdrop-blur-sm border border-white/20">
+                  <div class="flex flex-col gap-[0.33rem] -ml-[0.17rem] p-[0.08rem] rounded-lg bg-black/30 backdrop-blur-sm border border-white/20">
                     <!-- 作者信息 -->
-                    <div class="flex items-center gap-0.5">
-                      <svg class="w-2.5 h-2.5 flex-shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <div class="flex items-center gap-[0.17rem]">
+                      <svg class="w-[0.58rem] h-[0.58rem] flex-shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
                       </svg>
-                      <span class="text-[9px] font-semibold text-white break-all drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ form.author || '佚名' }}</span>
+                      <span class="text-[8px] font-semibold text-white break-all drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ form.author || '佚名' }}</span>
                     </div>
 
                     <!-- 字数统计 -->
-                    <div class="flex items-center gap-0.5">
-                      <svg class="w-2.5 h-2.5 flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <div class="flex items-center gap-[0.17rem]">
+                      <svg class="w-[0.58rem] h-[0.58rem] flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
                       </svg>
-                      <span class="text-[10px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">200万字</span>
+                      <span class="text-[9.33px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">200万字</span>
                     </div>
                     
                     <!-- 更新时间 - 显示到秒 -->
-                    <div class="flex items-center gap-0.5">
-                      <svg class="w-2.5 h-2.5 flex-shrink-0 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                    <div class="flex items-center gap-[0.17rem]">
+                      <svg class="w-[0.58rem] h-[0.58rem] flex-shrink-0 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
                       </svg>
-                      <span class="text-[9px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">01/01 12:00:00</span>
+                      <span class="text-[7.33px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">01/01 12:00:00</span>
                     </div>
                   </div>
                 </div>
 
-                <!-- 右侧书名栏 (25%宽度) - 纵向显示，紧贴右边，上下留空 -->
-                <div class="flex-1 flex items-center justify-end pr-2 py-3">
-                  <div class="vertical-title-container">
-                    <!-- 书名 - 纵向排列 -->
+                <!-- 右侧书名栏 (25%宽度) - 纵向显示，紧贴右边，顶部对齐 -->
+                <div class="flex-1 flex items-start justify-end pr-[0.67rem] pt-[0.17rem] pb-[1rem]">
+                  <!-- 第二列（右侧）- 显示第9-15个字符 -->
+                  <div v-if="(form.name || '书名预览').length > 8" class="vertical-title-container">
                     <h3 
                       class="vertical-title text-white font-black tracking-widest"
-                      style="font-size: 14px; writing-mode: vertical-rl; text-orientation: upright;"
+                      :style="{ fontSize: getPreviewTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
                     >
-                      {{ form.name || '书名预览' }}
+                      <span style="visibility: hidden;">空</span>{{ (form.name || '书名预览').slice(8) }}
+                    </h3>
+                  </div>
+                  <!-- 第一列（右侧）- 显示前8个字符 -->
+                  <div class="vertical-title-container">
+                    <h3 
+                      class="vertical-title text-white font-black tracking-widest"
+                      :style="{ fontSize: getPreviewTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
+                    >
+                      {{ (form.name || '书名预览').slice(0, 8) }}
                     </h3>
                   </div>
                 </div>
@@ -111,8 +120,8 @@
             <el-form-item prop="name" label="书名">
               <el-input
                 v-model="form.name"
-                placeholder="请输入书籍名称（最多20个字符）"
-                maxlength="20"
+                placeholder="请输入书籍名称（最多15个字符）"
+                maxlength="15"
                 show-word-limit
               />
             </el-form-item>
@@ -135,7 +144,7 @@
               <el-input
                 v-model="form.author"
                 placeholder="请输入作者名称"
-                maxlength="20"
+                maxlength="10"
                 show-word-limit
               />
             </el-form-item>
@@ -324,18 +333,36 @@ const previewCoverStyle = computed(() => {
   if (form.value.coverUrl) {
     let imageUrl = form.value.coverUrl
     
-    // 如果是网络路径，直接使用
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    // 如果包含 URL 编码的 data: 标记，先解码
+    if (imageUrl.includes('data%3Aimage') || imageUrl.includes('data%3aimage')) {
+      try {
+        imageUrl = decodeURIComponent(imageUrl)
+      } catch (e) {
+        console.warn('URL解码失败:', e)
+      }
+    }
+    
+    // 优先检查：如果是 base64 数据URL，直接使用
+    if (imageUrl.startsWith('data:image/')) {
       return {
         backgroundImage: `url("${imageUrl}")`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }
-    } else {
+    }
+    // 如果是网络路径，直接使用
+    else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return {
+        backgroundImage: `url("${imageUrl}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }
+    } 
+    else {
       // 本地路径使用 atom:// 协议（Electron 安全协议）
-      // 注意：这需要在主进程中注册自定义协议处理
-      // 暂时使用相对路径或者通过 IPC 转换为 base64
-      const encodedPath = encodeURIComponent(imageUrl)
+      // 将 Windows 反斜杠转换为正斜杠，并使用 encodeURI 保留路径结构
+      const normalizedPath = imageUrl.replace(/\\/g, '/')
+      const encodedPath = encodeURI(normalizedPath)
       return {
         backgroundImage: `url("atom://${encodedPath}")`,
         backgroundSize: 'cover',
@@ -596,6 +623,22 @@ async function selectLocalCover() {
   }
 }
 
+// 根据书名长度动态计算预览图纵向字号（按照 120/180 = 0.667 比例缩放）
+function getPreviewTitleSize() {
+  const nameLength = form.value.name ? form.value.name.length : 4
+  if (nameLength <= 4) {
+    return 21.33  // 对应实际的 32px × 0.667
+  } else if (nameLength <= 6) {
+    return 18.67  // 对应实际的 28px × 0.667
+  } else if (nameLength <= 8) {
+    return 16  // 对应实际的 24px × 0.667
+  } else if (nameLength <= 10) {
+    return 13.33  // 对应实际的 20px × 0.667
+  } else {
+    return 12  // 对应实际的 18px × 0.667
+  }
+}
+
 // 刷新图表数据
 async function refreshChart() {
   chartRef.value?.updateData()
@@ -649,7 +692,7 @@ onBeforeUnmount(() => {
 }
 
 .vertical-title {
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans CN', serif;
+  font-family: 'KaiTi', 'STKaiti', '楷体', 'KaiTi_GB2312', serif;
   text-shadow: 
     0 2px 10px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(251, 191, 36, 0.3),

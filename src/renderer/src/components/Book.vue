@@ -58,20 +58,29 @@
               <svg class="w-3.5 h-3.5 flex-shrink-0 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
               </svg>
-              <span class="text-[12px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ fullDateTime }}</span>
+              <span class="text-[11px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ fullDateTime }}</span>
             </div>
           </div>
         </div>
 
-        <!-- 右侧书名栏 (约25%宽度) - 纵向显示，紧贴右边，上下留空 -->
-        <div class="flex-1 flex items-center justify-end pr-4 py-6">
-          <div class="vertical-title-container">
-            <!-- 书名 - 纵向排列 -->
+        <!-- 右侧书名栏 (约25%宽度) - 纵向显示，紧贴右边，顶部对齐 -->
+        <div class="flex-1 flex items-start justify-end pr-4 pt-1 pb-6">
+          <!-- 第二列（右侧）- 显示第9-15个字符 -->
+          <div v-if="name && name.length > 8" class="vertical-title-container">
             <h3 
               class="vertical-title text-white font-black tracking-widest"
               :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
             >
-              {{ name }}
+              <span style="visibility: hidden;">空</span>{{ name.slice(8) }}
+            </h3>
+          </div>
+          <!-- 第一列（右侧）- 显示前8个字符 -->
+          <div class="vertical-title-container">
+            <h3 
+              class="vertical-title text-white font-black tracking-widest"
+              :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
+            >
+              {{ name ? name.slice(0, 8) : '' }}
             </h3>
           </div>
         </div>
@@ -167,17 +176,57 @@ const coverStyle = computed(() => {
     // 如果有封面URL
     let imageUrl = props.coverUrl
     
-    // 如果是网络路径，直接使用
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    // 如果包含 URL 编码的 data: 标记，先解码
+    // 检测是否是被编码的 data:image 格式（data%3Aimage）
+    if (imageUrl.includes('data%3Aimage') || imageUrl.includes('data%3aimage')) {
+      try {
+        imageUrl = decodeURIComponent(imageUrl)
+      } catch (e) {
+        console.warn('URL解码失败:', e)
+      }
+    }
+    
+    // 优先检查：如果已经是 base64 数据URL，直接使用（避免被误认为本地路径）
+    if (imageUrl.startsWith('data:image/')) {
       return {
         backgroundImage: `url("${imageUrl}")`
       }
-    } else {
-      // 本地路径使用 atom:// 协议（Electron 安全协议）
-      // 注意：这需要在主进程中注册自定义协议处理
-      const encodedPath = encodeURIComponent(imageUrl)
+    }
+    // 如果是网络路径，直接使用
+    else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       return {
-        backgroundImage: `url("atom://${encodedPath}")`
+        backgroundImage: `url("${imageUrl}")`
+      }
+    } 
+    else {
+      // 本地路径使用 atom:// 协议（Electron 安全协议）
+      // 支持多种图片格式：jpg, jpeg, png, gif, bmp, webp
+      const path = require('path')
+      const ext = path.extname(imageUrl).toLowerCase()
+      const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.bmp': 'image/bmp',
+        '.webp': 'image/webp'
+      }
+      
+      // 验证图片格式
+      if (mimeTypes[ext]) {
+        // 将 Windows 反斜杠转换为正斜杠，并对特殊字符进行编码
+        // 但保留路径分隔符和盘符冒号
+        const normalizedPath = imageUrl.replace(/\\/g, '/')
+        // 使用 encodeURI 而不是 encodeURIComponent，保留路径结构
+        const encodedPath = encodeURI(normalizedPath)
+        return {
+          backgroundImage: `url("atom://${encodedPath}")`
+        }
+      } else {
+        console.warn('不支持的图片格式:', ext)
+        return {
+          background: 'linear-gradient(135deg, #ee9ca7 0%, #ffdde1 50%, #fbc2eb 100%)'
+        }
       }
     }
   } else {
@@ -356,13 +405,20 @@ onBeforeUnmount(() => {
 }
 
 .vertical-title {
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans CN', serif;
+  font-family: 'KaiTi', 'STKaiti', '楷体', 'KaiTi_GB2312', serif;
   text-shadow: 
     0 2px 10px rgba(0, 0, 0, 0.5),
     0 0 20px rgba(251, 191, 36, 0.3),
     2px 2px 4px rgba(0, 0, 0, 0.3);
   letter-spacing: 0.15em;
   line-height: 1.2;
+}
+
+/* 底部信息区文本使用楷体 */
+.book-body {
+  span {
+    font-family: 'KaiTi', 'STKaiti', '楷体', 'KaiTi_GB2312', serif;
+  }
 }
 </style>
 
