@@ -193,11 +193,11 @@ function main() {
   // 推送代码和 tag
   console.log('📤 推送代码和 tag 到远程仓库...')
   try {
-    execSync(`git push origin ${branch}`, {
+    execSync(`git push base ${branch}`, {
       cwd: rootDir,
       stdio: 'inherit'
     })
-    execSync(`git push origin ${tagName}`, {
+    execSync(`git push base ${tagName}`, {
       cwd: rootDir,
       stdio: 'inherit'
     })
