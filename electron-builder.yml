@@ -64,9 +64,5 @@ linux:
 appImage:
   artifactName: ${productName}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: github
-  owner: LittleOrange-i
-  repo: Youzi-Write
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
