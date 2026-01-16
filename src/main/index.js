@@ -1234,6 +1234,12 @@ function decryptBackupData(encryptedData) {
  * @param {string} basePath - 基础路径（用于计算相对路径）
  * @returns {Array} 文件列表
  */
+/**
+ * 递归读取目录下的所有文件和空文件夹（包括二进制文件）
+ * @param {string} dirPath - 要读取的目录路径
+ * @param {string} basePath - 基础路径，用于计算相对路径
+ * @returns {Array} 文件和目录数组，每个项包含 path、content、encoding、isDirectory 属性
+ */
 function readDirectoryRecursive(dirPath, basePath) {
   const files = []
   
@@ -1249,15 +1255,47 @@ function readDirectoryRecursive(dirPath, basePath) {
     
     if (item.isDirectory()) {
       // 递归读取子目录
-      files.push(...readDirectoryRecursive(fullPath, basePath))
-    } else {
-      // 读取文件内容
-      try {
-        const content = fs.readFileSync(fullPath, 'utf-8')
+      const subItems = readDirectoryRecursive(fullPath, basePath)
+      files.push(...subItems)
+      
+      // 如果子目录为空，记录该空目录
+      if (subItems.length === 0) {
         files.push({
-          path: relativePath.replace(/\\/g, '/'), // 统一使用正斜杠
-          content: content
+          path: relativePath.replace(/\\/g, '/'),
+          isDirectory: true
         })
+      }
+    } else {
+      // 读取文件内容（支持文本和二进制文件）
+      try {
+        // 检测文件类型
+        const ext = path.extname(fullPath).toLowerCase()
+        const textExtensions = ['.txt', '.md', '.json', '.js', '.ts', '.vue', '.jsx', '.tsx', 
+                               '.css', '.scss', '.sass', '.less', '.html', '.xml', '.yml', 
+                               '.yaml', '.ini', '.conf', '.log', '.csv', '.svg']
+        
+        const isTextFile = textExtensions.includes(ext)
+        
+        if (isTextFile) {
+          // 文本文件：使用 UTF-8 编码读取
+          const content = fs.readFileSync(fullPath, 'utf-8')
+          files.push({
+            path: relativePath.replace(/\\/g, '/'), // 统一使用正斜杠
+            content: content,
+            encoding: 'utf-8',
+            isDirectory: false
+          })
+        } else {
+          // 二进制文件：转为 base64 存储
+          const buffer = fs.readFileSync(fullPath)
+          const base64Content = buffer.toString('base64')
+          files.push({
+            path: relativePath.replace(/\\/g, '/'),
+            content: base64Content,
+            encoding: 'base64',
+            isDirectory: false
+          })
+        }
       } catch (error) {
         console.error(`读取文件失败: ${fullPath}`, error)
       }
@@ -1391,6 +1429,9 @@ ipcMain.handle('export-bookshelf', async (event) => {
             
             // 读取所有文件内容
             const bookFiles = readDirectoryRecursive(bookPath, bookPath)
+            const fileCount = bookFiles.filter(f => !f.isDirectory).length
+            const dirCount = bookFiles.filter(f => f.isDirectory).length
+            console.log(`[导出] 书籍 "${file.name}" 包含 ${fileCount} 个文件${dirCount > 0 ? `, ${dirCount} 个空文件夹` : ''}`)
             
             // 处理人物头像（如果有 characters.json）
             const charactersFile = bookFiles.find(f => f.path === 'characters.json')
@@ -1446,10 +1487,17 @@ ipcMain.handle('export-bookshelf', async (event) => {
     // 写入文件
     fs.writeFileSync(filePath, encryptedData, 'utf-8')
     
+    // 计算总文件数和空文件夹数
+    const totalFiles = books.reduce((sum, book) => sum + book.files.filter(f => !f.isDirectory).length, 0)
+    const totalDirs = books.reduce((sum, book) => sum + book.files.filter(f => f.isDirectory).length, 0)
+    console.log(`[导出] 导出完成: ${books.length} 本书籍, 共 ${totalFiles} 个文件${totalDirs > 0 ? `, ${totalDirs} 个空文件夹` : ''}`)
+    
     return {
       success: true,
       filePath: filePath,
-      booksCount: books.length
+      booksCount: books.length,
+      totalFiles: totalFiles,
+      totalDirs: totalDirs
     }
   } catch (error) {
     console.error('导出书架失败:', error)
@@ -1658,16 +1706,33 @@ ipcMain.handle('import-bookshelf', async (event, options = {}) => {
                 
                 for (const file of book.files) {
                   const filePath = join(targetPath, file.path)
+                  
+                  // 如果是目录标记，创建空目录
+                  if (file.isDirectory) {
+                    fs.mkdirSync(filePath, { recursive: true })
+                    continue
+                  }
+                  
                   const fileDir = path.dirname(filePath)
                   
                   if (!fs.existsSync(fileDir)) {
                     fs.mkdirSync(fileDir, { recursive: true })
                   }
                   
-                  fs.writeFileSync(filePath, file.content, 'utf-8')
+                  // 根据文件编码类型写入
+                  if (file.encoding === 'base64') {
+                    // 二进制文件：从 base64 还原
+                    const buffer = Buffer.from(file.content, 'base64')
+                    fs.writeFileSync(filePath, buffer)
+                  } else {
+                    // 文本文件：使用 UTF-8 编码
+                    fs.writeFileSync(filePath, file.content, 'utf-8')
+                  }
                 }
                 
-                console.log('[导入执行] 已写入', book.files.length, '个文件')
+                const fileCount = book.files.filter(f => !f.isDirectory).length
+                const dirCount = book.files.filter(f => f.isDirectory).length
+                console.log(`[导入执行] 已写入 ${fileCount} 个文件${dirCount > 0 ? `, 创建 ${dirCount} 个空文件夹` : ''}`)
                 
                 // 更新元数据
                 const newMetaPath = join(targetPath, 'mazi.json')
@@ -1712,6 +1777,13 @@ ipcMain.handle('import-bookshelf', async (event, options = {}) => {
           // 写入所有文件
           for (const file of book.files) {
             const filePath = join(targetPath, file.path)
+            
+            // 如果是目录标记，创建空目录
+            if (file.isDirectory) {
+              fs.mkdirSync(filePath, { recursive: true })
+              continue
+            }
+            
             const fileDir = path.dirname(filePath)
             
             // 确保目录存在
@@ -1719,11 +1791,20 @@ ipcMain.handle('import-bookshelf', async (event, options = {}) => {
               fs.mkdirSync(fileDir, { recursive: true })
             }
             
-            // 写入文件内容
-            fs.writeFileSync(filePath, file.content, 'utf-8')
+            // 根据文件编码类型写入
+            if (file.encoding === 'base64') {
+              // 二进制文件：从 base64 还原
+              const buffer = Buffer.from(file.content, 'base64')
+              fs.writeFileSync(filePath, buffer)
+            } else {
+              // 文本文件：使用 UTF-8 编码
+              fs.writeFileSync(filePath, file.content, 'utf-8')
+            }
           }
           
-          console.log('[导入执行] 已写入', book.files.length, '个文件')
+          const fileCount = book.files.filter(f => !f.isDirectory).length
+          const dirCount = book.files.filter(f => f.isDirectory).length
+          console.log(`[导入执行] 已写入 ${fileCount} 个文件${dirCount > 0 ? `, 创建 ${dirCount} 个空文件夹` : ''}`)
           
           // 更新元数据中的导入时间
           const metaPath = join(targetPath, 'mazi.json')
@@ -1749,16 +1830,33 @@ ipcMain.handle('import-bookshelf', async (event, options = {}) => {
           // 写入所有文件
           for (const file of book.files) {
             const filePath = join(targetPath, file.path)
+            
+            // 如果是目录标记，创建空目录
+            if (file.isDirectory) {
+              fs.mkdirSync(filePath, { recursive: true })
+              continue
+            }
+            
             const fileDir = path.dirname(filePath)
             
             if (!fs.existsSync(fileDir)) {
               fs.mkdirSync(fileDir, { recursive: true })
             }
             
-            fs.writeFileSync(filePath, file.content, 'utf-8')
+            // 根据文件编码类型写入
+            if (file.encoding === 'base64') {
+              // 二进制文件：从 base64 还原
+              const buffer = Buffer.from(file.content, 'base64')
+              fs.writeFileSync(filePath, buffer)
+            } else {
+              // 文本文件：使用 UTF-8 编码
+              fs.writeFileSync(filePath, file.content, 'utf-8')
+            }
           }
           
-          console.log('[导入执行] 已写入', book.files.length, '个文件')
+          const fileCount = book.files.filter(f => !f.isDirectory).length
+          const dirCount = book.files.filter(f => f.isDirectory).length
+          console.log(`[导入执行] 已写入 ${fileCount} 个文件${dirCount > 0 ? `, 创建 ${dirCount} 个空文件夹` : ''}`)
           
           // 更新元数据
           const metaPath = join(targetPath, 'mazi.json')

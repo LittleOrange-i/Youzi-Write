@@ -671,7 +671,7 @@ async function handleExportBookshelf() {
     
     if (result.success) {
       ElMessage({
-        message: `导出成功！共导出 ${result.booksCount} 本书籍`,
+        message: `导出成功！共导出 ${result.booksCount} 本书籍，包含 ${result.totalFiles || 0} 个文件`,
         type: 'success',
         duration: 3000
       })
