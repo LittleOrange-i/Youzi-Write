@@ -1,5 +1,7 @@
 appId: com.electron.app
 productName: 柚子写作
+# 禁用自动发布，只在 GitHub Actions 中手动上传
+publish: null
 directories:
   buildResources: build
 files:
@@ -15,8 +17,6 @@ asarUnpack:
 win:
   icon: build/icon.ico
   executableName: 柚子写作
-  # 禁用 blockmap 文件生成
-  publish: null
 nsis:
   artifactName: ${productName}-${version}-setup.${ext}
   shortcutName: ${productName}
