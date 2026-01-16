@@ -234,6 +234,14 @@ if (process.contextIsolated) {
       // 验证书架密码
       verifyShelfPassword: (password) => ipcRenderer.invoke('verify-shelf-password', password),
 
+      // --------- 书架导出导入相关 ---------
+      // 导出整个书架
+      exportBookshelf: () => ipcRenderer.invoke('export-bookshelf'),
+      // 导入书架
+      importBookshelf: (options) => ipcRenderer.invoke('import-bookshelf', options),
+      // 检查导入冲突
+      checkImportConflicts: (importData) => ipcRenderer.invoke('check-import-conflicts', importData),
+
       // --------- 快捷键管理相关 ---------
       // 注册快捷键
       registerShortcuts: (shortcutMap) => ipcRenderer.invoke('register-shortcuts', shortcutMap),

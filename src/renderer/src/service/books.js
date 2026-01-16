@@ -40,7 +40,7 @@ export async function readBooksDir() {
 }
 
 /**
- * 删除书籍（假设主进程有 delete-book 处理）
+ * 删除书籍
  * @param {string} name 书籍名称
  * @returns {Promise<any>}
  */

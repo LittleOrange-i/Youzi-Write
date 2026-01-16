@@ -80,6 +80,35 @@ ipcMain.handle('store:delete', async (_, key) => {
   return true
 })
 
+// ========== 书籍路径辅助函数 ==========
+
+/**
+ * 获取书籍的完整路径
+ * @param {string} bookName - 书籍名称
+ * @returns {string} 书籍完整路径
+ */
+function getBookPath(bookName) {
+  const booksDir = store.get('booksDir')
+  return join(booksDir, bookName)
+}
+
+/**
+ * 根据书名查找书籍路径
+ * @param {string} bookName - 书籍名称
+ * @returns {string|null} 书籍路径，如果不存在返回null
+ */
+function findBookPath(bookName) {
+  const booksDir = store.get('booksDir')
+  
+  // 检查根目录
+  const mainPath = join(booksDir, bookName)
+  if (fs.existsSync(mainPath)) {
+    return mainPath
+  }
+  
+  return null
+}
+
 // ========== 书架密码加密处理 ==========
 
 // 加密算法：使用 AES-256-CBC
@@ -384,7 +413,7 @@ async function loadAndRegisterShortcuts() {
             
             if (success) {
               registeredShortcuts[actionId] = accelerator
-              console.log(`快捷键注册成功: ${actionId} - ${accelerator}`)
+              // console.log(`快捷键注册成功: ${actionId} - ${accelerator}`)
             } else {
               console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
             }
@@ -1009,10 +1038,13 @@ ipcMain.handle('create-book', async (event, bookInfo) => {
 })
 
 // 读取书籍目录
+// 读取书籍目录
 ipcMain.handle('read-books-dir', async () => {
   const books = []
   const booksDir = store.get('booksDir')
   if (!fs.existsSync(booksDir)) return books
+  
+  // 读取目录下的所有书籍
   const files = fs.readdirSync(booksDir, { withFileTypes: true })
   for (const file of files) {
     if (file.isDirectory()) {
@@ -1020,7 +1052,6 @@ ipcMain.handle('read-books-dir', async () => {
       if (fs.existsSync(metaPath)) {
         try {
           const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
-          // 只返回必要的字段，确保name是文件夹名称而不是路径
           books.push(meta)
         } catch (e) {
           // ignore parse error
@@ -1029,6 +1060,7 @@ ipcMain.handle('read-books-dir', async () => {
       }
     }
   }
+  
   // 按updatedAt排序，最新的在前
   // updatedAt格式可能是 "2024/1/1 12:00:00" 或 ISO格式，需要统一处理
   books.sort((a, b) => {
@@ -1073,9 +1105,11 @@ ipcMain.handle('delete-book', async (event, { name }) => {
       return false
     }
 
+    // 书籍路径在根目录
     const bookPath = join(booksDir, name)
 
     if (!fs.existsSync(bookPath)) {
+      console.error('书籍不存在:', bookPath)
       return false
     }
 
@@ -1095,6 +1129,8 @@ ipcMain.handle('edit-book', async (event, bookInfo) => {
 
     // 如果传入了原始名称，使用原始名称定位文件夹
     const originalName = bookInfo.originalName || bookInfo.name
+    
+    // 书籍路径在根目录
     const bookPath = join(booksDir, originalName)
 
     if (!fs.existsSync(bookPath)) {
@@ -1108,6 +1144,7 @@ ipcMain.handle('edit-book', async (event, bookInfo) => {
 
     // 如果书名发生变化，需要重命名文件夹
     if (bookInfo.name !== originalName) {
+      // 新路径在根目录
       const newBookPath = join(booksDir, bookInfo.name)
 
       // 检查新名称是否已存在
@@ -1121,7 +1158,7 @@ ipcMain.handle('edit-book', async (event, bookInfo) => {
       // 更新元数据路径
       const newMetaPath = join(newBookPath, 'mazi.json')
 
-      // 合并新旧数据，保留原有数据
+      // 合并新旧数据
       const mergedMeta = { ...existingMeta, ...bookInfo }
       fs.writeFileSync(newMetaPath, JSON.stringify(mergedMeta, null, 2), 'utf-8')
     } else {
@@ -1133,6 +1170,631 @@ ipcMain.handle('edit-book', async (event, bookInfo) => {
     return { success: true }
   } catch (error) {
     console.error('编辑书籍失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+// ========== 书架导出导入功能 ==========
+
+// 自定义加密密钥（用于导出数据加密）
+const BACKUP_ENCRYPTION_KEY = 'youziwrite-backup-encryption-key-2026-v1'
+
+/**
+ * 加密备份数据
+ * @param {string} data - 要加密的JSON字符串
+ * @returns {string} 加密后的数据
+ */
+function encryptBackupData(data) {
+  try {
+    const key = crypto.scryptSync(BACKUP_ENCRYPTION_KEY, 'backup-salt', 32)
+    const iv = crypto.randomBytes(IV_LENGTH)
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
+    
+    let encrypted = cipher.update(data, 'utf8', 'hex')
+    encrypted += cipher.final('hex')
+    
+    // 返回 iv:encrypted 格式
+    return iv.toString('hex') + ':' + encrypted
+  } catch (error) {
+    console.error('加密备份数据失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 解密备份数据
+ * @param {string} encryptedData - 加密的数据
+ * @returns {string} 解密后的JSON字符串
+ */
+function decryptBackupData(encryptedData) {
+  try {
+    const parts = encryptedData.split(':')
+    if (parts.length !== 2) {
+      throw new Error('备份数据格式错误')
+    }
+    
+    const iv = Buffer.from(parts[0], 'hex')
+    const encrypted = parts[1]
+    const key = crypto.scryptSync(BACKUP_ENCRYPTION_KEY, 'backup-salt', 32)
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+    decrypted += decipher.final('utf8')
+    
+    return decrypted
+  } catch (error) {
+    console.error('解密备份数据失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 递归读取目录并返回所有文件的相对路径和内容
+ * @param {string} dirPath - 目录路径
+ * @param {string} basePath - 基础路径（用于计算相对路径）
+ * @returns {Array} 文件列表
+ */
+function readDirectoryRecursive(dirPath, basePath) {
+  const files = []
+  
+  if (!fs.existsSync(dirPath)) {
+    return files
+  }
+  
+  const items = fs.readdirSync(dirPath, { withFileTypes: true })
+  
+  for (const item of items) {
+    const fullPath = join(dirPath, item.name)
+    const relativePath = path.relative(basePath, fullPath)
+    
+    if (item.isDirectory()) {
+      // 递归读取子目录
+      files.push(...readDirectoryRecursive(fullPath, basePath))
+    } else {
+      // 读取文件内容
+      try {
+        const content = fs.readFileSync(fullPath, 'utf-8')
+        files.push({
+          path: relativePath.replace(/\\/g, '/'), // 统一使用正斜杠
+          content: content
+        })
+      } catch (error) {
+        console.error(`读取文件失败: ${fullPath}`, error)
+      }
+    }
+  }
+  
+  return files
+}
+
+/**
+ * 下载网络图片并转换为base64
+ * @param {string} url - 图片URL
+ * @returns {Promise<string>} base64数据URL
+ */
+async function downloadImageToBase64(url) {
+  try {
+    const https = await import('https')
+    const http = await import('http')
+    
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https') ? https : http
+      
+      protocol.get(url, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`))
+          return
+        }
+        
+        const chunks = []
+        response.on('data', (chunk) => chunks.push(chunk))
+        response.on('end', () => {
+          const buffer = Buffer.concat(chunks)
+          const contentType = response.headers['content-type'] || 'image/jpeg'
+          const base64 = buffer.toString('base64')
+          resolve(`data:${contentType};base64,${base64}`)
+        })
+      }).on('error', reject)
+    })
+  } catch (error) {
+    console.error('下载图片失败:', error)
+    return null
+  }
+}
+
+/**
+ * 缓存图片到本地（处理在线链接和base64）
+ * @param {string} imageData - 图片URL或base64
+ * @returns {Promise<string>} 缓存后的base64数据
+ */
+async function cacheImageToBase64(imageData) {
+  if (!imageData) {
+    return null
+  }
+  
+  // 已经是base64格式，直接返回
+  if (imageData.startsWith('data:image/')) {
+    return imageData
+  }
+  
+  // 在线链接，下载并转换
+  if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+    return await downloadImageToBase64(imageData)
+  }
+  
+  // 本地文件路径，读取并转换
+  if (fs.existsSync(imageData)) {
+    try {
+      const buffer = fs.readFileSync(imageData)
+      const ext = path.extname(imageData).toLowerCase()
+      let mimeType = 'image/jpeg'
+      
+      if (ext === '.png') mimeType = 'image/png'
+      else if (ext === '.gif') mimeType = 'image/gif'
+      else if (ext === '.webp') mimeType = 'image/webp'
+      
+      const base64 = buffer.toString('base64')
+      return `data:${mimeType};base64,${base64}`
+    } catch (error) {
+      console.error('读取本地图片失败:', error)
+      return null
+    }
+  }
+  
+  return null
+}
+
+/**
+ * 导出整个书架
+ */
+ipcMain.handle('export-bookshelf', async (event) => {
+  try {
+    const booksDir = store.get('booksDir')
+    if (!booksDir) {
+      return { success: false, message: '未设置书籍目录' }
+    }
+    
+    // 显示保存对话框
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: '导出书架',
+      defaultPath: `bookshelf_${dayjs().format('YYYYMMDD_HHmmss')}.youzibak`,
+      filters: [
+        { name: '柚子写作备份文件', extensions: ['youzibak'] }
+      ]
+    })
+    
+    if (canceled || !filePath) {
+      return { success: false, message: '用户取消操作' }
+    }
+    
+    // 读取所有书籍
+    const books = []
+    const files = fs.readdirSync(booksDir, { withFileTypes: true })
+    
+    for (const file of files) {
+      if (file.isDirectory()) {
+        const metaPath = join(booksDir, file.name, 'mazi.json')
+        if (fs.existsSync(metaPath)) {
+          try {
+            const bookPath = join(booksDir, file.name)
+            
+            // 读取元数据
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+            
+            // 缓存封面图片
+            if (meta.coverUrl) {
+              const cachedCover = await cacheImageToBase64(meta.coverUrl)
+              if (cachedCover) {
+                meta.coverUrl = cachedCover
+              }
+            }
+            
+            // 读取所有文件内容
+            const bookFiles = readDirectoryRecursive(bookPath, bookPath)
+            
+            // 处理人物头像（如果有 characters.json）
+            const charactersFile = bookFiles.find(f => f.path === 'characters.json')
+            if (charactersFile) {
+              try {
+                const characters = JSON.parse(charactersFile.content)
+                if (Array.isArray(characters)) {
+                  for (const char of characters) {
+                    if (char.avatar) {
+                      const cachedAvatar = await cacheImageToBase64(char.avatar)
+                      if (cachedAvatar) {
+                        char.avatar = cachedAvatar
+                      }
+                    }
+                  }
+                  charactersFile.content = JSON.stringify(characters, null, 2)
+                }
+              } catch (error) {
+                console.error('处理人物头像失败:', error)
+              }
+            }
+            
+            books.push({
+              name: file.name,
+              metadata: meta,
+              files: bookFiles
+            })
+          } catch (error) {
+            console.error(`读取书籍失败: ${file.name}`, error)
+          }
+        }
+      }
+    }
+    
+    if (books.length === 0) {
+      return { success: false, message: '没有找到任何书籍' }
+    }
+    
+    // 构建导出数据
+    const exportData = {
+      version: '1.0.0',
+      exportTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      booksCount: books.length,
+      books: books
+    }
+    
+    // 转换为JSON
+    const jsonData = JSON.stringify(exportData)
+    
+    // 加密数据
+    const encryptedData = encryptBackupData(jsonData)
+    
+    // 写入文件
+    fs.writeFileSync(filePath, encryptedData, 'utf-8')
+    
+    return {
+      success: true,
+      filePath: filePath,
+      booksCount: books.length
+    }
+  } catch (error) {
+    console.error('导出书架失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+/**
+ * 检查导入书籍的冲突
+ */
+ipcMain.handle('check-import-conflicts', async (event, importData) => {
+  try {
+    const booksDir = store.get('booksDir')
+    if (!booksDir) {
+      return { success: false, message: '未设置书籍目录' }
+    }
+    
+    const conflicts = []
+    
+    // 规范化作者名称的辅助函数
+    const normalizeAuthor = (author) => {
+      console.log('[导入日志] 规范化作者前:', JSON.stringify(author), 'type:', typeof author)
+      if (!author || author.trim() === '' || author === '佚名') {
+        console.log('[导入日志] 规范化作者后: 佚名')
+        return '佚名'
+      }
+      const normalized = author.trim()
+      console.log('[导入日志] 规范化作者后:', normalized)
+      return normalized
+    }
+    
+    console.log('[导入日志] ========== 开始检查导入冲突 ==========')
+    console.log('[导入日志] 导入数据中的书籍数量:', importData.books.length)
+    
+    // 检查每本书是否存在冲突
+    for (const book of importData.books) {
+      console.log('[导入日志] 检查书籍:', book.name)
+      // 获取作者：优先从 metadata 中获取，兼容旧格式
+      const bookAuthor = book.metadata?.author || book.author
+      console.log('[导入日志] 导入书籍的原始作者:', JSON.stringify(bookAuthor), 'type:', typeof bookAuthor)
+      
+      // 检查根目录
+      const mainPath = join(booksDir, book.name)
+      if (fs.existsSync(mainPath)) {
+        console.log('[导入日志] 根目录存在:', mainPath)
+        const metaPath = join(mainPath, 'mazi.json')
+        if (fs.existsSync(metaPath)) {
+          const existingMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+          console.log('[导入日志] 现有书籍的原始作者:', JSON.stringify(existingMeta.author), 'type:', typeof existingMeta.author)
+          
+          const normalizedBookAuthor = normalizeAuthor(bookAuthor)
+          const normalizedExistingAuthor = normalizeAuthor(existingMeta.author)
+          
+          const isSame = normalizedBookAuthor === normalizedExistingAuthor
+          console.log('[导入日志] 作者比较结果:', normalizedBookAuthor, '===', normalizedExistingAuthor, '=', isSame)
+          
+          conflicts.push({
+            bookName: book.name,
+            author: normalizedBookAuthor,
+            existingAuthor: normalizedExistingAuthor,
+            sameAuthor: isSame
+          })
+          console.log('[导入日志] 添加冲突记录:', { bookName: book.name, sameAuthor: isSame })
+        }
+      }
+    }
+    
+    console.log('[导入日志] 冲突检查完成，共发现冲突:', conflicts.length)
+    console.log('[导入日志] 冲突详情:', JSON.stringify(conflicts, null, 2))
+    
+    return {
+      success: true,
+      conflicts: conflicts
+    }
+  } catch (error) {
+    console.error('检查导入冲突失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
+/**
+ * 导入书架
+ */
+ipcMain.handle('import-bookshelf', async (event, options = {}) => {
+  try {
+    const booksDir = store.get('booksDir')
+    if (!booksDir) {
+      return { success: false, message: '未设置书籍目录' }
+    }
+    
+    let importData
+    
+    // 如果已经提供了 importData，直接使用，不再打开文件选择对话框
+    if (options.importData) {
+      importData = options.importData
+    } else {
+      // 显示打开对话框
+      const { filePaths, canceled } = await dialog.showOpenDialog({
+        title: '导入书架',
+        filters: [
+          { name: '柚子写作备份文件', extensions: ['youzibak'] }
+        ],
+        properties: ['openFile']
+      })
+      
+      if (canceled || filePaths.length === 0) {
+        return { success: false, message: '用户取消操作' }
+      }
+      
+      const backupFilePath = filePaths[0]
+      
+      // 读取加密文件
+      const encryptedData = fs.readFileSync(backupFilePath, 'utf-8')
+      
+      // 解密数据
+      const jsonData = decryptBackupData(encryptedData)
+      importData = JSON.parse(jsonData)
+    }
+    
+    // 验证数据格式
+    if (!importData.version || !importData.books || !Array.isArray(importData.books)) {
+      return { success: false, message: '备份文件格式错误' }
+    }
+    
+    // 如果没有传入冲突解决方案，返回需要用户选择
+    if (!options.conflictResolutions) {
+      return {
+        success: false,
+        needUserChoice: true,
+        importData: importData
+      }
+    }
+    
+    // 规范化作者名称的辅助函数
+    const normalizeAuthor = (author) => {
+      console.log('[导入执行] 规范化作者前:', JSON.stringify(author), 'type:', typeof author)
+      if (!author || author.trim() === '' || author === '佚名') {
+        console.log('[导入执行] 规范化作者后: 佚名')
+        return '佚名'
+      }
+      const normalized = author.trim()
+      console.log('[导入执行] 规范化作者后:', normalized)
+      return normalized
+    }
+    
+    const importedBooks = []
+    const skippedBooks = []
+    const overwrittenBooks = []
+    
+    console.log('[导入执行] ========== 开始执行导入 ==========')
+    console.log('[导入执行] 冲突解决方案:', JSON.stringify(options.conflictResolutions, null, 2))
+    
+    // 导入每本书
+    for (const book of importData.books) {
+      try {
+        console.log('[导入执行] --- 处理书籍:', book.name, '---')
+        const resolution = options.conflictResolutions[book.name] || 'copy'
+        console.log('[导入执行] 解决方案:', resolution)
+        
+        // 获取作者：优先从 metadata 中获取，兼容旧格式
+        const bookAuthor = book.metadata?.author || book.author
+        console.log('[导入执行] 书籍原始作者:', JSON.stringify(bookAuthor), 'type:', typeof bookAuthor)
+        
+        // 检查根目录是否存在
+        const mainPath = join(booksDir, book.name)
+        const mainExists = fs.existsSync(mainPath)
+        console.log('[导入执行] 根目录存在:', mainExists)
+        
+        // 如果存在冲突
+        if (mainExists) {
+          console.log('[导入执行] 检测到冲突')
+          if (resolution === 'skip') {
+            // 跳过
+            console.log('[导入执行] 跳过此书')
+            skippedBooks.push(book.name)
+            continue
+          } else if (resolution === 'overwrite') {
+            console.log('[导入执行] 尝试覆盖')
+            // 覆盖：需要验证作者是否一致
+            const targetPath = mainPath
+            console.log('[导入执行] 目标路径:', targetPath)
+            const metaPath = join(targetPath, 'mazi.json')
+            
+            if (fs.existsSync(metaPath)) {
+              const existingMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+              console.log('[导入执行] 现有书籍的原始作者:', JSON.stringify(existingMeta.author), 'type:', typeof existingMeta.author)
+              
+              // 验证作者（规范化后比较）
+              const normalizedBookAuthor = normalizeAuthor(bookAuthor)
+              const normalizedExistingAuthor = normalizeAuthor(existingMeta.author)
+              
+              console.log('[导入执行] 作者比较:', normalizedExistingAuthor, '!==', normalizedBookAuthor, '=', normalizedExistingAuthor !== normalizedBookAuthor)
+              
+              if (normalizedExistingAuthor !== normalizedBookAuthor) {
+                // 作者不一致，强制使用副本模式
+                console.log('[导入执行] 作者不一致，改用副本模式')
+                // 不修改 resolution，继续走副本逻辑
+              } else {
+                console.log('[导入执行] 作者一致，执行覆盖')
+                // 删除原目录
+                fs.rmSync(targetPath, { recursive: true, force: true })
+                console.log('[导入执行] 已删除原目录')
+                
+                // 重新创建并写入文件
+                fs.mkdirSync(targetPath, { recursive: true })
+                
+                for (const file of book.files) {
+                  const filePath = join(targetPath, file.path)
+                  const fileDir = path.dirname(filePath)
+                  
+                  if (!fs.existsSync(fileDir)) {
+                    fs.mkdirSync(fileDir, { recursive: true })
+                  }
+                  
+                  fs.writeFileSync(filePath, file.content, 'utf-8')
+                }
+                
+                console.log('[导入执行] 已写入', book.files.length, '个文件')
+                
+                // 更新元数据
+                const newMetaPath = join(targetPath, 'mazi.json')
+                if (fs.existsSync(newMetaPath)) {
+                  const meta = JSON.parse(fs.readFileSync(newMetaPath, 'utf-8'))
+                  meta.importedAt = dayjs().format('YYYY/MM/DD HH:mm:ss')
+                  fs.writeFileSync(newMetaPath, JSON.stringify(meta, null, 2), 'utf-8')
+                  console.log('[导入执行] 已更新元数据')
+                }
+                
+                overwrittenBooks.push(book.name)
+                console.log('[导入执行] 覆盖完成')
+                continue
+              }
+            }
+          }
+        }
+        
+        // 副本模式或覆盖失败（作者不一致）时的处理
+        if (resolution === 'copy' || (resolution === 'overwrite' && mainExists)) {
+          console.log('[导入执行] 使用副本模式')
+          let targetName = book.name
+          let targetPath = join(booksDir, targetName)
+          let counter = 1
+          
+          // 如果已存在同名书籍，添加后缀 "（副本）"、"（副本2）"等
+          while (fs.existsSync(targetPath)) {
+            if (counter === 1) {
+              targetName = `${book.name}（副本）`
+            } else {
+              targetName = `${book.name}（副本${counter}）`
+            }
+            targetPath = join(booksDir, targetName)
+            counter++
+          }
+          
+          console.log('[导入执行] 目标名称:', targetName, '目标路径:', targetPath)
+          
+          // 创建书籍目录
+          fs.mkdirSync(targetPath, { recursive: true })
+          
+          // 写入所有文件
+          for (const file of book.files) {
+            const filePath = join(targetPath, file.path)
+            const fileDir = path.dirname(filePath)
+            
+            // 确保目录存在
+            if (!fs.existsSync(fileDir)) {
+              fs.mkdirSync(fileDir, { recursive: true })
+            }
+            
+            // 写入文件内容
+            fs.writeFileSync(filePath, file.content, 'utf-8')
+          }
+          
+          console.log('[导入执行] 已写入', book.files.length, '个文件')
+          
+          // 更新元数据中的导入时间
+          const metaPath = join(targetPath, 'mazi.json')
+          if (fs.existsSync(metaPath)) {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+            meta.name = targetName // 更新书名为新名称
+            meta.importedAt = dayjs().format('YYYY/MM/DD HH:mm:ss')
+            meta.originalName = book.name
+            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8')
+            console.log('[导入执行] 已更新元数据')
+          }
+          
+          importedBooks.push(targetName)
+          console.log('[导入执行] 副本创建完成')
+        } else {
+          // 如果不存在冲突，直接导入到根目录
+          console.log('[导入执行] 无冲突，直接导入到根目录')
+          const targetPath = join(booksDir, book.name)
+          
+          // 创建书籍目录
+          fs.mkdirSync(targetPath, { recursive: true })
+          
+          // 写入所有文件
+          for (const file of book.files) {
+            const filePath = join(targetPath, file.path)
+            const fileDir = path.dirname(filePath)
+            
+            if (!fs.existsSync(fileDir)) {
+              fs.mkdirSync(fileDir, { recursive: true })
+            }
+            
+            fs.writeFileSync(filePath, file.content, 'utf-8')
+          }
+          
+          console.log('[导入执行] 已写入', book.files.length, '个文件')
+          
+          // 更新元数据
+          const metaPath = join(targetPath, 'mazi.json')
+          if (fs.existsSync(metaPath)) {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+            meta.importedAt = dayjs().format('YYYY/MM/DD HH:mm:ss')
+            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8')
+            console.log('[导入执行] 已更新元数据')
+          }
+          
+          importedBooks.push(book.name)
+          console.log('[导入执行] 导入完成')
+        }
+      } catch (error) {
+        console.error('[导入执行] 导入书籍失败:', book.name, error)
+        skippedBooks.push(book.name)
+      }
+    }
+    
+    console.log('[导入执行] ========== 导入执行完成 ==========')
+    console.log('[导入执行] 导入成功:', importedBooks.length, '本')
+    console.log('[导入执行] 跳过:', skippedBooks.length, '本')
+    console.log('[导入执行] 覆盖:', overwrittenBooks.length, '本')
+    
+    return {
+      success: true,
+      importedCount: importedBooks.length,
+      skippedCount: skippedBooks.length,
+      overwrittenCount: overwrittenBooks.length,
+      importedBooks: importedBooks,
+      skippedBooks: skippedBooks,
+      overwrittenBooks: overwrittenBooks,
+      savePath: booksDir  // 返回书籍保存路径
+    }
+  } catch (error) {
+    console.error('导入书架失败:', error)
     return { success: false, message: error.message }
   }
 })
@@ -1288,8 +1950,11 @@ ipcMain.handle('create-chapter', async (event, { bookName, volumeId }) => {
 
 // 加载章节数据
 ipcMain.handle('load-chapters', async (event, bookName) => {
-  const booksDir = store.get('booksDir')
-  const bookPath = join(booksDir, bookName)
+  const bookPath = findBookPath(bookName)
+  if (!bookPath) {
+    return []
+  }
+  
   const volumePath = join(bookPath, '正文')
 
   if (!fs.existsSync(volumePath)) {
@@ -1983,8 +2648,12 @@ ipcMain.handle(
 
 // 读取章节内容
 ipcMain.handle('read-chapter', async (event, { bookName, volumeName, chapterName }) => {
-  const booksDir = store.get('booksDir')
-  const chapterPath = join(booksDir, bookName, '正文', volumeName, `${chapterName}.txt`)
+  const bookPath = findBookPath(bookName)
+  if (!bookPath) {
+    return { success: false, message: '书籍不存在' }
+  }
+  
+  const chapterPath = join(bookPath, '正文', volumeName, `${chapterName}.txt`)
   if (!fs.existsSync(chapterPath)) {
     return { success: false, message: '章节不存在' }
   }
@@ -2002,8 +2671,9 @@ function countChapterWords(content) {
 
 // 计算书籍总字数
 async function calculateBookWordCount(bookName) {
-  const booksDir = store.get('booksDir')
-  const bookPath = join(booksDir, bookName)
+  const bookPath = findBookPath(bookName)
+  if (!bookPath) return 0
+  
   const volumePath = join(bookPath, '正文')
   let totalWords = 0
 
@@ -2013,11 +2683,11 @@ async function calculateBookWordCount(bookName) {
   for (const volume of volumes) {
     if (volume.isDirectory()) {
       const volumeName = volume.name
-      const volumePath = join(bookPath, '正文', volumeName)
-      const files = fs.readdirSync(volumePath, { withFileTypes: true })
+      const currentVolumePath = join(bookPath, '正文', volumeName)
+      const files = fs.readdirSync(currentVolumePath, { withFileTypes: true })
       for (const file of files) {
         if (file.isFile() && file.name.endsWith('.txt')) {
-          const content = fs.readFileSync(join(volumePath, file.name), 'utf-8')
+          const content = fs.readFileSync(join(currentVolumePath, file.name), 'utf-8')
           totalWords += countChapterWords(content)
         }
       }
@@ -2028,8 +2698,9 @@ async function calculateBookWordCount(bookName) {
 
 // 更新书籍元数据
 async function updateBookMetadata(bookName) {
-  const booksDir = store.get('booksDir')
-  const bookPath = join(booksDir, bookName)
+  const bookPath = findBookPath(bookName)
+  if (!bookPath) return false
+  
   const metaPath = join(bookPath, 'mazi.json')
 
   if (!fs.existsSync(metaPath)) return false
@@ -2149,8 +2820,12 @@ function updateChapterStats(bookName, volumeName, chapterName, oldContent, newCo
 ipcMain.handle(
   'save-chapter',
   async (event, { bookName, volumeName, chapterName, newName, content }) => {
-    const booksDir = store.get('booksDir')
-    const volumePath = join(booksDir, bookName, '正文', volumeName)
+    const bookPath = findBookPath(bookName)
+    if (!bookPath) {
+      return { success: false, message: '书籍不存在' }
+    }
+    
+    const volumePath = join(bookPath, '正文', volumeName)
     const oldPath = join(volumePath, `${chapterName}.txt`)
     const newPath = join(volumePath, `${newName || chapterName}.txt`)
 

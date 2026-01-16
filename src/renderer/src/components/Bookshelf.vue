@@ -11,6 +11,24 @@
             <el-icon class="text-lg"><Plus /></el-icon>
             <span>新建书籍</span>
           </button>
+
+          <button
+            @click="handleExportBookshelf"
+            class="flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg border border-green-500"
+            title="导出整个书架"
+          >
+            <el-icon class="text-lg"><Upload /></el-icon>
+            <span>导出书架</span>
+          </button>
+          <button
+            @click="handleImportBookshelf"
+            class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg border border-blue-500"
+            title="导入书架"
+          >
+            <el-icon class="text-lg"><Download /></el-icon>
+            <span>导入书架</span>
+          </button>
+
           <button
             @click="() => { readBooksDir(); refreshChart();  ElMessage.success('刷新成功') }"
             class="p-2.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-600"
@@ -258,11 +276,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, h } from 'vue'
 import Book from './Book.vue'
 import WordCountChart from './WordCountChart.vue'
 import ThemeSelector from './ThemeSelector.vue'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, Upload, Download } from '@element-plus/icons-vue'
 import { useMainStore } from '@renderer/stores'
 import { BOOK_TYPES } from '@renderer/constants/config'
 import { readBooksDir, createBook, deleteBook, updateBook } from '@renderer/service/books'
@@ -636,6 +654,219 @@ function getPreviewTitleSize() {
     return 13.33  // 对应实际的 20px × 0.667
   } else {
     return 12  // 对应实际的 18px × 0.667
+  }
+}
+
+// 导出书架
+async function handleExportBookshelf() {
+  try {
+    const loading = ElMessage({
+      message: '正在导出书架，请稍候...',
+      type: 'info',
+      duration: 0
+    })
+    
+    const result = await window.electron.exportBookshelf()
+    loading.close()
+    
+    if (result.success) {
+      ElMessage({
+        message: `导出成功！共导出 ${result.booksCount} 本书籍`,
+        type: 'success',
+        duration: 3000
+      })
+    } else {
+      ElMessage({
+        message: `导出失败：${result.message}`,
+        type: 'error',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    ElMessage({
+      message: `导出失败：${error.message}`,
+      type: 'error',
+      duration: 3000
+    })
+  }
+}
+
+// 导入书架
+async function handleImportBookshelf() {
+  try {
+    await ElMessageBox.confirm(
+      '导入的书籍将保存到书籍目录中。如果有同名书籍，将提示您选择处理方式。是否继续？',
+      '导入书架',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    
+    const loading = ElMessage({
+      message: '正在导入书架，请稍候...',
+      type: 'info',
+      duration: 0
+    })
+    
+    // 第一次调用：获取导入数据和冲突信息
+    const result = await window.electron.importBookshelf()
+    loading.close()
+    
+    if (!result.success && result.needUserChoice) {
+      // 需要用户选择如何处理冲突
+      const importData = result.importData
+      const conflictResolutions = {}
+      
+      // 检查冲突
+      const checkResult = await window.electron.checkImportConflicts(importData)
+      
+      if (checkResult.success && checkResult.conflicts.length > 0) {
+        // 构建冲突提示信息
+        let conflictMessages = []
+        for (const conflict of checkResult.conflicts) {
+          const location = conflict.location === 'main' ? '主书架' : '备份区'
+          const authorMatch = conflict.sameAuthor ? '（作者相同）' : '（作者不同）'
+          conflictMessages.push(`• ${conflict.bookName} - ${location} ${authorMatch}`)
+        }
+        
+        // 创建下拉框选择对话框
+        let selectedAction = 'copy' // 默认值
+        
+        await ElMessageBox({
+          title: '处理冲突',
+          message: h('div', { style: 'max-height: 400px; overflow-y: auto;' }, [
+            h('p', { style: 'margin-bottom: 12px; font-weight: 500;' }, 
+              `检测到 ${checkResult.conflicts.length} 本书籍存在冲突：`
+            ),
+            h('div', { style: 'margin-bottom: 16px; padding: 8px; background: #f5f5f5; border-radius: 4px; max-height: 200px; overflow-y: auto;' },
+              conflictMessages.map(msg => 
+                h('div', { style: 'padding: 4px 0; color: #606266;' }, msg)
+              )
+            ),
+            h('p', { style: 'margin-bottom: 8px; font-weight: 500;' }, 
+              '请为所有冲突书籍选择统一的处理方式：'
+            ),
+            h('select', {
+              id: 'conflict-action-select',
+              style: 'width: 100%; padding: 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px;',
+              onChange: (e) => { selectedAction = e.target.value }
+            }, [
+              h('option', { value: 'copy' }, 'copy - 创建副本（默认）'),
+              h('option', { value: 'overwrite' }, 'overwrite - 覆盖（仅作者相同时有效，否则创建副本）'),
+              h('option', { value: 'skip' }, 'skip - 跳过')
+            ])
+          ]),
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          dangerouslyUseHTMLString: false,
+          beforeClose: (action, instance, done) => {
+            if (action === 'confirm') {
+              const selectElement = document.getElementById('conflict-action-select')
+              if (selectElement) {
+                selectedAction = selectElement.value
+              }
+              instance.confirmButtonLoading = false
+              done()
+            } else {
+              done()
+            }
+          }
+        })
+        
+        const defaultAction = selectedAction || 'copy'
+        
+        // 为每本书设置处理方式
+        for (const book of importData.books) {
+          conflictResolutions[book.name] = defaultAction
+        }
+      } else {
+        // 没有冲突，直接导入
+        for (const book of importData.books) {
+          conflictResolutions[book.name] = 'copy'
+        }
+      }
+      
+      // 第二次调用：使用用户选择的冲突解决方案执行导入
+      // 传入 importData 和 conflictResolutions,避免再次打开文件选择对话框
+      const loading2 = ElMessage({
+        message: '正在导入书架，请稍候...',
+        type: 'info',
+        duration: 0
+      })
+      
+      try {
+        const finalResult = await window.electron.importBookshelf({
+          importData: importData,
+          conflictResolutions: conflictResolutions
+        })
+        
+        loading2.close()
+        
+        if (finalResult.success) {
+          let message = `导入成功！共导入 ${finalResult.importedCount} 本书籍`
+          if (finalResult.overwrittenCount > 0) {
+            message += `，覆盖 ${finalResult.overwrittenCount} 本`
+          }
+          if (finalResult.skippedCount > 0) {
+            message += `，跳过 ${finalResult.skippedCount} 本`
+          }
+          // console.log(finalResult)
+          message += `\n导入位置：${finalResult.savePath}`
+          
+          ElMessageBox.alert(message, '导入完成', {
+            confirmButtonText: '确定',
+            type: 'success',
+            callback: () => {
+              // 刷新书架列表
+              readBooksDir()
+            }
+          })
+        } else {
+          ElMessage({
+            message: `导入失败：${finalResult.message}`,
+            type: 'error',
+            duration: 3000
+          })
+        }
+      } catch (error) {
+        loading2.close()
+        throw error
+      }
+    } else if (result.success) {
+      // 直接成功（没有冲突的情况）
+      let message = `导入成功！共导入 ${result.importedCount} 本书籍`
+      if (result.skippedCount > 0) {
+        message += `，跳过 ${result.skippedCount} 本`
+      }
+
+      // console.log(result)
+      message += `\n导入位置：${result.savePath }`
+      
+      ElMessageBox.alert(message, '导入完成', {
+        confirmButtonText: '确定',
+        type: 'success',
+        callback: () => {
+          // 刷新书架列表
+          readBooksDir()
+        }
+      })
+    } else {
+      ElMessage({
+        message: `导入失败：${result.message}`,
+        type: 'error',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage({
+        message: `导入失败：${error.message || error}`,
+        type: 'error',
+        duration: 3000
+      })
+    }
   }
 }
 
