@@ -376,8 +376,56 @@ function handleNodeDoubleClickDirect(node, event) {
 
 // 角色点击事件，显示环绕菜单
 const onNodeClick = (nodeObject) => {
-  // 如果在连线模式下，不显示环绕菜单
-  if (isLinkMode.value) return
+  // 如果在连线模式下，处理连线目标节点选择
+  if (isLinkMode.value && linkStartNode.value) {
+    // 检查是否点击了同一个节点
+    if (linkStartNode.value.id === nodeObject.id) {
+      ElMessage.warning('不能连接到自己')
+      return
+    }
+
+    // 检查连线是否已存在
+    const existingLine = relationshipData.lines.find(
+      (line) => line.from === linkStartNode.value.id && line.to === nodeObject.id
+    )
+    if (existingLine) {
+      ElMessage.warning('连线已存在')
+      // 退出连线模式
+      isLinkMode.value = false
+      linkStartNode.value = null
+      return
+    }
+
+    // 创建新连线
+    const newLine = {
+      id: genId(),
+      from: linkStartNode.value.id,
+      to: nodeObject.id,
+      text: '',
+      fontColor: '#409eff',
+      lineShape: 1
+    }
+
+    // 添加到数据源
+    relationshipData.lines.push(newLine)
+
+    // 使用增量更新
+    const graphInstance = graphRef.value?.getInstance()
+    if (graphInstance) {
+      // 添加新连线
+      graphInstance.addLines([newLine])
+      
+      // 重新计算并应用角色大小（因为连线关系可能改变了层级）
+      applyNodeSizes()
+    }
+
+    // 退出连线模式
+    isLinkMode.value = false
+    linkStartNode.value = null
+
+    ElMessage.success('连线创建成功')
+    return
+  }
   
   // 设置选中的角色
   selectedNode.value = nodeObject
@@ -451,6 +499,13 @@ const onLineClick = (line) => {
 // 画布点击时隐藏菜单
 const onCanvasClick = () => {
   showRadialMenu.value = false
+  
+  // 如果在连线模式下，退出连线模式
+  if (isLinkMode.value) {
+    isLinkMode.value = false
+    linkStartNode.value = null
+    ElMessage.info('已取消连线')
+  }
 }
 
 // 环绕菜单事件处理函数（预留实现）
@@ -843,12 +898,33 @@ function handleNodeRightClick(node, event) {
   // 设置新的定时器
   rightClickTimer = setTimeout(() => {
     if (rightClickCount === 2) {
-      // 双击右键：进入连线模式
-      handleNodeLink()
+      // 双击右键：以当前节点为起点进入连线模式
+      handleNodeLinkFromNode(node)
     }
     // 重置点击计数
     rightClickCount = 0
   }, 300) // 300ms内的点击视为双击
+}
+
+// 连线起始节点
+const linkStartNode = ref(null)
+
+// 从指定节点开始连线
+function handleNodeLinkFromNode(node) {
+  if (!node) return
+
+  // 设置连线起始节点
+  linkStartNode.value = node
+
+  // 进入连线模式
+  isLinkMode.value = true
+
+  // 隐藏环绕菜单
+  showRadialMenu.value = false
+
+  // 显示连线模式提示
+  ElMessage.info(`从 "${node.text}" 开始连线，请点击目标角色完成连线`)
+  console.log('Link mode started from node:', node.id)
 }
 
 // 关闭对话框并重置表单
