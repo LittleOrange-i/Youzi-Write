@@ -38,77 +38,61 @@
         <!-- 菜单头部 -->
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary-50 to-purple-50 dark:from-gray-700 dark:to-gray-700">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">选择主题</h3>
-          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ themeGroups.length }} 个主题系列可选</p>
+          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">{{ allThemes.length }} 个主题可选</p>
         </div>
 
         <!-- 主题列表 -->
-        <div class="max-h-96 overflow-y-auto">
-          <div
-            v-for="group in themeGroups"
-            :key="group.name"
-            class="border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+        <div class="max-h-96 overflow-y-auto py-1">
+          <button
+            v-for="themeKey in allThemes"
+            :key="themeKey"
+            @click.stop="handleThemeChange(themeKey)"
+            class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
+            :class="{
+              'bg-primary-50 dark:bg-primary-900/20': themeStore.currentTheme === themeKey
+            }"
           >
-            <!-- 分组标题 -->
-            <div class="px-4 py-2 bg-gray-50 dark:bg-gray-750">
-              <h4 class="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                {{ group.name }}
-              </h4>
+            <!-- 主题颜色预览 -->
+            <div class="flex gap-1">
+              <div
+                v-for="(color, index) in getThemeColors(themeKey)"
+                :key="index"
+                class="w-4 h-4 rounded"
+                :style="{ backgroundColor: color }"
+              ></div>
             </div>
 
-            <!-- 分组主题选项 -->
-            <div class="py-1">
-              <button
-                v-for="themeKey in group.themes"
-                :key="themeKey"
-                @click.stop="handleThemeChange(themeKey)"
-                class="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 cursor-pointer"
-                :class="{
-                  'bg-primary-50 dark:bg-primary-900/20': themeStore.currentTheme === themeKey
-                }"
-              >
-                <!-- 主题颜色预览 -->
-                <div class="flex gap-1">
-                  <div
-                    v-for="(color, index) in getThemeColors(themeKey)"
-                    :key="index"
-                    class="w-4 h-4 rounded"
-                    :style="{ backgroundColor: color }"
-                  ></div>
-                </div>
-
-                <!-- 主题信息 -->
-                <div class="flex-1 text-left">
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="text-sm font-medium"
-                      :class="{
-                        'text-primary-600 dark:text-primary-400': themeStore.currentTheme === themeKey,
-                        'text-gray-900 dark:text-gray-100': themeStore.currentTheme !== themeKey
-                      }"
-                    >
-                      {{ THEME_CONFIGS[themeKey]?.name }}
-                    </span>
-                    <!-- 当前主题标记 -->
-                    <svg
-                      v-if="themeStore.currentTheme === themeKey"
-                      class="w-4 h-4 text-primary-600 dark:text-primary-400"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {{ THEME_CONFIGS[themeKey]?.description }}
-                  </p>
-                </div>
-              </button>
+            <!-- 主题信息 -->
+            <div class="flex-1 text-left">
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-sm font-medium"
+                  :class="{
+                    'text-primary-600 dark:text-primary-400': themeStore.currentTheme === themeKey,
+                    'text-gray-900 dark:text-gray-100': themeStore.currentTheme !== themeKey
+                  }"
+                >
+                  {{ THEME_CONFIGS[themeKey]?.name }}
+                </span>
+                <!-- 当前主题标记 -->
+                <svg
+                  v-if="themeStore.currentTheme === themeKey"
+                  class="w-4 h-4 text-primary-600 dark:text-primary-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </div>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ THEME_CONFIGS[themeKey]?.description }}
+              </p>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </Transition>
@@ -129,50 +113,34 @@ onMounted(() => {
   console.log('[ThemeSelector] 主题配置:', THEME_CONFIGS)
 })
 
-// 主题分组配置
-const themeGroups = computed(() => [
-  {
-    name: '经典主题',
-    themes: ['light', 'dark', 'yellow']
-  },
-  {
-    name: 'DaisyUI',
-    themes: ['daisyui', 'daisyui-dark']
-  },
-  {
-    name: 'Flowbite',
-    themes: ['flowbite', 'flowbite-dark']
-  },
-  {
-    name: 'Preline',
-    themes: ['preline', 'preline-dark']
-  },
-  {
-    name: 'Material Tailwind',
-    themes: ['material', 'material-dark']
-  },
-  {
-    name: 'Meraki UI',
-    themes: ['meraki', 'meraki-dark']
-  }
-])
+// 所有主题列表
+const allThemes = computed(() => Object.keys(THEME_CONFIGS))
 
 // 获取主题的颜色预览
 function getThemeColors(themeKey) {
   const colorMap = {
+    // 经典主题
     light: ['#F8F9FA', '#FFFFFF', '#4A90E2'],
     dark: ['#1a202c', '#2d3748', '#64748B'],
     yellow: ['#FAF0E6', '#F5E6D3', '#D97706'],
-    daisyui: ['#FAF7FF', '#F3EEFF', '#8B5CF6'],
-    'daisyui-dark': ['#1E1B2E', '#2A2440', '#A78BFA'],
-    flowbite: ['#F0F9FF', '#E0F2FE', '#0EA5E9'],
-    'flowbite-dark': ['#0C1E2F', '#1E3A52', '#38BDF8'],
-    preline: ['#EEF2FF', '#E0E7FF', '#6366F1'],
-    'preline-dark': ['#1E1B4B', '#312E81', '#818CF8'],
-    material: ['#ECFEFF', '#CFFAFE', '#06B6D4'],
-    'material-dark': ['#083344', '#0E4C5D', '#22D3EE'],
-    meraki: ['#FDF2F8', '#FCE7F3', '#EC4899'],
-    'meraki-dark': ['#4C0519', '#701A3A', '#F472B6']
+    // 柔和渐变色系
+    pink: ['#FFF5F4', '#FFD5D1', '#FFB7B2'],
+    peach: ['#FFF9F5', '#FFE5D0', '#FFDAC1'],
+    lime: ['#FAFCF5', '#EAF4D8', '#AAD55C'],
+    mint: ['#F5FCFA', '#D0F1E8', '#B5EAD7'],
+    lavender: ['#F7F8FC', '#DFE2F0', '#C7CEEA'],
+    // 绿色系渐变
+    'green-light': ['#F5FCF9', '#D5F0E3', '#4CAF7E'],
+    'green-soft': ['#F3FAF5', '#CCEBD7', '#55B377'],
+    'green-sage': ['#F2F7F3', '#C2E0C8', '#66B37A'],
+    'green-forest': ['#EEF5F0', '#B8D5BE', '#4F8B5B'],
+    'green-dark': ['#EBF3ED', '#AECFB4', '#3D7A47'],
+    // Call Me By Your Name 主题
+    'sky-blue': ['#F0FAFC', '#C8EDF5', '#7CC8D8'],
+    'ocean-blue': ['#EFF6FB', '#B8D4E8', '#4682B4'],
+    'sand-beige': ['#FFFBF5', '#FFEDC8', '#F5DEB3'],
+    'coral-orange': ['#FFF7F5', '#FFDCD0', '#F08460'],
+    'emerald-green': ['#F0FAF6', '#C8EBD9', '#3F9B72']
   }
   return colorMap[themeKey] || ['#ccc', '#ddd', '#eee']
 }

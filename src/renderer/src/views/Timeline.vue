@@ -79,6 +79,7 @@
       </div>
     </template>
   </LayoutTool>
+  <!-- 新增/编辑节点对话框 -->
   <el-dialog
     v-model="dialogVisible"
     :title="nodeInfo.id === -1 ? '新增节点' : '编辑节点'"
@@ -104,6 +105,29 @@
       <el-button type="primary" @click="confirmAddNode">确认</el-button>
     </template>
   </el-dialog>
+
+  <!-- 新增时间线对话框 -->
+  <el-dialog
+    v-model="timelineDialogVisible"
+    title="新增时间线"
+    width="500px"
+    @close="timelineDialogVisible = false"
+  >
+    <el-form :model="timelineInfo" label-width="80px">
+      <el-form-item label="名称">
+        <el-input
+          v-model="timelineInfo.title"
+          placeholder="请输入时间线名称"
+          :maxlength="20"
+          clearable
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="timelineDialogVisible = false">取消</el-button>
+      <el-button type="primary" @click="confirmAddTimeline">确认</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -115,11 +139,17 @@ import { EditPen, Delete, Plus } from '@element-plus/icons-vue'
 import { genId } from '@renderer/utils/utils'
 
 const route = useRoute()
+// 节点对话框
 const dialogVisible = ref(false)
 const nodeInfo = reactive({
   id: -1,
   title: '',
   desc: ''
+})
+// 时间线对话框
+const timelineDialogVisible = ref(false)
+const timelineInfo = reactive({
+  title: ''
 })
 const timelines = ref([])
 
@@ -211,12 +241,30 @@ async function saveTimelines() {
   }
 }
 
+/**
+ * 打开新增时间线对话框
+ */
 function addTimeline() {
+  timelineInfo.title = ''
+  timelineDialogVisible.value = true
+}
+
+/**
+ * 确认新增时间线
+ */
+function confirmAddTimeline() {
+  const title = timelineInfo.title.trim()
+  if (!title) {
+    ElMessage.warning('请输入时间线名称')
+    return
+  }
   timelines.value.push({
     id: genId(),
-    title: '新时间线',
+    title: title,
     nodes: []
   })
+  timelineDialogVisible.value = false
+  ElMessage.success('时间线创建成功')
 }
 async function removeTimeline(idx) {
   try {

@@ -2218,7 +2218,7 @@ const regenerateResult = async () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--el-color-primary);
+  color: var(--el-color-base);
   font-weight: 500;
 }
 </style>
@@ -2249,10 +2249,10 @@ const regenerateResult = async () => {
   .provider-desc {
     margin-top: 8px;
     padding: 8px 12px;
-    background: var(--el-color-primary-light-9);
+    background: var(--bg-mute); /* 使用主题背景色 */
     border-left: 3px solid var(--el-color-primary);
     font-size: 12px;
-    color: var(--text-secondary);
+    color: var(--text-base); /* 使用主文本颜色确保可读性 */
     line-height: 1.6;
   }
 }

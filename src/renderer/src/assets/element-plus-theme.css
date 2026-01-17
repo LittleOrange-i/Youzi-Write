@@ -119,22 +119,73 @@
   --el-select-input-focus-border-color: var(--accent-color) !important;
 }
 
+/* Select 输入框包裹层 */
+.el-select__wrapper {
+  background-color: var(--bg-primary) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--accent-color) inset !important;
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--accent-color) inset !important;
+}
+
+/* Select 选中值文本颜色 */
+.el-select .el-select__placeholder {
+  color: var(--text-gray) !important;
+}
+
+.el-select .el-select__selected-item {
+  color: var(--text-base) !important;
+}
+
+/* 下拉框容器 */
 .el-select-dropdown {
   background-color: var(--bg-soft) !important;
   border-color: var(--border-color) !important;
 }
 
+/* 下拉框内部包裹层 */
+.el-select-dropdown__wrap {
+  background-color: var(--bg-soft) !important;
+}
+
+/* 下拉框列表 */
+.el-select-dropdown__list {
+  background-color: var(--bg-soft) !important;
+}
+
+/* 下拉框选项 */
 .el-select-dropdown__item {
+  background-color: var(--bg-soft) !important;
   color: var(--text-base) !important;
 }
 
+/* 下拉框选项悬停状态 */
 .el-select-dropdown__item:hover {
   background-color: var(--bg-mute) !important;
+  color: var(--text-base) !important;
 }
 
+/* 下拉框选项选中状态 */
 .el-select-dropdown__item.selected {
+  background-color: var(--bg-mute) !important;
   color: var(--accent-color) !important;
   font-weight: 600;
+}
+
+/* 下拉框选项禁用状态 */
+.el-select-dropdown__item.is-disabled {
+  color: var(--text-gray) !important;
+  background-color: var(--bg-soft) !important;
+}
+
+/* 下拉框空状态 */
+.el-select-dropdown__empty {
+  color: var(--text-gray) !important;
 }
 
 /* Tree Select 树形选择器 */
@@ -458,4 +509,40 @@
 .el-divider__text {
   background-color: var(--bg-soft) !important;
   color: var(--text-base) !important;
+}
+
+/* Tree 树形组件 - 深色模式适配 */
+.el-tree {
+  background-color: var(--bg-soft) !important;
+  color: var(--text-base) !important;
+}
+
+.el-tree-node__content {
+  color: var(--text-base) !important;
+  background-color: transparent !important;
+}
+
+.el-tree-node__content:hover {
+  background-color: var(--bg-mute) !important;
+}
+
+/* 选中状态的树节点 */
+.el-tree-node.is-current > .el-tree-node__content {
+  background-color: var(--bg-mute) !important;
+  color: var(--text-base) !important;
+}
+
+/* 确保树节点文本颜色正确 */
+.el-tree-node__label {
+  color: var(--text-base) !important;
+}
+
+/* 树节点展开/折叠图标 */
+.el-tree-node__expand-icon {
+  color: var(--text-gray) !important;
+}
+
+/* 空状态文本 */
+.el-tree__empty-text {
+  color: var(--text-gray) !important;
 }

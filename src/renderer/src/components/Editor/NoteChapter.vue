@@ -948,6 +948,7 @@ async function handleSettingsChanged(newSettings) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--text-base); /* 确保文件名颜色使用主题变量 */
   }
   .chapter-actions {
     opacity: 0;

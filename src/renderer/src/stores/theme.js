@@ -18,55 +18,83 @@ export const THEME_CONFIGS = {
     description: '温暖柔和的护眼主题',
     isDark: false
   },
-  daisyui: {
-    name: 'DaisyUI',
-    description: '活力彩色设计风格',
+  // 柔和渐变色系
+  pink: {
+    name: '柔粉',
+    description: '温柔舒适的粉色主题',
     isDark: false
   },
-  'daisyui-dark': {
-    name: 'DaisyUI Dark',
-    description: 'DaisyUI 深色模式',
-    isDark: true
-  },
-  flowbite: {
-    name: 'Flowbite',
-    description: '清新蓝色现代风格',
+  peach: {
+    name: '蜜桃',
+    description: '温暖明媚的橙色主题',
     isDark: false
   },
-  'flowbite-dark': {
-    name: 'Flowbite Dark',
-    description: 'Flowbite 深色模式',
-    isDark: true
-  },
-  preline: {
-    name: 'Preline',
-    description: '简约商务风格',
+  lime: {
+    name: '青柠',
+    description: '清新活力的黄绿主题',
     isDark: false
   },
-  'preline-dark': {
-    name: 'Preline Dark',
-    description: 'Preline 深色模式',
-    isDark: true
-  },
-  material: {
-    name: 'Material',
-    description: 'Material Design 风格',
+  mint: {
+    name: '薄荷',
+    description: '清凉舒爽的青绿主题',
     isDark: false
   },
-  'material-dark': {
-    name: 'Material Dark',
-    description: 'Material 深色模式',
-    isDark: true
-  },
-  meraki: {
-    name: 'Meraki',
-    description: '优雅渐变风格',
+  lavender: {
+    name: '薰衣草',
+    description: '优雅宁静的淡紫主题',
     isDark: false
   },
-  'meraki-dark': {
-    name: 'Meraki Dark',
-    description: 'Meraki 深色模式',
-    isDark: true
+  // 绿色系渐变
+  'green-light': {
+    name: '浅绿',
+    description: '柔和清新的浅绿主题',
+    isDark: false
+  },
+  'green-soft': {
+    name: '嫩绿',
+    description: '温和舒适的嫩绿主题',
+    isDark: false
+  },
+  'green-sage': {
+    name: '鼠尾草绿',
+    description: '自然静谧的鼠尾草绿',
+    isDark: false
+  },
+  'green-forest': {
+    name: '森林绿',
+    description: '深邃沉稳的森林绿',
+    isDark: false
+  },
+  'green-dark': {
+    name: '墨绿',
+    description: '深沉雅致的墨绿主题',
+    isDark: false
+  },
+  // "Call Me By Your Name" 主题 - 蓝绿色系
+  'sky-blue': {
+    name: '天蓝',
+    description: '清新明亮的天蓝主题',
+    isDark: false
+  },
+  'ocean-blue': {
+    name: '海洋蓝',
+    description: '深邃沉稳的海洋蓝',
+    isDark: false
+  },
+  'sand-beige': {
+    name: '沙滩米',
+    description: '温暖柔和的沙滩米色',
+    isDark: false
+  },
+  'coral-orange': {
+    name: '珊瑚橙',
+    description: '活力温暖的珊瑚橙',
+    isDark: false
+  },
+  'emerald-green': {
+    name: '翡翠绿',
+    description: '优雅自然的翡翠绿',
+    isDark: false
   }
 }
 
@@ -103,21 +131,22 @@ export const useThemeStore = defineStore('theme', () => {
     
     switch (theme) {
       case 'dark':
-        // 主背景色：更深的护眼灰蓝色（#1a202c - 类似slate-900）
+        // 主背景色:更深的护眼灰蓝色(#1a202c - 类似slate-900)
         root.style.setProperty('--bg-primary', '#1a202c')
         root.style.setProperty('--bg-primary-a5', 'rgba(26, 32, 44, 0.5)')
         root.style.setProperty('--bg-primary-a7', 'rgba(26, 32, 44, 0.7)')
-        // 次级背景色：稍亮的灰蓝色（#2d3748 - 类似slate-800）
+        // 次级背景色:稍亮的灰蓝色(#2d3748 - 类似slate-800)
         root.style.setProperty('--bg-soft', '#2d3748')
         root.style.setProperty('--bg-soft-a5', 'rgba(45, 55, 72, 0.5)')
         root.style.setProperty('--bg-soft-a7', 'rgba(45, 55, 72, 0.7)')
-        // 弱化背景色：更亮一些的灰蓝色（#4a5568 - 类似slate-700）
+        // 弱化背景色:更亮一些的灰蓝色(#4a5568 - 类似slate-700)
         root.style.setProperty('--bg-mute', '#4a5568')
         root.style.setProperty('--bg-mute-a5', 'rgba(74, 85, 104, 0.5)')
         root.style.setProperty('--bg-mute-a7', 'rgba(74, 85, 104, 0.7)')
-        // 文本颜色：柔和的灰白色（#cbd5e0 - 类似slate-300），更护眼
-        root.style.setProperty('--text-base', '#cbd5e0')
-        root.style.setProperty('--text-gray', '#718096')
+        // 文本颜色:更明亮的灰白色(#e2e8f0 - 类似slate-200),提高对比度
+        root.style.setProperty('--text-base', '#e2e8f0')
+        root.style.setProperty('--text-secondary', '#cbd5e0')
+        root.style.setProperty('--text-gray', '#94a3b8')
         root.style.setProperty('--text-gray-light', '#a0aec0')
         root.style.setProperty('--text-gray-lighter', '#cbd5e0')
         root.style.setProperty('--text-gray-lightest', '#e2e8f0')
@@ -147,215 +176,320 @@ export const useThemeStore = defineStore('theme', () => {
         root.style.setProperty('--border-color-soft', '#EBE0C9')
         root.style.setProperty('--success-green', '#84CC16')
         break
-      // DaisyUI 主题 - 紫色系
-      case 'daisyui':
-        root.style.setProperty('--bg-primary', '#FAF7FF')
-        root.style.setProperty('--bg-primary-a5', 'rgba(250, 247, 255, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(250, 247, 255, 0.7)')
-        root.style.setProperty('--bg-soft', '#F3EEFF')
-        root.style.setProperty('--bg-soft-a5', 'rgba(243, 238, 255, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(243, 238, 255, 0.7)')
-        root.style.setProperty('--bg-mute', '#EBE4FF')
-        root.style.setProperty('--bg-mute-a5', 'rgba(235, 228, 255, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(235, 228, 255, 0.7)')
-        root.style.setProperty('--text-base', '#1f2937')
-        root.style.setProperty('--text-gray', '#6b7280')
-        root.style.setProperty('--text-gray-light', '#9ca3af')
-        root.style.setProperty('--text-gray-lighter', '#d1d5db')
-        root.style.setProperty('--text-gray-lightest', '#f3f4f6')
-        root.style.setProperty('--accent-color', '#8B5CF6')
-        root.style.setProperty('--border-color', '#E4DBFF')
-        root.style.setProperty('--border-color-soft', '#EDE7FF')
+      // 柔粉主题 (#FFB7B2)
+      case 'pink':
+        root.style.setProperty('--bg-primary', '#FFF5F4')
+        root.style.setProperty('--bg-primary-a5', 'rgba(255, 245, 244, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(255, 245, 244, 0.7)')
+        root.style.setProperty('--bg-soft', '#FFE8E6')
+        root.style.setProperty('--bg-soft-a5', 'rgba(255, 232, 230, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(255, 232, 230, 0.7)')
+        root.style.setProperty('--bg-mute', '#FFD5D1')
+        root.style.setProperty('--bg-mute-a5', 'rgba(255, 213, 209, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(255, 213, 209, 0.7)')
+        root.style.setProperty('--text-base', '#4A1F1E')
+        root.style.setProperty('--text-gray', '#7C3533')
+        root.style.setProperty('--text-gray-light', '#A64D4B')
+        root.style.setProperty('--text-gray-lighter', '#D17572')
+        root.style.setProperty('--text-gray-lightest', '#FFA09A')
+        root.style.setProperty('--accent-color', '#FFB7B2')
+        root.style.setProperty('--border-color', '#FFC5C0')
+        root.style.setProperty('--border-color-soft', '#FFE0DD')
         root.style.setProperty('--success-green', '#10B981')
         break
-      case 'daisyui-dark':
-        // 深紫色系暗色主题
-        root.style.setProperty('--bg-primary', '#1E1B2E')
-        root.style.setProperty('--bg-primary-a5', 'rgba(30, 27, 46, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(30, 27, 46, 0.7)')
-        root.style.setProperty('--bg-soft', '#2A2440')
-        root.style.setProperty('--bg-soft-a5', 'rgba(42, 36, 64, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(42, 36, 64, 0.7)')
-        root.style.setProperty('--bg-mute', '#3D3555')
-        root.style.setProperty('--bg-mute-a5', 'rgba(61, 53, 85, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(61, 53, 85, 0.7)')
-        root.style.setProperty('--text-base', '#E9D5FF')
-        root.style.setProperty('--text-gray', '#C4B5FD')
-        root.style.setProperty('--text-gray-light', '#A78BFA')
-        root.style.setProperty('--text-gray-lighter', '#8B5CF6')
-        root.style.setProperty('--text-gray-lightest', '#7C3AED')
-        root.style.setProperty('--accent-color', '#A78BFA')
-        root.style.setProperty('--border-color', '#4C3A6B')
-        root.style.setProperty('--border-color-soft', '#5B4780')
-        root.style.setProperty('--success-green', '#34D399')
+      // 蜜桃主题 (#FFDAC1)
+      case 'peach':
+        root.style.setProperty('--bg-primary', '#FFF9F5')
+        root.style.setProperty('--bg-primary-a5', 'rgba(255, 249, 245, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(255, 249, 245, 0.7)')
+        root.style.setProperty('--bg-soft', '#FFF0E5')
+        root.style.setProperty('--bg-soft-a5', 'rgba(255, 240, 229, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(255, 240, 229, 0.7)')
+        root.style.setProperty('--bg-mute', '#FFE5D0')
+        root.style.setProperty('--bg-mute-a5', 'rgba(255, 229, 208, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(255, 229, 208, 0.7)')
+        root.style.setProperty('--text-base', '#4A2F1E')
+        root.style.setProperty('--text-gray', '#7C5133')
+        root.style.setProperty('--text-gray-light', '#A6714B')
+        root.style.setProperty('--text-gray-lighter', '#D19972')
+        root.style.setProperty('--text-gray-lightest', '#FFBE8F')
+        root.style.setProperty('--accent-color', '#FFDAC1')
+        root.style.setProperty('--border-color', '#FFE8D5')
+        root.style.setProperty('--border-color-soft', '#FFF0E5')
+        root.style.setProperty('--success-green', '#10B981')
         break
-      // Flowbite 主题 - 蓝色系
-      case 'flowbite':
-        root.style.setProperty('--bg-primary', '#F0F9FF')
-        root.style.setProperty('--bg-primary-a5', 'rgba(240, 249, 255, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(240, 249, 255, 0.7)')
-        root.style.setProperty('--bg-soft', '#E0F2FE')
-        root.style.setProperty('--bg-soft-a5', 'rgba(224, 242, 254, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(224, 242, 254, 0.7)')
-        root.style.setProperty('--bg-mute', '#BAE6FD')
-        root.style.setProperty('--bg-mute-a5', 'rgba(186, 230, 253, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(186, 230, 253, 0.7)')
-        root.style.setProperty('--text-base', '#0C4A6E')
-        root.style.setProperty('--text-gray', '#075985')
-        root.style.setProperty('--text-gray-light', '#0284C7')
-        root.style.setProperty('--text-gray-lighter', '#7DD3FC')
-        root.style.setProperty('--text-gray-lightest', '#BAE6FD')
-        root.style.setProperty('--accent-color', '#0EA5E9')
-        root.style.setProperty('--border-color', '#7DD3FC')
-        root.style.setProperty('--border-color-soft', '#BAE6FD')
+      // 青柠主题 (#E2F0CB)
+      case 'lime':
+        root.style.setProperty('--bg-primary', '#FAFCF5')
+        root.style.setProperty('--bg-primary-a5', 'rgba(250, 252, 245, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(250, 252, 245, 0.7)')
+        root.style.setProperty('--bg-soft', '#F2F7E5')
+        root.style.setProperty('--bg-soft-a5', 'rgba(242, 247, 229, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(242, 247, 229, 0.7)')
+        root.style.setProperty('--bg-mute', '#EAF4D8')
+        root.style.setProperty('--bg-mute-a5', 'rgba(234, 244, 216, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(234, 244, 216, 0.7)')
+        root.style.setProperty('--text-base', '#2F4A1E')
+        root.style.setProperty('--text-gray', '#4D6B33')
+        root.style.setProperty('--text-gray-light', '#6B8B4B')
+        root.style.setProperty('--text-gray-lighter', '#90B372')
+        root.style.setProperty('--text-gray-lightest', '#B8D89A')
+        root.style.setProperty('--accent-color', '#AAD55C')
+        root.style.setProperty('--border-color', '#D5E8B0')
+        root.style.setProperty('--border-color-soft', '#E8F4D3')
+        root.style.setProperty('--success-green', '#84CC16')
+        break
+      // 薄荷主题 (#B5EAD7)
+      case 'mint':
+        root.style.setProperty('--bg-primary', '#F5FCFA')
+        root.style.setProperty('--bg-primary-a5', 'rgba(245, 252, 250, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(245, 252, 250, 0.7)')
+        root.style.setProperty('--bg-soft', '#E5F7F2')
+        root.style.setProperty('--bg-soft-a5', 'rgba(229, 247, 242, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(229, 247, 242, 0.7)')
+        root.style.setProperty('--bg-mute', '#D0F1E8')
+        root.style.setProperty('--bg-mute-a5', 'rgba(208, 241, 232, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(208, 241, 232, 0.7)')
+        root.style.setProperty('--text-base', '#1E4A3D')
+        root.style.setProperty('--text-gray', '#336B5B')
+        root.style.setProperty('--text-gray-light', '#4B8B79')
+        root.style.setProperty('--text-gray-lighter', '#72B39E')
+        root.style.setProperty('--text-gray-lightest', '#9AD5C2')
+        root.style.setProperty('--accent-color', '#58C2A3')
+        root.style.setProperty('--border-color', '#A0DCC9')
+        root.style.setProperty('--border-color-soft', '#CCEEDE')
         root.style.setProperty('--success-green', '#14B8A6')
         break
-      case 'flowbite-dark':
-        // 深蓝色系暗色主题
-        root.style.setProperty('--bg-primary', '#0C1E2F')
-        root.style.setProperty('--bg-primary-a5', 'rgba(12, 30, 47, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(12, 30, 47, 0.7)')
-        root.style.setProperty('--bg-soft', '#1E3A52')
-        root.style.setProperty('--bg-soft-a5', 'rgba(30, 58, 82, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(30, 58, 82, 0.7)')
-        root.style.setProperty('--bg-mute', '#2E5266')
-        root.style.setProperty('--bg-mute-a5', 'rgba(46, 82, 102, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(46, 82, 102, 0.7)')
-        root.style.setProperty('--text-base', '#BAE6FD')
-        root.style.setProperty('--text-gray', '#7DD3FC')
-        root.style.setProperty('--text-gray-light', '#38BDF8')
-        root.style.setProperty('--text-gray-lighter', '#0EA5E9')
-        root.style.setProperty('--text-gray-lightest', '#0284C7')
-        root.style.setProperty('--accent-color', '#38BDF8')
-        root.style.setProperty('--border-color', '#1E3A52')
-        root.style.setProperty('--border-color-soft', '#2E5266')
-        root.style.setProperty('--success-green', '#2DD4BF')
-        break
-      // Preline 主题 - 靛蓝色系
-      case 'preline':
-        root.style.setProperty('--bg-primary', '#EEF2FF')
-        root.style.setProperty('--bg-primary-a5', 'rgba(238, 242, 255, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(238, 242, 255, 0.7)')
-        root.style.setProperty('--bg-soft', '#E0E7FF')
-        root.style.setProperty('--bg-soft-a5', 'rgba(224, 231, 255, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(224, 231, 255, 0.7)')
-        root.style.setProperty('--bg-mute', '#C7D2FE')
-        root.style.setProperty('--bg-mute-a5', 'rgba(199, 210, 254, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(199, 210, 254, 0.7)')
-        root.style.setProperty('--text-base', '#1E1B4B')
-        root.style.setProperty('--text-gray', '#3730A3')
-        root.style.setProperty('--text-gray-light', '#4F46E5')
-        root.style.setProperty('--text-gray-lighter', '#818CF8')
-        root.style.setProperty('--text-gray-lightest', '#A5B4FC')
-        root.style.setProperty('--accent-color', '#6366F1')
-        root.style.setProperty('--border-color', '#A5B4FC')
-        root.style.setProperty('--border-color-soft', '#C7D2FE')
-        root.style.setProperty('--success-green', '#059669')
-        break
-      case 'preline-dark':
-        // 深靛蓝色系暗色主题
-        root.style.setProperty('--bg-primary', '#1E1B4B')
-        root.style.setProperty('--bg-primary-a5', 'rgba(30, 27, 75, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(30, 27, 75, 0.7)')
-        root.style.setProperty('--bg-soft', '#312E81')
-        root.style.setProperty('--bg-soft-a5', 'rgba(49, 46, 129, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(49, 46, 129, 0.7)')
-        root.style.setProperty('--bg-mute', '#3730A3')
-        root.style.setProperty('--bg-mute-a5', 'rgba(55, 48, 163, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(55, 48, 163, 0.7)')
-        root.style.setProperty('--text-base', '#E0E7FF')
-        root.style.setProperty('--text-gray', '#C7D2FE')
-        root.style.setProperty('--text-gray-light', '#A5B4FC')
-        root.style.setProperty('--text-gray-lighter', '#818CF8')
-        root.style.setProperty('--text-gray-lightest', '#6366F1')
-        root.style.setProperty('--accent-color', '#818CF8')
-        root.style.setProperty('--border-color', '#4338CA')
-        root.style.setProperty('--border-color-soft', '#4F46E5')
+      // 薰衣草主题 (#C7CEEA)
+      case 'lavender':
+        root.style.setProperty('--bg-primary', '#F7F8FC')
+        root.style.setProperty('--bg-primary-a5', 'rgba(247, 248, 252, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(247, 248, 252, 0.7)')
+        root.style.setProperty('--bg-soft', '#EEF0F7')
+        root.style.setProperty('--bg-soft-a5', 'rgba(238, 240, 247, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(238, 240, 247, 0.7)')
+        root.style.setProperty('--bg-mute', '#DFE2F0')
+        root.style.setProperty('--bg-mute-a5', 'rgba(223, 226, 240, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(223, 226, 240, 0.7)')
+        root.style.setProperty('--text-base', '#2D324A')
+        root.style.setProperty('--text-gray', '#4D556B')
+        root.style.setProperty('--text-gray-light', '#6B758B')
+        root.style.setProperty('--text-gray-lighter', '#9099B3')
+        root.style.setProperty('--text-gray-lightest', '#B5BDD5')
+        root.style.setProperty('--accent-color', '#8A95C8')
+        root.style.setProperty('--border-color', '#B8BFDC')
+        root.style.setProperty('--border-color-soft', '#D8DCF0')
         root.style.setProperty('--success-green', '#10B981')
         break
-      // Material Tailwind 主题 - 青色系
-      case 'material':
-        root.style.setProperty('--bg-primary', '#ECFEFF')
-        root.style.setProperty('--bg-primary-a5', 'rgba(236, 254, 255, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(236, 254, 255, 0.7)')
-        root.style.setProperty('--bg-soft', '#CFFAFE')
-        root.style.setProperty('--bg-soft-a5', 'rgba(207, 250, 254, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(207, 250, 254, 0.7)')
-        root.style.setProperty('--bg-mute', '#A5F3FC')
-        root.style.setProperty('--bg-mute-a5', 'rgba(165, 243, 252, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(165, 243, 252, 0.7)')
-        root.style.setProperty('--text-base', '#164E63')
-        root.style.setProperty('--text-gray', '#0E7490')
-        root.style.setProperty('--text-gray-light', '#0891B2')
-        root.style.setProperty('--text-gray-lighter', '#22D3EE')
-        root.style.setProperty('--text-gray-lightest', '#67E8F9')
-        root.style.setProperty('--accent-color', '#06B6D4')
-        root.style.setProperty('--border-color', '#67E8F9')
-        root.style.setProperty('--border-color-soft', '#A5F3FC')
+      // 浅绿主题
+      case 'green-light':
+        root.style.setProperty('--bg-primary', '#F5FCF9')
+        root.style.setProperty('--bg-primary-a5', 'rgba(245, 252, 249, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(245, 252, 249, 0.7)')
+        root.style.setProperty('--bg-soft', '#E8F7F0')
+        root.style.setProperty('--bg-soft-a5', 'rgba(232, 247, 240, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(232, 247, 240, 0.7)')
+        root.style.setProperty('--bg-mute', '#D5F0E3')
+        root.style.setProperty('--bg-mute-a5', 'rgba(213, 240, 227, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(213, 240, 227, 0.7)')
+        root.style.setProperty('--text-base', '#1E4A35')
+        root.style.setProperty('--text-gray', '#2D6B4F')
+        root.style.setProperty('--text-gray-light', '#3D8B69')
+        root.style.setProperty('--text-gray-lighter', '#5FB391')
+        root.style.setProperty('--text-gray-lightest', '#8DD5B8')
+        root.style.setProperty('--accent-color', '#4CAF7E')
+        root.style.setProperty('--border-color', '#B8E5CF')
+        root.style.setProperty('--border-color-soft', '#D8F2E5')
+        root.style.setProperty('--success-green', '#10B981')
+        break
+      // 嫩绿主题
+      case 'green-soft':
+        root.style.setProperty('--bg-primary', '#F3FAF5')
+        root.style.setProperty('--bg-primary-a5', 'rgba(243, 250, 245, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(243, 250, 245, 0.7)')
+        root.style.setProperty('--bg-soft', '#E3F4E8')
+        root.style.setProperty('--bg-soft-a5', 'rgba(227, 244, 232, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(227, 244, 232, 0.7)')
+        root.style.setProperty('--bg-mute', '#CCEBD7')
+        root.style.setProperty('--bg-mute-a5', 'rgba(204, 235, 215, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(204, 235, 215, 0.7)')
+        root.style.setProperty('--text-base', '#234A31')
+        root.style.setProperty('--text-gray', '#376B48')
+        root.style.setProperty('--text-gray-light', '#4B8B5F')
+        root.style.setProperty('--text-gray-lighter', '#6FAF86')
+        root.style.setProperty('--text-gray-lightest', '#9BD5B1')
+        root.style.setProperty('--accent-color', '#55B377')
+        root.style.setProperty('--border-color', '#ADDFC3')
+        root.style.setProperty('--border-color-soft', '#D0F0DC')
+        root.style.setProperty('--success-green', '#22C55E')
+        break
+      // 鼠尾草绿主题
+      case 'green-sage':
+        root.style.setProperty('--bg-primary', '#F2F7F3')
+        root.style.setProperty('--bg-primary-a5', 'rgba(242, 247, 243, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(242, 247, 243, 0.7)')
+        root.style.setProperty('--bg-soft', '#E0EFE3')
+        root.style.setProperty('--bg-soft-a5', 'rgba(224, 239, 227, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(224, 239, 227, 0.7)')
+        root.style.setProperty('--bg-mute', '#C2E0C8')
+        root.style.setProperty('--bg-mute-a5', 'rgba(194, 224, 200, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(194, 224, 200, 0.7)')
+        root.style.setProperty('--text-base', '#2A4A32')
+        root.style.setProperty('--text-gray', '#416B4A')
+        root.style.setProperty('--text-gray-light', '#588B62')
+        root.style.setProperty('--text-gray-lighter', '#79AF89')
+        root.style.setProperty('--text-gray-lightest', '#A3D5B0')
+        root.style.setProperty('--accent-color', '#66B37A')
+        root.style.setProperty('--border-color', '#9BCCAA')
+        root.style.setProperty('--border-color-soft', '#C8E5D0')
+        root.style.setProperty('--success-green', '#16A34A')
+        break
+      // 森林绿主题
+      case 'green-forest':
+        root.style.setProperty('--bg-primary', '#EEF5F0')
+        root.style.setProperty('--bg-primary-a5', 'rgba(238, 245, 240, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(238, 245, 240, 0.7)')
+        root.style.setProperty('--bg-soft', '#DAEADE')
+        root.style.setProperty('--bg-soft-a5', 'rgba(218, 234, 222, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(218, 234, 222, 0.7)')
+        root.style.setProperty('--bg-mute', '#B8D5BE')
+        root.style.setProperty('--bg-mute-a5', 'rgba(184, 213, 190, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(184, 213, 190, 0.7)')
+        root.style.setProperty('--text-base', '#304A37')
+        root.style.setProperty('--text-gray', '#496B4F')
+        root.style.setProperty('--text-gray-light', '#628B67')
+        root.style.setProperty('--text-gray-lighter', '#84AF8E')
+        root.style.setProperty('--text-gray-lightest', '#A8D5B5')
+        root.style.setProperty('--accent-color', '#4F8B5B')
+        root.style.setProperty('--border-color', '#90BF9B')
+        root.style.setProperty('--border-color-soft', '#BFDDC6')
+        root.style.setProperty('--success-green', '#15803D')
+        break
+      // 墨绿主题
+      case 'green-dark':
+        root.style.setProperty('--bg-primary', '#EBF3ED')
+        root.style.setProperty('--bg-primary-a5', 'rgba(235, 243, 237, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(235, 243, 237, 0.7)')
+        root.style.setProperty('--bg-soft', '#D5E5D8')
+        root.style.setProperty('--bg-soft-a5', 'rgba(213, 229, 216, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(213, 229, 216, 0.7)')
+        root.style.setProperty('--bg-mute', '#AECFB4')
+        root.style.setProperty('--bg-mute-a5', 'rgba(174, 207, 180, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(174, 207, 180, 0.7)')
+        root.style.setProperty('--text-base', '#354A3A')
+        root.style.setProperty('--text-gray', '#4E6B52')
+        root.style.setProperty('--text-gray-light', '#678B6A')
+        root.style.setProperty('--text-gray-lighter', '#8DAF92')
+        root.style.setProperty('--text-gray-lightest', '#B5D5BA')
+        root.style.setProperty('--accent-color', '#3D7A47')
+        root.style.setProperty('--border-color', '#87B990')
+        root.style.setProperty('--border-color-soft', '#B8DBC0')
+        root.style.setProperty('--success-green', '#166534')
+        break
+      // 天蓝主题 (#7CC8D8)
+      case 'sky-blue':
+        root.style.setProperty('--bg-primary', '#F0FAFC')
+        root.style.setProperty('--bg-primary-a5', 'rgba(240, 250, 252, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(240, 250, 252, 0.7)')
+        root.style.setProperty('--bg-soft', '#E0F4F9')
+        root.style.setProperty('--bg-soft-a5', 'rgba(224, 244, 249, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(224, 244, 249, 0.7)')
+        root.style.setProperty('--bg-mute', '#C8EDF5')
+        root.style.setProperty('--bg-mute-a5', 'rgba(200, 237, 245, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(200, 237, 245, 0.7)')
+        root.style.setProperty('--text-base', '#1E4A55')
+        root.style.setProperty('--text-gray', '#2F6B7B')
+        root.style.setProperty('--text-gray-light', '#4A8B9C')
+        root.style.setProperty('--text-gray-lighter', '#6FAFC0')
+        root.style.setProperty('--text-gray-lightest', '#9BD3E0')
+        root.style.setProperty('--accent-color', '#7CC8D8')
+        root.style.setProperty('--border-color', '#A8DCE8')
+        root.style.setProperty('--border-color-soft', '#D0EDF5')
         root.style.setProperty('--success-green', '#14B8A6')
         break
-      case 'material-dark':
-        // 深青色系暗色主题
-        root.style.setProperty('--bg-primary', '#083344')
-        root.style.setProperty('--bg-primary-a5', 'rgba(8, 51, 68, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(8, 51, 68, 0.7)')
-        root.style.setProperty('--bg-soft', '#0E4C5D')
-        root.style.setProperty('--bg-soft-a5', 'rgba(14, 76, 93, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(14, 76, 93, 0.7)')
-        root.style.setProperty('--bg-mute', '#155E75')
-        root.style.setProperty('--bg-mute-a5', 'rgba(21, 94, 117, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(21, 94, 117, 0.7)')
-        root.style.setProperty('--text-base', '#A5F3FC')
-        root.style.setProperty('--text-gray', '#67E8F9')
-        root.style.setProperty('--text-gray-light', '#22D3EE')
-        root.style.setProperty('--text-gray-lighter', '#06B6D4')
-        root.style.setProperty('--text-gray-lightest', '#0891B2')
-        root.style.setProperty('--accent-color', '#22D3EE')
-        root.style.setProperty('--border-color', '#164E63')
-        root.style.setProperty('--border-color-soft', '#155E75')
-        root.style.setProperty('--success-green', '#2DD4BF')
+      // 海洋蓝主题 (#4682B4)
+      case 'ocean-blue':
+        root.style.setProperty('--bg-primary', '#EFF6FB')
+        root.style.setProperty('--bg-primary-a5', 'rgba(239, 246, 251, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(239, 246, 251, 0.7)')
+        root.style.setProperty('--bg-soft', '#DCE9F5')
+        root.style.setProperty('--bg-soft-a5', 'rgba(220, 233, 245, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(220, 233, 245, 0.7)')
+        root.style.setProperty('--bg-mute', '#B8D4E8')
+        root.style.setProperty('--bg-mute-a5', 'rgba(184, 212, 232, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(184, 212, 232, 0.7)')
+        root.style.setProperty('--text-base', '#1E3A52')
+        root.style.setProperty('--text-gray', '#2F5570')
+        root.style.setProperty('--text-gray-light', '#4A708E')
+        root.style.setProperty('--text-gray-lighter', '#6F95B3')
+        root.style.setProperty('--text-gray-lightest', '#9BBAD8')
+        root.style.setProperty('--accent-color', '#4682B4')
+        root.style.setProperty('--border-color', '#8BACC9')
+        root.style.setProperty('--border-color-soft', '#C0D5E5')
+        root.style.setProperty('--success-green', '#0891B2')
         break
-      // Meraki UI 主题 - 粉色系
-      case 'meraki':
-        root.style.setProperty('--bg-primary', '#FDF2F8')
-        root.style.setProperty('--bg-primary-a5', 'rgba(253, 242, 248, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(253, 242, 248, 0.7)')
-        root.style.setProperty('--bg-soft', '#FCE7F3')
-        root.style.setProperty('--bg-soft-a5', 'rgba(252, 231, 243, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(252, 231, 243, 0.7)')
-        root.style.setProperty('--bg-mute', '#FBCFE8')
-        root.style.setProperty('--bg-mute-a5', 'rgba(251, 207, 232, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(251, 207, 232, 0.7)')
-        root.style.setProperty('--text-base', '#831843')
-        root.style.setProperty('--text-gray', '#9F1239')
-        root.style.setProperty('--text-gray-light', '#BE123C')
-        root.style.setProperty('--text-gray-lighter', '#F472B6')
-        root.style.setProperty('--text-gray-lightest', '#F9A8D4')
-        root.style.setProperty('--accent-color', '#EC4899')
-        root.style.setProperty('--border-color', '#F9A8D4')
-        root.style.setProperty('--border-color-soft', '#FBCFE8')
+      // 沙滩米色主题 (#F5DEB3)
+      case 'sand-beige':
+        root.style.setProperty('--bg-primary', '#FFFBF5')
+        root.style.setProperty('--bg-primary-a5', 'rgba(255, 251, 245, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(255, 251, 245, 0.7)')
+        root.style.setProperty('--bg-soft', '#FFF5E8')
+        root.style.setProperty('--bg-soft-a5', 'rgba(255, 245, 232, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(255, 245, 232, 0.7)')
+        root.style.setProperty('--bg-mute', '#FFEDC8')
+        root.style.setProperty('--bg-mute-a5', 'rgba(255, 237, 200, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(255, 237, 200, 0.7)')
+        root.style.setProperty('--text-base', '#4A3F2E')
+        root.style.setProperty('--text-gray', '#6B5B45')
+        root.style.setProperty('--text-gray-light', '#8B775C')
+        root.style.setProperty('--text-gray-lighter', '#B39A7A')
+        root.style.setProperty('--text-gray-lightest', '#D5C3A8')
+        root.style.setProperty('--accent-color', '#D4A574')
+        root.style.setProperty('--border-color', '#E8D0A8')
+        root.style.setProperty('--border-color-soft', '#F5E5C8')
+        root.style.setProperty('--success-green', '#84CC16')
+        break
+      // 珊瑚橙主题 (#F08460)
+      case 'coral-orange':
+        root.style.setProperty('--bg-primary', '#FFF7F5')
+        root.style.setProperty('--bg-primary-a5', 'rgba(255, 247, 245, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(255, 247, 245, 0.7)')
+        root.style.setProperty('--bg-soft', '#FFEDE8')
+        root.style.setProperty('--bg-soft-a5', 'rgba(255, 237, 232, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(255, 237, 232, 0.7)')
+        root.style.setProperty('--bg-mute', '#FFDCD0')
+        root.style.setProperty('--bg-mute-a5', 'rgba(255, 220, 208, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(255, 220, 208, 0.7)')
+        root.style.setProperty('--text-base', '#4A2520')
+        root.style.setProperty('--text-gray', '#7C3F35')
+        root.style.setProperty('--text-gray-light', '#A6594A')
+        root.style.setProperty('--text-gray-lighter', '#D1806F')
+        root.style.setProperty('--text-gray-lightest', '#FFAA95')
+        root.style.setProperty('--accent-color', '#F08460')
+        root.style.setProperty('--border-color', '#FFB8A0')
+        root.style.setProperty('--border-color-soft', '#FFD8C8')
         root.style.setProperty('--success-green', '#10B981')
         break
-      case 'meraki-dark':
-        // 深玫瑰色系暗色主题
-        root.style.setProperty('--bg-primary', '#4C0519')
-        root.style.setProperty('--bg-primary-a5', 'rgba(76, 5, 25, 0.5)')
-        root.style.setProperty('--bg-primary-a7', 'rgba(76, 5, 25, 0.7)')
-        root.style.setProperty('--bg-soft', '#701A3A')
-        root.style.setProperty('--bg-soft-a5', 'rgba(112, 26, 58, 0.5)')
-        root.style.setProperty('--bg-soft-a7', 'rgba(112, 26, 58, 0.7)')
-        root.style.setProperty('--bg-mute', '#881337')
-        root.style.setProperty('--bg-mute-a5', 'rgba(136, 19, 55, 0.5)')
-        root.style.setProperty('--bg-mute-a7', 'rgba(136, 19, 55, 0.7)')
-        root.style.setProperty('--text-base', '#FCE7F3')
-        root.style.setProperty('--text-gray', '#FBCFE8')
-        root.style.setProperty('--text-gray-light', '#F9A8D4')
-        root.style.setProperty('--text-gray-lighter', '#F472B6')
-        root.style.setProperty('--text-gray-lightest', '#EC4899')
-        root.style.setProperty('--accent-color', '#F472B6')
-        root.style.setProperty('--border-color', '#9F1239')
-        root.style.setProperty('--border-color-soft', '#BE123C')
-        root.style.setProperty('--success-green', '#34D399')
+      // 翡翠绿主题 (#3F9B72)
+      case 'emerald-green':
+        root.style.setProperty('--bg-primary', '#F0FAF6')
+        root.style.setProperty('--bg-primary-a5', 'rgba(240, 250, 246, 0.5)')
+        root.style.setProperty('--bg-primary-a7', 'rgba(240, 250, 246, 0.7)')
+        root.style.setProperty('--bg-soft', '#E0F4ED')
+        root.style.setProperty('--bg-soft-a5', 'rgba(224, 244, 237, 0.5)')
+        root.style.setProperty('--bg-soft-a7', 'rgba(224, 244, 237, 0.7)')
+        root.style.setProperty('--bg-mute', '#C8EBD9')
+        root.style.setProperty('--bg-mute-a5', 'rgba(200, 235, 217, 0.5)')
+        root.style.setProperty('--bg-mute-a7', 'rgba(200, 235, 217, 0.7)')
+        root.style.setProperty('--text-base', '#1E4A39')
+        root.style.setProperty('--text-gray', '#2F6B55')
+        root.style.setProperty('--text-gray-light', '#4A8B71')
+        root.style.setProperty('--text-gray-lighter', '#6FAF95')
+        root.style.setProperty('--text-gray-lightest', '#9BD3BE')
+        root.style.setProperty('--accent-color', '#3F9B72')
+        root.style.setProperty('--border-color', '#88C4A8')
+        root.style.setProperty('--border-color-soft', '#BCDDC8')
+        root.style.setProperty('--success-green', '#16A34A')
         break
       default: // light
         root.style.setProperty('--bg-primary', '#F8F9FA')
