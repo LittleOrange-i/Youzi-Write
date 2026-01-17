@@ -141,6 +141,9 @@ if (process.contextIsolated) {
       // 保存人物谱数据
       writeCharacters: (bookName, data) =>
         ipcRenderer.invoke('write-characters', { bookName, data }),
+      // 保存单个角色到人物谱
+      saveCharacter: (bookName, character) =>
+        ipcRenderer.invoke('save-character', { bookName, character }),
 
       // --------- 词条字典相关 ---------
       // 读取词条字典数据

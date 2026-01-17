@@ -3072,6 +3072,47 @@ ipcMain.handle('write-characters', async (event, { bookName, data }) => {
   }
 })
 
+// 保存单个角色到人物谱
+ipcMain.handle('save-character', async (event, { bookName, character }) => {
+  const booksDir = store.get('booksDir')
+  const bookPath = join(booksDir, bookName)
+  const charactersPath = join(bookPath, 'characters.json')
+
+  try {
+    // 确保目录存在
+    if (!fs.existsSync(bookPath)) {
+      fs.mkdirSync(bookPath, { recursive: true })
+    }
+
+    // 读取现有人物谱数据
+    let characters = []
+    if (fs.existsSync(charactersPath)) {
+      try {
+        characters = JSON.parse(fs.readFileSync(charactersPath, 'utf-8'))
+      } catch {
+        characters = []
+      }
+    }
+
+    // 检查角色是否已存在（根据ID）
+    const existingIndex = characters.findIndex(c => c.id === character.id)
+    if (existingIndex !== -1) {
+      // 更新现有角色
+      characters[existingIndex] = character
+    } else {
+      // 添加新角色
+      characters.push(character)
+    }
+
+    // 保存更新后的数据
+    fs.writeFileSync(charactersPath, JSON.stringify(characters, null, 2), 'utf-8')
+    return { success: true }
+  } catch (error) {
+    console.error('保存角色失败:', error)
+    return { success: false, message: error.message }
+  }
+})
+
 // 词条字典数据读写
 ipcMain.handle('read-dictionary', async (event, { bookName }) => {
   const booksDir = store.get('booksDir')
