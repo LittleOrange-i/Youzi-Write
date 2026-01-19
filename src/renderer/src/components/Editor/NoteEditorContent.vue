@@ -323,30 +323,30 @@ const NoteDragHandle = Extension.create({
               if (pos < 0) return false
               // 确保拖拽开始时已记录 draggingPos
               if (draggingPos == null) draggingPos = pos
-              // 使用整段节点作为拖拽预览
-              const nodeDom = view.nodeDOM(pos)
-              if (!(nodeDom instanceof HTMLElement)) return false
+              // 创建一个小的透明拖拽预览图，避免显示巨大的图标
               try {
-                // 克隆节点作为 drag image，避免直接使用原节点造成布局抖动
-                const clone = nodeDom.cloneNode(true)
-                if (clone instanceof HTMLElement) {
-                  clone.style.position = 'fixed'
-                  clone.style.pointerEvents = 'none'
-                  clone.style.top = '-10000px'
-                  clone.style.left = '-10000px'
-                  clone.style.width = getComputedStyle(nodeDom).width
-                  clone.style.background = getComputedStyle(nodeDom).backgroundColor || '#fff'
-                  document.body.appendChild(clone)
-                  if (event.dataTransfer) {
-                    event.dataTransfer.effectAllowed = 'move'
-                    // 设置任意数据以启用 Firefox 的 drop
-                    event.dataTransfer.setData('text/plain', 'move-note-paragraph')
-                    event.dataTransfer.setDragImage(clone, 8, 8)
-                  }
-                  // 下一帧移除克隆节点
+                if (event.dataTransfer) {
+                  event.dataTransfer.effectAllowed = 'move'
+                  // 设置任意数据以启用 Firefox 的 drop
+                  event.dataTransfer.setData('text/plain', 'move-note-paragraph')
+                  
+                  // 创建一个小的透明图像作为拖拽预览
+                  const img = document.createElement('div')
+                  img.style.position = 'fixed'
+                  img.style.top = '-10000px'
+                  img.style.left = '-10000px'
+                  img.style.width = '1px'
+                  img.style.height = '1px'
+                  img.style.opacity = '0'
+                  document.body.appendChild(img)
+                  
+                  // 使用透明的小图像作为拖拽预览
+                  event.dataTransfer.setDragImage(img, 0, 0)
+                  
+                  // 下一帧移除临时元素
                   requestAnimationFrame(() => {
-                    if (clone.parentNode) {
-                      clone.parentNode.removeChild(clone)
+                    if (img.parentNode) {
+                      img.parentNode.removeChild(img)
                     }
                   })
                 }
