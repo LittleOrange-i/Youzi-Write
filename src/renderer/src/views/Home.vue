@@ -802,17 +802,17 @@ async function checkConflicts(currentIndex) {
   currentShortcut.conflictWith = ''
   currentShortcut.occupied = false // 用户修改后清除占用状态
   
-  // 检查与其他快捷键的冲突
+  // 先清除所有快捷键的冲突状态（但不重置occupied状态）
+  shortcuts.value.forEach((shortcut) => {
+    shortcut.conflict = false
+    shortcut.conflictWith = ''
+  })
+  
+  // 重新检查所有快捷键之间的冲突
   shortcuts.value.forEach((shortcut, index) => {
-    if (index !== currentIndex) {
-      // 重置其他快捷键的冲突状态（但不重置occupied状态）
-      if (shortcut.key !== currentShortcut.key || !currentShortcut.key) {
-        shortcut.conflict = false
-        shortcut.conflictWith = ''
-      }
-      
+    if (index !== currentIndex && shortcut.key && currentShortcut.key) {
       // 检查是否与当前快捷键冲突
-      if (shortcut.key === currentShortcut.key && currentShortcut.key) {
+      if (shortcut.key === currentShortcut.key) {
         currentShortcut.conflict = true
         currentShortcut.conflictWith = shortcut.name
         shortcut.conflict = true
@@ -845,15 +845,23 @@ function handleClearShortcut(index) {
   checkConflicts(index)
 }
 
-// 验证所有快捷键的可用性
+// 验证所有快捷键的可用性和冲突
 async function validateAllShortcuts() {
   if (!window.electron?.checkShortcutAvailable) {
-    return // 如果没有检查API，直接返回
+    return false // 如果没有检查API，直接返回
   }
 
   let hasOccupied = false
+  let hasConflictInternal = false
   
-  // 遍历所有快捷键进行验证
+  // 先清除所有状态
+  shortcuts.value.forEach(shortcut => {
+    shortcut.occupied = false
+    shortcut.conflict = false
+    shortcut.conflictWith = ''
+  })
+  
+  // 检查内部冲突（先检查冲突，因为这个更重要）
   for (let i = 0; i < shortcuts.value.length; i++) {
     const shortcut = shortcuts.value[i]
     
@@ -861,11 +869,32 @@ async function validateAllShortcuts() {
       continue // 跳过空快捷键
     }
     
-    // 重置状态
-    shortcut.occupied = false
+    for (let j = i + 1; j < shortcuts.value.length; j++) {
+      if (shortcuts.value[j].key === shortcut.key && shortcut.key) {
+        // 发现冲突
+        shortcut.conflict = true
+        shortcuts.value[j].conflict = true
+        shortcut.conflictWith = shortcuts.value[j].name
+        shortcuts.value[j].conflictWith = shortcut.name
+        hasConflictInternal = true
+      }
+    }
+  }
+  
+  // 如果有内部冲突，直接返回，不需要检查系统占用
+  if (hasConflictInternal) {
+    return { hasConflict: true, hasOccupied: false }
+  }
+  
+  // 检查系统占用
+  for (let i = 0; i < shortcuts.value.length; i++) {
+    const shortcut = shortcuts.value[i]
+    
+    if (!shortcut.key) {
+      continue // 跳过空快捷键
+    }
     
     try {
-      // 检查系统占用
       const result = await window.electron.checkShortcutAvailable(shortcut.key)
       if (!result.available) {
         shortcut.occupied = true
@@ -874,20 +903,10 @@ async function validateAllShortcuts() {
     } catch (error) {
       console.error(`检查快捷键 ${shortcut.key} 失败:`, error)
     }
-    
-    // 检查内部冲突
-    for (let j = 0; j < shortcuts.value.length; j++) {
-      if (i !== j && shortcuts.value[j].key === shortcut.key && shortcut.key) {
-        shortcut.conflict = true
-        shortcuts.value[j].conflict = true
-        shortcut.conflictWith = shortcuts.value[j].name
-        shortcuts.value[j].conflictWith = shortcut.name
-      }
-    }
   }
   
   hasOccupiedShortcuts.value = hasOccupied
-  return hasOccupied
+  return { hasConflict: false, hasOccupied }
 }
 
 // 恢复默认快捷键
@@ -896,9 +915,11 @@ async function handleResetShortcuts() {
   shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))
   
   // 验证默认快捷键是否可用
-  const hasOccupied = await validateAllShortcuts()
+  const result = await validateAllShortcuts()
   
-  if (hasOccupied) {
+  if (result.hasConflict) {
+    ElMessage.warning('默认快捷键已恢复，但存在冲突，请检查')
+  } else if (result.hasOccupied) {
     ElMessage.warning('默认快捷键已恢复，但部分快捷键已被系统占用，请重新设置被占用的快捷键')
   } else {
     ElMessage.success('已恢复默认快捷键设置')
@@ -907,20 +928,22 @@ async function handleResetShortcuts() {
 
 // 保存快捷键设置
 async function handleSaveShortcuts() {
-  if (hasConflict.value) {
-    ElMessage.error('存在快捷键冲突或被占用，请先解决问题')
+  // 保存前再次验证所有快捷键的可用性和冲突
+  const result = await validateAllShortcuts()
+  
+  // 检查是否有内部冲突
+  if (result.hasConflict) {
+    ElMessage.error('存在快捷键冲突，请修改冲突的快捷键后再保存')
+    return
+  }
+  
+  // 检查是否有被占用的快捷键
+  if (result.hasOccupied) {
+    ElMessage.error('检测到部分快捷键已被系统占用，请重新设置后再保存')
     return
   }
   
   try {
-    // 保存前再次验证所有快捷键的可用性
-    const hasOccupied = await validateAllShortcuts()
-    
-    if (hasOccupied) {
-      ElMessage.error('检测到部分快捷键已被系统占用，请重新设置后再保存')
-      return
-    }
-    
     // 将响应式对象转换为纯对象数组（避免克隆错误）
     const plainShortcuts = shortcuts.value.map(s => ({
       id: s.id,
