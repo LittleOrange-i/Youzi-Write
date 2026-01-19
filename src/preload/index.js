@@ -252,6 +252,10 @@ if (process.contextIsolated) {
       checkShortcutAvailable: (accelerator) => ipcRenderer.invoke('check-shortcut-available', accelerator),
       // 设置快捷键启用状态（true=启用，false=禁用）
       setShortcutEnabled: (enabled) => ipcRenderer.invoke('set-shortcut-enabled', enabled),
+      // 获取被占用的快捷键信息
+      getOccupiedShortcuts: () => ipcRenderer.invoke('get-occupied-shortcuts'),
+      // 清除被占用的快捷键信息
+      clearOccupiedShortcuts: () => ipcRenderer.invoke('clear-occupied-shortcuts'),
       // 监听快捷键触发事件
       onShortcutTriggered: (callback) => {
         ipcRenderer.on('shortcut-triggered', (event, actionId) => callback(actionId))

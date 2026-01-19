@@ -33,7 +33,7 @@
           <span class="font-medium">系统设置</span>
         </div>
 
-        <div class="menu-item-modern group" @click="showShortcutDialog = true">
+        <div class="menu-item-modern group" @click="handleOpenShortcutDialog">
           <svg class="w-5 h-5 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
           </svg>
@@ -190,8 +190,8 @@
     </el-dialog>
 
     <!-- 系统设置弹框 -->
-    <el-dialog v-model="showSettingsDialog" title="系统设置" width="600px" align-center>
-      <div class="space-y-6">
+    <el-dialog v-model="showSettingsDialog" title="系统设置" width="600px" align-center :style="{ maxHeight: '80vh' }">
+      <div class="space-y-6 settings-dialog-content">
         <!-- 书籍目录设置 -->
         <div class="setting-section">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">书籍存储目录</h4>
@@ -271,8 +271,32 @@
     </el-dialog>
 
     <!-- 快捷键设置弹框 -->
-    <el-dialog v-model="showShortcutDialog" title="快捷键设置" width="700px" align-center>
-      <div class="space-y-4">
+    <el-dialog 
+      v-model="showShortcutDialog" 
+      title="快捷键设置" 
+      width="700px" 
+      align-center 
+      :style="{ maxHeight: '80vh' }"
+      @close="handleShortcutDialogClose"
+    >
+      <div class="space-y-4 shortcut-dialog-content">
+        <!-- 被占用快捷键警告 -->
+        <el-alert
+          v-if="hasOccupiedShortcuts"
+          title="检测到部分快捷键被系统或其他应用占用，无法正常使用。请重新设置这些快捷键。"
+          type="warning"
+          :closable="false"
+        >
+          <template #default>
+            <!-- 只在自动打开时显示"不再提示"选项 -->
+            <div v-if="isAutoOpenShortcut" class="mt-2">
+              <el-checkbox v-model="ignoreOccupiedWarning">
+                不再提示（下次启动不会自动打开此设置）
+              </el-checkbox>
+            </div>
+          </template>
+        </el-alert>
+
         <!-- 提示信息 -->
         <el-alert
           title="提示：点击快捷键输入框，按下键盘组合键即可设置。系统会自动检测冲突。"
@@ -287,8 +311,8 @@
             :key="shortcut.id"
             class="shortcut-item p-4 rounded-lg border transition-all"
             :class="{
-              'border-red-500 bg-red-50 dark:bg-red-900/20': shortcut.conflict,
-              'border-gray-200 dark:border-gray-700': !shortcut.conflict
+              'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-700': shortcut.conflict || shortcut.occupied,
+              'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800': !shortcut.conflict && !shortcut.occupied
             }"
           >
             <div class="flex items-center justify-between gap-4">
@@ -296,6 +320,7 @@
               <div class="flex-1">
                 <div class="font-medium text-gray-900 dark:text-white">
                   {{ shortcut.name }}
+                  <span v-if="shortcut.occupied" class="text-orange-500 text-sm ml-2">（被占用）</span>
                 </div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {{ shortcut.description }}
@@ -310,10 +335,10 @@
                   @focus="handleInputFocus(index)"
                   placeholder="按下快捷键"
                   readonly
-                  class="shortcut-input px-3 py-2 rounded border text-center cursor-pointer min-w-[180px]"
+                  class="shortcut-input px-3 py-2 rounded border text-center cursor-pointer min-w-[180px] transition-all"
                   :class="{
-                    'border-red-500 bg-red-50 dark:bg-red-900/20': shortcut.conflict,
-                    'border-gray-300 dark:border-gray-600 focus:border-primary-500': !shortcut.conflict
+                    'border-red-400 bg-red-50 dark:bg-red-900/30 dark:border-red-600 text-red-600 dark:text-red-400': shortcut.conflict || shortcut.occupied,
+                    'border-gray-300 dark:border-gray-600 focus:border-primary-500 dark:focus:border-primary-400': !shortcut.conflict && !shortcut.occupied
                   }"
                 />
                 <el-button
@@ -331,6 +356,10 @@
             <div v-if="shortcut.conflict" class="mt-2 text-sm text-red-600 dark:text-red-400">
               ⚠️ 该快捷键与"{{ shortcut.conflictWith }}"冲突，请更换其他组合
             </div>
+            <!-- 被占用提示 -->
+            <div v-if="shortcut.occupied" class="mt-2 text-sm text-orange-600 dark:text-orange-400">
+              ⚠️ 该快捷键已被系统或其他应用占用，请更换其他组合
+            </div>
           </div>
         </div>
       </div>
@@ -339,7 +368,7 @@
         <div class="flex justify-between items-center">
           <el-button @click="handleResetShortcuts">恢复默认</el-button>
           <div>
-            <el-button @click="showShortcutDialog = false">取消</el-button>
+            <el-button @click="handleCloseShortcutDialog">取消</el-button>
             <el-button type="primary" @click="handleSaveShortcuts" :disabled="hasConflict">
               保存设置
             </el-button>
@@ -371,6 +400,9 @@ const contactEmail = '3026408975@qq.com'
 // 快捷键设置相关
 const showShortcutDialog = ref(false)
 const currentFocusIndex = ref(-1)
+const ignoreOccupiedWarning = ref(false) // 是否忽略被占用快捷键警告
+const hasOccupiedShortcuts = ref(false) // 是否有被占用的快捷键
+const isAutoOpenShortcut = ref(false) // 是否是自动打开快捷键设置（用于区分是否显示"不再提示"）
 
 // 默认快捷键配置
 const DEFAULT_SHORTCUTS = [
@@ -449,9 +481,9 @@ const DEFAULT_SHORTCUTS = [
 // 快捷键列表
 const shortcuts = ref(JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS)))
 
-// 检查是否有冲突
+// 检查是否有冲突或被占用
 const hasConflict = computed(() => {
-  return shortcuts.value.some(s => s.conflict)
+  return shortcuts.value.some(s => s.conflict || s.occupied)
 })
 
 // 书架密码设置相关
@@ -583,6 +615,8 @@ onMounted(async () => {
   await loadShelfPasswordHint()
   // 加载快捷键设置
   await loadShortcuts()
+  // 检查被占用的快捷键
+  await checkOccupiedShortcuts()
 })
 
 // 选择目录
@@ -643,14 +677,83 @@ async function loadShortcuts() {
           ...defaultShortcut,
           ...saved,
           conflict: false,
-          conflictWith: ''
+          conflictWith: '',
+          occupied: false // 初始化被占用状态,每次加载时都重置
         }
       })
+    } else {
+      // 如果没有保存的快捷键,使用默认值
+      shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))
     }
   } catch (error) {
     console.error('加载快捷键设置失败:', error)
   }
 }
+
+// 检查被占用的快捷键
+// forceCheck: 是否强制检查（忽略"不再提示"的设置）
+async function checkOccupiedShortcuts(forceCheck = false) {
+  try {
+    // 检查是否已设置忽略警告（除非强制检查）
+    if (!forceCheck) {
+      const ignored = await window.electronStore?.get('ignoreShortcutOccupiedWarning')
+      if (ignored) {
+        return // 如果已忽略，直接返回
+      }
+    }
+
+    // 获取被占用的快捷键列表
+    if (window.electron?.getOccupiedShortcuts) {
+      const occupiedList = await window.electron.getOccupiedShortcuts()
+      
+      if (occupiedList && occupiedList.length > 0) {
+        // 标记被占用的快捷键
+        occupiedList.forEach(occupied => {
+          const shortcut = shortcuts.value.find(s => s.id === occupied.id)
+          if (shortcut) {
+            shortcut.occupied = true
+          }
+        })
+        
+        // 设置有被占用快捷键的标志
+        hasOccupiedShortcuts.value = true
+        
+        // 如果是自动检查（非强制），延迟打开对话框，并标记为自动打开
+        if (!forceCheck) {
+          isAutoOpenShortcut.value = true
+          setTimeout(() => {
+            showShortcutDialog.value = true
+          }, 500)
+        }
+      } else {
+        // 如果没有被占用的快捷键，清除所有占用标记
+        shortcuts.value.forEach(shortcut => {
+          shortcut.occupied = false
+        })
+        hasOccupiedShortcuts.value = false
+      }
+    }
+  } catch (error) {
+    console.error('检查被占用快捷键失败:', error)
+  }
+}
+
+// 处理打开快捷键设置对话框
+async function handleOpenShortcutDialog() {
+  // 标记为手动打开
+  isAutoOpenShortcut.value = false
+  
+  // 重新加载快捷键配置（清除所有旧的状态标记）
+  await loadShortcuts()
+  
+  // 每次打开时都重新检查快捷键占用情况（强制检查）
+  await checkOccupiedShortcuts(true)
+  
+  // 打开对话框
+  showShortcutDialog.value = true
+}
+
+
 
 // 处理键盘按下事件
 function handleKeyDown(event, index) {
@@ -687,16 +790,19 @@ function handleKeyDown(event, index) {
 async function checkConflicts(currentIndex) {
   const currentShortcut = shortcuts.value[currentIndex]
   
-  // 重置当前快捷键的冲突状态
+  // 重置当前快捷键的冲突和占用状态
   currentShortcut.conflict = false
   currentShortcut.conflictWith = ''
+  currentShortcut.occupied = false // 用户修改后清除占用状态
   
   // 检查与其他快捷键的冲突
   shortcuts.value.forEach((shortcut, index) => {
     if (index !== currentIndex) {
-      // 重置其他快捷键的冲突状态
-      shortcut.conflict = false
-      shortcut.conflictWith = ''
+      // 重置其他快捷键的冲突状态（但不重置occupied状态）
+      if (shortcut.key !== currentShortcut.key || !currentShortcut.key) {
+        shortcut.conflict = false
+        shortcut.conflictWith = ''
+      }
       
       // 检查是否与当前快捷键冲突
       if (shortcut.key === currentShortcut.key && currentShortcut.key) {
@@ -713,8 +819,7 @@ async function checkConflicts(currentIndex) {
     try {
       const result = await window.electron.checkShortcutAvailable(currentShortcut.key)
       if (!result.available) {
-        currentShortcut.conflict = true
-        currentShortcut.conflictWith = '系统或其他应用'
+        currentShortcut.occupied = true // 使用occupied而不是conflict
       }
     } catch (error) {
       console.error('检查快捷键可用性失败:', error)
@@ -733,20 +838,82 @@ function handleClearShortcut(index) {
   checkConflicts(index)
 }
 
+// 验证所有快捷键的可用性
+async function validateAllShortcuts() {
+  if (!window.electron?.checkShortcutAvailable) {
+    return // 如果没有检查API，直接返回
+  }
+
+  let hasOccupied = false
+  
+  // 遍历所有快捷键进行验证
+  for (let i = 0; i < shortcuts.value.length; i++) {
+    const shortcut = shortcuts.value[i]
+    
+    if (!shortcut.key) {
+      continue // 跳过空快捷键
+    }
+    
+    // 重置状态
+    shortcut.occupied = false
+    
+    try {
+      // 检查系统占用
+      const result = await window.electron.checkShortcutAvailable(shortcut.key)
+      if (!result.available) {
+        shortcut.occupied = true
+        hasOccupied = true
+      }
+    } catch (error) {
+      console.error(`检查快捷键 ${shortcut.key} 失败:`, error)
+    }
+    
+    // 检查内部冲突
+    for (let j = 0; j < shortcuts.value.length; j++) {
+      if (i !== j && shortcuts.value[j].key === shortcut.key && shortcut.key) {
+        shortcut.conflict = true
+        shortcuts.value[j].conflict = true
+        shortcut.conflictWith = shortcuts.value[j].name
+        shortcuts.value[j].conflictWith = shortcut.name
+      }
+    }
+  }
+  
+  hasOccupiedShortcuts.value = hasOccupied
+  return hasOccupied
+}
+
 // 恢复默认快捷键
-function handleResetShortcuts() {
+async function handleResetShortcuts() {
+  // 先恢复默认值
   shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))
-  ElMessage.success('已恢复默认快捷键设置')
+  
+  // 验证默认快捷键是否可用
+  const hasOccupied = await validateAllShortcuts()
+  
+  if (hasOccupied) {
+    ElMessage.warning('默认快捷键已恢复，但部分快捷键已被系统占用，请重新设置被占用的快捷键')
+  } else {
+    ElMessage.success('已恢复默认快捷键设置')
+  }
 }
 
 // 保存快捷键设置
 async function handleSaveShortcuts() {
   if (hasConflict.value) {
-    ElMessage.error('存在快捷键冲突，请先解决冲突')
+    ElMessage.error('存在快捷键冲突或被占用，请先解决问题')
     return
   }
   
   try {
+    // 保存前再次验证所有快捷键的可用性
+    const hasOccupied = await validateAllShortcuts()
+    
+    if (hasOccupied) {
+      ElMessage.error('检测到部分快捷键已被系统占用，请重新设置后再保存')
+      return
+    }
+    
     // 将响应式对象转换为纯对象数组（避免克隆错误）
     const plainShortcuts = shortcuts.value.map(s => ({
       id: s.id,
@@ -770,13 +937,69 @@ async function handleSaveShortcuts() {
       await window.electron.registerShortcuts(shortcutMap)
     }
     
+    // 如果勾选了忽略警告，保存设置并清除占用信息
+    if (ignoreOccupiedWarning.value) {
+      await window.electronStore?.set('ignoreShortcutOccupiedWarning', true)
+      if (window.electron?.clearOccupiedShortcuts) {
+        await window.electron.clearOccupiedShortcuts()
+      }
+    }
+    
     ElMessage.success('快捷键设置保存成功')
+    
+    // 重置状态
+    hasOccupiedShortcuts.value = false
+    ignoreOccupiedWarning.value = false
+    isAutoOpenShortcut.value = false
+    
+    // 关闭对话框
     showShortcutDialog.value = false
+    
+    // 清除被占用的快捷键记录（因为已经保存了新的配置）
+    if (window.electron?.clearOccupiedShortcuts) {
+      await window.electron.clearOccupiedShortcuts()
+    }
   } catch (error) {
     console.error('保存快捷键设置失败:', error)
     ElMessage.error('保存失败，请重试')
   }
 }
+
+// 关闭快捷键设置对话框（取消按钮）
+async function handleCloseShortcutDialog() {
+  // 如果勾选了忽略警告且是自动打开，保存设置并清除占用信息
+  if (ignoreOccupiedWarning.value && isAutoOpenShortcut.value) {
+    await window.electronStore?.set('ignoreShortcutOccupiedWarning', true)
+    if (window.electron?.clearOccupiedShortcuts) {
+      await window.electron.clearOccupiedShortcuts()
+    }
+  }
+  
+  showShortcutDialog.value = false
+  hasOccupiedShortcuts.value = false
+  ignoreOccupiedWarning.value = false
+  isAutoOpenShortcut.value = false
+}
+
+
+// 弹窗关闭时的处理 (用于监听所有关闭方式)
+async function handleShortcutDialogClose() {
+  // 在弹窗关闭时检查是否勾选了"不再提示"（只在自动打开时生效）
+  if (ignoreOccupiedWarning.value && isAutoOpenShortcut.value) {
+    await window.electronStore?.set('ignoreShortcutOccupiedWarning', true)
+    if (window.electron?.clearOccupiedShortcuts) {
+      await window.electron.clearOccupiedShortcuts()
+    }
+  }
+  
+  // 重置状态
+  hasOccupiedShortcuts.value = false
+  ignoreOccupiedWarning.value = false
+  isAutoOpenShortcut.value = false
+}
+
+
+
 
 
 
@@ -895,6 +1118,7 @@ async function handleSaveShortcuts() {
 .shortcut-list {
   max-height: 500px;
   overflow-y: auto;
+  scrollbar-width: none; // 隐藏滚动条
 }
 
 .shortcut-item {
@@ -922,6 +1146,23 @@ async function handleSaveShortcuts() {
 .shortcut-input::placeholder {
   color: var(--text-muted);
 }
+
+/* 弹窗内容区域样式 - 防止高度撑满视口 */
+.settings-dialog-content {
+  max-height: calc(80vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none; // 隐藏滚动条
+
+}
+
+.shortcut-dialog-content {
+  max-height: calc(80vh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none; // 隐藏滚动条
+
+}
+
+
 
 </style>
 

@@ -273,6 +273,9 @@ let registeredShortcuts = {}
 // 存储各窗口的快捷键启用状态（true表示可以触发快捷键，false表示在其他页面不可触发）
 const windowShortcutStates = new Map()
 
+// 存储启动时被占用的快捷键信息
+let occupiedShortcuts = []
+
 // 注册快捷键
 ipcMain.handle('register-shortcuts', async (event, shortcutMap) => {
   try {
@@ -377,9 +380,23 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll()
 })
 
+// 获取被占用的快捷键信息
+ipcMain.handle('get-occupied-shortcuts', async () => {
+  return occupiedShortcuts
+})
+
+// 清除被占用的快捷键信息（用户确认忽略后调用）
+ipcMain.handle('clear-occupied-shortcuts', async () => {
+  occupiedShortcuts = []
+  return { success: true }
+})
+
 // 加载并注册保存的快捷键（应用启动时调用）
 async function loadAndRegisterShortcuts() {
   try {
+    // 清空之前记录的被占用快捷键
+    occupiedShortcuts = []
+    
     const savedShortcuts = store.get('shortcuts')
     if (savedShortcuts && Array.isArray(savedShortcuts)) {
       const shortcutMap = {}
@@ -415,10 +432,27 @@ async function loadAndRegisterShortcuts() {
               registeredShortcuts[actionId] = accelerator
               // console.log(`快捷键注册成功: ${actionId} - ${accelerator}`)
             } else {
+              // 记录注册失败的快捷键（被占用）
               console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
+              const shortcutInfo = savedShortcuts.find(s => s.id === actionId)
+              occupiedShortcuts.push({
+                id: actionId,
+                name: shortcutInfo?.name || actionId,
+                key: accelerator,
+                description: shortcutInfo?.description || ''
+              })
             }
           } catch (error) {
+            // 记录注册出错的快捷键
             console.error(`注册快捷键出错: ${actionId} - ${accelerator}`, error)
+            const shortcutInfo = savedShortcuts.find(s => s.id === actionId)
+            occupiedShortcuts.push({
+              id: actionId,
+              name: shortcutInfo?.name || actionId,
+              key: accelerator,
+              description: shortcutInfo?.description || '',
+              error: error.message
+            })
           }
         }
       }
