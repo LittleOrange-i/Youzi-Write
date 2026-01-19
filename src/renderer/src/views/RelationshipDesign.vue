@@ -38,6 +38,8 @@
                 :style="getNodeStyle(node)"
                 @dblclick.stop="handleNodeDoubleClickDirect(node, $event)"
                 @contextmenu.prevent="handleNodeRightClick(node, $event)"
+                @mouseenter="handleNodeHover(node, $event)"
+                @mouseleave="handleNodeLeave"
               >
                 <div class="node-text">
                   {{ node.text }}
@@ -136,6 +138,46 @@
     <template #footer>
       <el-button @click="closeEdgeDialog">取消</el-button>
       <el-button type="primary" @click="saveEdgeInfo">保存</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 角色悬浮提示弹窗 -->
+  <div
+    v-if="hoverTooltip.visible"
+    class="character-tooltip"
+    :style="{
+      left: hoverTooltip.x + 'px',
+      top: hoverTooltip.y + 'px'
+    }"
+    @mouseenter="cancelTooltipHide"
+    @mouseleave="handleTooltipLeave"
+  >
+    <div class="tooltip-header">
+      <span class="tooltip-name">{{ hoverTooltip.name }}</span>
+      <span class="tooltip-gender">{{ getGenderText(hoverTooltip.gender) }}</span>
+    </div>
+    <div class="tooltip-description" :class="{ 'description-truncated': hoverTooltip.isTruncated }">
+      {{ hoverTooltip.description || '暂无描述' }}
+    </div>
+    <div v-if="hoverTooltip.isTruncated" class="tooltip-actions">
+      <el-button type="primary" size="small" @click="showFullDescription">查看完整描述</el-button>
+      <el-button size="small" @click="closeTooltip">关闭</el-button>
+    </div>
+  </div>
+
+  <!-- 完整描述预览弹窗 -->
+  <el-dialog v-model="fullDescriptionVisible" title="角色描述" width="600px">
+    <div class="full-description-content">
+      <div class="description-header">
+        <span class="description-name">{{ fullDescriptionData.name }}</span>
+        <span class="description-gender">{{ getGenderText(fullDescriptionData.gender) }}</span>
+      </div>
+      <div class="description-text">
+        {{ fullDescriptionData.description || '暂无描述' }}
+      </div>
+    </div>
+    <template #footer>
+      <el-button type="primary" @click="fullDescriptionVisible = false">关闭</el-button>
     </template>
   </el-dialog>
 </template>
@@ -770,6 +812,32 @@ const isAddMode = ref(false)
 // 连线模式相关状态
 const isLinkMode = ref(false)
 
+// 悬浮提示相关状态
+const hoverTooltip = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  name: '',
+  gender: '',
+  description: '',
+  isTruncated: false // 描述是否被截断
+})
+
+// 完整描述弹窗相关状态
+const fullDescriptionVisible = ref(false)
+const fullDescriptionData = reactive({
+  name: '',
+  gender: '',
+  description: ''
+})
+
+// 描述最大长度（字符数）
+const MAX_DESCRIPTION_LENGTH = 100
+
+// 悬浮提示隐藏定时器
+let tooltipHideTimer = null
+
+
 const presetColors = [
   { label: '蓝色', value: '#409eff' },
   { label: '橙色', value: '#ff5819' },
@@ -926,6 +994,96 @@ function handleNodeLinkFromNode(node) {
   ElMessage.info(`从 "${node.text}" 开始连线，请点击目标角色完成连线`)
   console.log('Link mode started from node:', node.id)
 }
+
+// 处理节点鼠标悬浮事件
+function handleNodeHover(node, event) {
+  // 取消之前的隐藏定时器
+  if (tooltipHideTimer) {
+    clearTimeout(tooltipHideTimer)
+    tooltipHideTimer = null
+  }
+
+  // 获取节点描述信息
+  const description = node.data?.description || ''
+  const isTruncated = description.length > MAX_DESCRIPTION_LENGTH
+
+  // 获取图表实例和节点在视图中的坐标
+  const graphInstance = graphRef.value?.getInstance()
+  if (!graphInstance) return
+
+  // 获取节点元素的屏幕坐标
+  const nodeElement = event.currentTarget
+  const rect = nodeElement.getBoundingClientRect()
+  
+  // 计算悬浮窗位置（显示在头像下方，左对齐）
+  const tooltipX = rect.left
+  const tooltipY = rect.bottom + 10 // 距离头像底部10px
+
+  // 设置悬浮提示数据
+  hoverTooltip.visible = true
+  hoverTooltip.x = tooltipX
+  hoverTooltip.y = tooltipY
+  hoverTooltip.name = node.text
+  hoverTooltip.gender = node.data?.gender || 'none'
+  hoverTooltip.description = isTruncated 
+    ? description.substring(0, MAX_DESCRIPTION_LENGTH) + '...' 
+    : description
+  hoverTooltip.isTruncated = isTruncated
+
+  // 保存完整描述数据
+  fullDescriptionData.name = node.text
+  fullDescriptionData.gender = node.data?.gender || 'none'
+  fullDescriptionData.description = description
+}
+
+// 处理节点鼠标离开事件
+function handleNodeLeave() {
+  // 延迟隐藏，允许鼠标移动到提示框上
+  tooltipHideTimer = setTimeout(() => {
+    hoverTooltip.visible = false
+  }, 200)
+}
+
+// 取消提示框隐藏
+function cancelTooltipHide() {
+  if (tooltipHideTimer) {
+    clearTimeout(tooltipHideTimer)
+    tooltipHideTimer = null
+  }
+}
+
+// 处理提示框鼠标离开事件
+function handleTooltipLeave() {
+  tooltipHideTimer = setTimeout(() => {
+    hoverTooltip.visible = false
+  }, 200)
+}
+
+// 关闭悬浮提示
+function closeTooltip() {
+  if (tooltipHideTimer) {
+    clearTimeout(tooltipHideTimer)
+    tooltipHideTimer = null
+  }
+  hoverTooltip.visible = false
+}
+
+// 显示完整描述
+function showFullDescription() {
+  fullDescriptionVisible.value = true
+  closeTooltip()
+}
+
+// 获取性别文本
+function getGenderText(gender) {
+  const genderMap = {
+    male: '男',
+    female: '女',
+    none: '无'
+  }
+  return genderMap[gender] || '无'
+}
+
 
 // 关闭对话框并重置表单
 function closeDialog() {
@@ -1306,8 +1464,14 @@ onMounted(async () => {
   height: 100%;
 }
 
-:deep(.relation-graph-canvas) {
-  background-color: var(--bg-primary);
+// :deep(.relation-graph-canvas) {
+//   background-color: var(--bg-primary);
+// }
+
+/* RelationGraph 背景样式跟随主题 */
+.design-canvas :deep(.rel-map-ready),
+.design-canvas :deep(.rel-map) {
+  background: var(--bg-soft) !important;
 }
 
 .node-detail {
@@ -1417,5 +1581,105 @@ onMounted(async () => {
   line-height: 1.2;
   word-break: break-word;
   padding: 4px;
+}
+
+/* 角色悬浮提示样式 */
+.character-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  min-width: 200px;
+  pointer-events: auto;
+}
+
+.tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tooltip-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--text-base);
+}
+
+.tooltip-gender {
+  font-size: 14px;
+  color: var(--text-soft);
+  padding: 2px 8px;
+  background: var(--bg-soft);
+  border-radius: 4px;
+}
+
+.tooltip-description {
+  font-size: 14px;
+  color: var(--text-base);
+  line-height: 1.6;
+  margin-bottom: 8px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.description-truncated {
+  color: var(--text-soft);
+}
+
+.tooltip-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 完整描述弹窗样式 */
+.full-description-content {
+  padding: 8px 0;
+}
+
+.description-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.description-name {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-base);
+}
+
+.description-gender {
+  font-size: 14px;
+  color: var(--text-soft);
+  padding: 4px 12px;
+  background: var(--bg-soft);
+  border-radius: 4px;
+}
+
+.description-text {
+  font-size: 15px;
+  color: var(--text-base);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--bg-soft);
+  border-radius: 4px;
 }
 </style>

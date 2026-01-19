@@ -99,6 +99,18 @@
       width="700px"
       :close-on-click-modal="false"
     >
+      <!-- 导入导出按钮 -->
+      <div class="import-export-actions">
+        <el-button size="small" @click="handleImportConfig">
+          <el-icon><Upload /></el-icon>
+          导入配置
+        </el-button>
+        <el-button size="small" @click="handleOpenExportDialog">
+          <el-icon><Download /></el-icon>
+          导出配置
+        </el-button>
+      </div>
+      
       <el-form :model="modelForm" label-width="120px" class="model-form">
             <el-form-item label="选择厂商">
               <el-select
@@ -194,6 +206,59 @@
           @click="handleSaveModel"
         >
           保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导出配置选择对话框 -->
+    <el-dialog
+      v-model="exportDialogVisible"
+      title="导出智能体配置"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <div class="export-dialog-content">
+        <div class="export-hint">
+          <el-icon><InfoFilled /></el-icon>
+          <span>请选择要导出的智能体配置（仅显示配置完整的模型）</span>
+        </div>
+        
+        <el-checkbox-group v-model="selectedExportModels" class="export-model-list">
+          <el-checkbox
+            v-for="model in exportableModels"
+            :key="model.id"
+            :label="model.id"
+            class="export-model-item"
+          >
+            <div class="model-info">
+              <div class="model-content">
+                <div class="model-name-row">
+                  <span class="model-name">{{ model.name }}</span>
+                </div>
+                <div class="model-details">
+                  <span class="model-id">{{ model.modelId }}</span>
+                </div>
+              </div>
+              <el-tag  class="el_tag" v-if="model.providerId" size="small" type="info">
+                {{ apiProviders.find(p => p.id === model.providerId)?.name || '自定义' }}
+              </el-tag>
+            </div>
+          </el-checkbox>
+        </el-checkbox-group>
+        
+        <div v-if="exportableModels.length === 0" class="empty-hint">
+          暂无可导出的配置
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="exportDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          :disabled="selectedExportModels.length === 0"
+          @click="handleExportConfig"
+        >
+          导出选中项 ({{ selectedExportModels.length }})
         </el-button>
       </template>
     </el-dialog>
@@ -624,7 +689,10 @@ import {
   Rank,
   Close,
   Loading,
-  ChatDotRound
+  ChatDotRound,
+  Upload,
+  Download,
+  InfoFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -769,6 +837,10 @@ const selectedProvider = ref('')
 const availableModels = ref([])
 const isTesting = ref(false) // 测试状态
 const testPassed = ref(false) // 测试是否通过
+
+// 导入导出相关
+const exportDialogVisible = ref(false) // 导出对话框显示状态
+const selectedExportModels = ref([]) // 选中待导出的模型
 
 // 模型表单数据
 const modelForm = ref({
@@ -1012,6 +1084,17 @@ const handleProviderChange = (providerId) => {
     // 如果只有一个模型，自动选择
     if (availableModels.value.length === 1) {
       modelForm.value.modelId = availableModels.value[0]
+    }
+    
+    // 自动填充模型名称（仅对非自定义厂商且非编辑模式）
+    if (!editingModelId.value) {
+      if (providerId === 'custom') {
+        // 自定义厂商不自动填充
+        modelForm.value.name = ''
+      } else {
+        // 其他厂商自动填充厂商名称
+        modelForm.value.name = provider.name
+      }
     }
   }
   // 更改配置后需要重新测试
@@ -2067,6 +2150,118 @@ const regenerateResult = async () => {
 defineExpose({
   toggleFloatingResult
 })
+
+// 导入配置
+const handleImportConfig = () => {
+  // 创建隐藏的文件选择input
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    try {
+      const text = await file.text()
+      const importedModels = JSON.parse(text)
+      
+      // 验证导入的数据格式
+      if (!Array.isArray(importedModels)) {
+        ElMessage.error('配置文件格式错误')
+        return
+      }
+      
+      // 合并导入的模型到现有列表（避免重复）
+      let addedCount = 0
+      importedModels.forEach(model => {
+        // 检查必需字段
+        if (!model.name || !model.endpoint || !model.modelId) {
+          return
+        }
+        
+        // 生成新的唯一ID
+        const newModel = {
+          ...model,
+          id: `model_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        }
+        
+        modelList.value.push(newModel)
+        addedCount++
+      })
+      
+      if (addedCount > 0) {
+        saveModels()
+        ElMessage.success(`成功导入 ${addedCount} 个智能体配置`)
+      } else {
+        ElMessage.warning('没有可导入的有效配置')
+      }
+    } catch (error) {
+      ElMessage.error('导入失败：文件格式错误')
+      console.error('导入配置失败:', error)
+    }
+  }
+  
+  input.click()
+}
+
+// 打开导出对话框
+const handleOpenExportDialog = () => {
+  // 筛选出已测试成功的模型
+  const validModels = modelList.value.filter(model => {
+    // 检查模型是否通过测试（简单判断：是否有完整的配置）
+    return model.endpoint && model.modelId
+  })
+  
+  if (validModels.length === 0) {
+    ElMessage.warning('没有可导出的智能体配置')
+    return
+  }
+  
+  selectedExportModels.value = []
+  exportDialogVisible.value = true
+}
+
+// 导出配置
+const handleExportConfig = () => {
+  if (selectedExportModels.value.length === 0) {
+    ElMessage.warning('请选择要导出的智能体配置')
+    return
+  }
+  
+  try {
+    // 获取选中的模型
+    const modelsToExport = modelList.value.filter(model => 
+      selectedExportModels.value.includes(model.id)
+    )
+    
+    // 移除id字段（导入时会重新生成）
+    const exportData = modelsToExport.map(({ id, ...rest }) => rest)
+    
+    // 创建下载链接
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ai-agents-config-${new Date().getTime()}.json`
+    link.click()
+    
+    // 清理
+    URL.revokeObjectURL(url)
+    
+    exportDialogVisible.value = false
+    ElMessage.success(`成功导出 ${selectedExportModels.value.length} 个智能体配置`)
+  } catch (error) {
+    ElMessage.error('导出失败')
+    console.error('导出配置失败:', error)
+  }
+}
+
+// 计算属性：获取所有可导出的模型
+const exportableModels = computed(() => {
+  return modelList.value.filter(model => model.endpoint && model.modelId)
+})
 </script>
 
 <style lang="scss" scoped>
@@ -2330,6 +2525,130 @@ defineExpose({
     font-size: 12px;
     color: var(--text-base); /* 使用主文本颜色确保可读性 */
     line-height: 1.6;
+  }
+}
+
+// 导入导出按钮组样式
+.import-export-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--bg-soft);
+  border-radius: 12px;
+  
+  .el-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 15px;
+    border-radius: 12px;
+
+  }
+}
+
+// 导出对话框样式
+.export-dialog-content {
+  .export-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--el-color-primary-light-9);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-base);
+    
+    .el-icon {
+      color: var(--el-color-primary);
+      font-size: 16px;
+    }
+  }
+  
+  // 模型列表样式
+  .export-model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--bg-soft);
+    border-radius: 6px;
+    
+    .export-model-item {
+      width: 100%;
+      margin: 0;
+      padding: 25px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      transition: all 0.2s;
+      
+      &:hover {
+        border-color: var(--el-color-primary);
+        background: var(--bg-soft);
+      }
+      
+      :deep(.el-checkbox__label) {
+        width: 100%;
+        padding-left: 8px;
+      }
+      
+      .model-info {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        
+        .model-content {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex: 1;
+        }
+        
+        .model-name-row {
+          display: flex;
+          align-items: center;
+          
+          .model-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-base);
+          }
+        }
+        
+        .model-details {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          
+          .model-id {
+            font-size: 15px;
+            color: var(--text-base);
+            font-family: monospace;
+          }
+        }
+
+        // 模型厂商垂直居中
+        .el_tag {
+          align-items: center;
+        }
+      }
+
+    }
+  }
+  
+  .empty-hint {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+    font-size: 14px;
   }
 }
 
