@@ -19,7 +19,7 @@
             <template #node="{ node }">
               <div
                 class="custom-node"
-                @mouseover="showNodeTooltip(node)"
+                @mouseover="showNodeTooltip(node, $event)"
                 @mouseout="hideNodeTooltip"
               >
                 {{ node.text }}
@@ -28,7 +28,14 @@
           </RelationGraph>
 
           <!-- 节点信息浮窗 -->
-          <div v-if="tooltipVisible" class="node-tooltip">
+          <div
+            v-if="tooltipVisible"
+            class="node-tooltip"
+            :style="{
+              left: `${tooltipPosition.x}px`,
+              top: `${tooltipPosition.y}px`
+            }"
+          >
             <div class="tooltip-title">{{ hoveredNode?.text }}</div>
             <div class="tooltip-description">
               {{ hoveredNode?.data?.description || '暂无描述' }}
@@ -184,6 +191,7 @@ const selectedNode = ref(null)
 // 浮窗相关
 const tooltipVisible = ref(false)
 const hoveredNode = ref(null)
+const tooltipPosition = ref({ x: 0, y: 0 })
 
 // 弹框相关
 const nodeDialogVisible = ref(false)
@@ -276,9 +284,24 @@ const closeNodeDialog = () => {
 }
 
 // 显示节点浮窗
-const showNodeTooltip = (node) => {
+const showNodeTooltip = (node, event) => {
   hoveredNode.value = node
   tooltipVisible.value = true
+
+  // 获取当前悬浮元素的位置信息
+  const targetElement = event.currentTarget
+  const targetRect = targetElement.getBoundingClientRect()
+  const canvasRect = canvasRef.value.getBoundingClientRect()
+
+  // 计算元素相对于画布容器的位置
+  const elementLeft = targetRect.left - canvasRect.left
+  const elementBottom = targetRect.bottom - canvasRect.top
+
+  // 浮窗显示在元素左下角，稍微向下偏移一点（例如5px）
+  const x = elementLeft
+  const y = elementBottom + 5
+
+  tooltipPosition.value = { x, y }
 }
 
 // 隐藏节点浮窗
@@ -592,6 +615,12 @@ onMounted(async () => {
   position: relative;
 }
 
+/* RelationGraph 背景样式跟随主题 */
+.design-canvas :deep(.rel-map-ready),
+.design-canvas :deep(.rel-map) {
+  background: var(--bg-primary) !important;
+}
+
 .dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -692,34 +721,82 @@ onMounted(async () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 节点浮窗样式 */
+/* 节点浮窗样式 - 重构版 */
 .node-tooltip {
   position: absolute;
-  top: 10px;
-  left: 10px;
   z-index: 1000;
-  background: #ffffff;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 12px 16px;
-  min-width: 200px;
-  max-width: 300px;
-  font-size: 14px;
-  line-height: 1.5;
-  animation: tooltipFadeIn 0.2s ease-out;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fb 100%);
+  border: 2px solid #e0e6ed;
+  border-radius: 12px;
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: 0;
+  min-width: 220px;
+  max-width: 320px;
+  overflow: hidden;
+  animation: tooltipFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  backdrop-filter: blur(10px);
 }
 
+/* 标题区域 - 深色背景区分 */
 .tooltip-title {
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
-  font-size: 16px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #ffffff;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #409eff 0%, #5faeff 100%);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+/* 标题图标装饰 */
+.tooltip-title::before {
+  content: '';
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* 描述区域 - 浅色背景 */
 .tooltip-description {
-  color: #606266;
+  padding: 14px 16px;
+  color: #4a5568;
+  font-size: 13px;
+  line-height: 1.6;
   word-wrap: break-word;
+  background: #ffffff;
+  position: relative;
+  min-height: 40px;
+}
+
+/* 描述区域的装饰线 */
+.tooltip-description::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  background: linear-gradient(180deg, #409eff 0%, transparent 100%);
+  border-radius: 2px;
+}
+
+/* 为描述文本添加左侧padding以避开装饰线 */
+.tooltip-description {
+  padding-left: 28px;
+}
+
+/* 空描述时的样式 */
+.tooltip-description:empty::after {
+  content: '暂无描述';
+  color: #a0aec0;
+  font-style: italic;
 }
 
 @keyframes tooltipFadeIn {

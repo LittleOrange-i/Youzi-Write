@@ -253,7 +253,7 @@ const fullDateTime = computed(() => {
 function formatWords(words) {
   const num = Number(words) || 0
   if (num >= 10000) {
-    return (num / 10000).toFixed(1) + '万字'
+    return (num / 10000).toFixed(1) + ' 万字'
   }
   return num.toString() + '字'
 }

@@ -52,9 +52,7 @@
               class="cover-preview"
               :style="previewCoverStyle"
             >
-              <!-- 半透明遮罩 -->
-              <div class="absolute inset-0 bg-gradient-to-br from-black/30 via-black/20 to-black/40"></div>
-              
+
               <!-- 渐变光效 -->
               <div class="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-white/0 to-purple-900/30 transition-opacity duration-500"></div>
               
@@ -87,7 +85,7 @@
                       <svg class="w-[0.58rem] h-[0.58rem] flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
                       </svg>
-                      <span class="text-[9.33px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">200万字</span>
+                      <span class="text-[9.33px] font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">200 万字</span>
                     </div>
                     
                     <!-- 更新时间 - 显示到秒 -->
@@ -365,7 +363,8 @@ const previewCoverStyle = computed(() => {
       return {
         backgroundImage: `url("${imageUrl}")`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        backgroundColor: '#c4b5d8'
       }
     }
     // 如果是网络路径，直接使用
@@ -373,7 +372,8 @@ const previewCoverStyle = computed(() => {
       return {
         backgroundImage: `url("${imageUrl}")`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        backgroundColor: '#c4b5d8'
       }
     } 
     else {
@@ -384,13 +384,14 @@ const previewCoverStyle = computed(() => {
       return {
         backgroundImage: `url("atom://${encodedPath}")`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        backgroundColor: '#c4b5d8'
       }
     }
   } else {
-    // 默认渐变背景
+    // 默认背景：与书架封面一致的淡紫色
     return {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)'
+      backgroundColor: '#c4b5d8'
     }
   }
 })
