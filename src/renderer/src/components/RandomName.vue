@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   CHINESE_SURNAMES,
@@ -130,6 +130,21 @@ const showJapaneseOptions = computed(() => type.value === 'jp')
 const showWesternOptions = computed(() => type.value === 'en')
 const showCustomOptions = computed(() => {
   return ['force', 'place', 'book', 'item', 'elixir'].includes(type.value)
+})
+
+// 监听类型切换，自动触发随机操作
+watch(type, (newType) => {
+  // 清空名字列表
+  names.value = []
+  
+  // 根据不同类型自动触发随机操作
+  if (newType === 'cn' || newType === 'jp' || newType === 'en') {
+    // 人名类型：自动随机姓氏
+    randomSurname()
+  } else if (['force', 'place', 'book', 'item', 'elixir'].includes(newType)) {
+    // 自定义类型：自动随机后缀
+    randomSuffix()
+  }
 })
 
 function randomSurname() {
