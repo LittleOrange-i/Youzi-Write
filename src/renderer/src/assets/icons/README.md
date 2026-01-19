@@ -20,7 +20,7 @@ src/assets/styles/
 
 ## 🎯 可用图标
 
-根据您的 iconfont 资源，以下图标可供使用：
+根据你的 iconfont 资源，以下图标可供使用：
 
 ### 功能图标
 - `relationship` - 关系图谱
@@ -210,4 +210,4 @@ src/assets/styles/
 </style>
 ```
 
-现在您可以在项目中灵活使用这些图标了！🎉
+现在你可以在项目中灵活使用这些图标了！🎉

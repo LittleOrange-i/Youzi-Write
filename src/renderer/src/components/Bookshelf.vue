@@ -696,7 +696,7 @@ async function handleExportBookshelf() {
 async function handleImportBookshelf() {
   try {
     await ElMessageBox.confirm(
-      '导入的书籍将保存到书籍目录中。如果有同名书籍，将提示您选择处理方式。是否继续？',
+      '导入的书籍将保存到书籍目录中。如果有同名书籍，将提示你选择处理方式。是否继续？',
       '导入书架',
       {
         confirmButtonText: '确定',

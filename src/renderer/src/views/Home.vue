@@ -463,6 +463,13 @@ const DEFAULT_SHORTCUTS = [
     defaultKey: 'Alt+D'
   },
   {
+    id: 'ai-result',
+    name: 'AI生成结果',
+    description: '打开AI生成结果浮窗',
+    key: 'Alt+R',
+    defaultKey: 'Alt+R'
+  },
+  {
     id: 'banned-words',
     name: '禁词管理',
     description: '打开禁词管理工具',
@@ -473,8 +480,8 @@ const DEFAULT_SHORTCUTS = [
     id: 'paragraph-settings',
     name: '字数设置',
     description: '设置段落字数相关参数',
-    key: 'Alt+R',
-    defaultKey: 'Alt+R'
+    key: 'Alt+V',
+    defaultKey: 'Alt+V'
   }
 ]
 

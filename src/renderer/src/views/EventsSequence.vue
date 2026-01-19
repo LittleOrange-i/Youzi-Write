@@ -154,7 +154,7 @@
         <div v-else class="content-placeholder">
           <el-empty :image-size="200" description="暂无事序图" class="empty-state">
             <template #description>
-              <p>点击"创建事序图"开始创建您的事件时间轴</p>
+              <p>点击"创建事序图"开始创建你的事件时间轴</p>
             </template>
           </el-empty>
         </div>

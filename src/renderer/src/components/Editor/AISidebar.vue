@@ -467,14 +467,12 @@
       :close-on-click-modal="false"
     >
       <el-form label-width="100px">
-        <el-form-item label="提问">
           <el-input
             v-model="qaForm.question"
             type="textarea"
             :rows="6"
             placeholder="请输入您的问题..."
           />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="handleCancelQA">取消</el-button>
@@ -525,6 +523,12 @@
       width="700px"
       :close-on-click-modal="false"
     >
+      <!-- 如果是 AI 提问，显示原始问题 -->
+      <div v-if="lastOperation?.type === 'qa' && currentQuestion" class="question-section">
+        <div class="question-label">提问的问题：</div>
+        <div class="question-content">{{ currentQuestion }}</div>
+        <el-divider />
+      </div>
       <el-input
         v-model="aiResult"
         type="textarea"
@@ -570,6 +574,11 @@
             <div v-if="aiProcessing" class="loading-overlay">
               <el-icon class="is-loading"><Loading /></el-icon>
               <span>AI 正在生成中...</span>
+            </div>
+            <!-- 如果是 AI 提问，显示原始问题 -->
+            <div v-if="lastOperation?.type === 'qa' && currentQuestion" class="question-section">
+              <div class="question-label">提问的问题：</div>
+              <div class="question-content">{{ currentQuestion }}</div>
             </div>
             <el-input
               v-model="aiResult"
@@ -838,6 +847,8 @@ const aiProcessing = ref(false)
 const aiResult = ref('')
 // 用于中断 AI 生成的标志
 const abortController = ref(null)
+// 保存 AI 提问的原始问题
+const currentQuestion = ref('')
 
 // 浮动结果窗口相关
 const showFloatingResult = ref(false)
@@ -1524,6 +1535,9 @@ const executeRewrite = async () => {
 
   aiProcessing.value = true
   try {
+    // 清空问题，因为这不是 AI 提问
+    currentQuestion.value = ''
+    
     let prompt = ''
     
     // 根据风格选择构建 prompt
@@ -1587,6 +1601,9 @@ const executeRewrite = async () => {
 const executeExpand = async () => {
   aiProcessing.value = true
   try {
+    // 清空问题，因为这不是 AI 提问
+    currentQuestion.value = ''
+    
     let prompt = `请在以下原文的基础上进行扩展，增加更多细节或内容，使其更加丰富。目标字数约为 ${expandForm.value.targetWords} 字：\n\n${inputText.value}`
     
     if (expandForm.value.emotion) {
@@ -1635,6 +1652,9 @@ const executeExpand = async () => {
 const executeContinue = async () => {
   aiProcessing.value = true
   try {
+    // 清空问题，因为这不是 AI 提问
+    currentQuestion.value = ''
+    
     let prompt = `请根据以下原文的上下文进行续写，续写字数约为 ${continueForm.value.targetWords} 字：\n\n${inputText.value}`
     
     if (continueForm.value.emotion) {
@@ -1684,6 +1704,9 @@ const executeContinue = async () => {
 const executePolish = async () => {
   aiProcessing.value = true
   try {
+    // 清空问题，因为这不是 AI 提问
+    currentQuestion.value = ''
+    
     let prompt = `请对以下原文进行修饰，使其语言更加优美，表达更加精确：\n\n${inputText.value}`
     
     if (polishForm.value.emotion) {
@@ -1746,6 +1769,9 @@ const executeNaming = async () => {
 
   aiProcessing.value = true
   try {
+    // 清空问题，因为这不是 AI 提问
+    currentQuestion.value = ''
+    
     const nameTypeMap = {
       chinese_person: '中国人名',
       japanese_person: '日本人名（中文表达）',
@@ -1857,6 +1883,8 @@ const executeQA = async () => {
   aiProcessing.value = true
   try {
     const prompt = qaForm.value.question
+    // 保存当前问题
+    currentQuestion.value = prompt
 
     const result = await callAI(prompt)
     
@@ -1998,6 +2026,22 @@ const closeFloatingResult = () => {
   isDragging.value = false
 }
 
+// 切换浮动窗口显示状态（用于快捷键）
+const toggleFloatingResult = () => {
+  if (showFloatingResult.value) {
+    // 如果窗口已显示，则关闭
+    closeFloatingResult()
+  } else {
+    // 如果窗口未显示，则打开（如果有结果内容）
+    if (aiResult.value) {
+      initFloatingPosition()
+      showFloatingResult.value = true
+    } else {
+      ElMessage.warning('暂无AI生成结果')
+    }
+  }
+}
+
 // 重新生成结果
 const regenerateResult = async () => {
   if (!lastOperation.value) {
@@ -2018,6 +2062,11 @@ const regenerateResult = async () => {
     aiProcessing.value = false
   }
 }
+
+// 暴露方法给父组件
+defineExpose({
+  toggleFloatingResult
+})
 </script>
 
 <style lang="scss" scoped>
@@ -2150,6 +2199,7 @@ const regenerateResult = async () => {
           background: var(--bg-soft);
         }
 
+
         .el-icon {
           font-size: 24px;
         }
@@ -2162,6 +2212,32 @@ const regenerateResult = async () => {
     }
   }
 }
+
+// AI 结果弹窗中的问题显示样式
+.question-section {
+  margin-bottom: 16px;
+
+  .question-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-base);
+    margin-bottom: 8px;
+  }
+
+  .question-content {
+    padding: 12px;
+    background: var(--bg-mute);
+    // border-left: 3px solid var(--el-color-primary);
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--text-base);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+
 
 </style>
 
@@ -2458,6 +2534,30 @@ const regenerateResult = async () => {
 
       .el-icon {
         font-size: 32px;
+      }
+    }
+
+    // 浮动窗口中的问题显示样式
+    .question-section {
+      margin-bottom: 12px;
+      padding: 10px;
+      background: var(--bg-soft);
+      // border-left: 3px solid var(--el-color-primary);
+      border-radius: 4px;
+
+      .question-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-base);
+        margin-bottom: 6px;
+      }
+
+      .question-content {
+        font-size: 13px;
+        color: var(--text-base);
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
     }
 

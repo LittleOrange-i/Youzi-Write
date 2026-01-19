@@ -23,7 +23,7 @@
             </el-splitter-panel>
             <el-splitter-panel :size="260">
               <!-- 右侧 AI 操作面板 -->
-              <AISidebar />
+              <AISidebar ref="aiSidebarRef" />
             </el-splitter-panel>
           </el-splitter>
         </el-splitter-panel>
@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import { useThemeStore } from '@renderer/stores/theme'
 import NoteChapter from '@renderer/components/Editor/NoteChapter.vue'
@@ -64,10 +64,22 @@ onMounted(async () => {
   }
   // 初始化主题
   await themeStore.initTheme()
+  
+  // 监听快捷键触发事件
+  if (window.electron?.onShortcutTriggered) {
+    window.electron.onShortcutTriggered(handleShortcut)
+  }
+})
+
+onUnmounted(() => {
+  // 清理快捷键监听器
+  // 注意：preload中的实现是直接on，没有提供off方法
+  // 如果需要清理，需要在preload中添加对应的removeListener
 })
 
 const noteChapterRef = ref(null)
 const editorPanelRef = ref(null)
+const aiSidebarRef = ref(null)
 
 // 提供编辑器实例给子组件（通过 EditorPanel 的 ref 访问）
 const editorInstance = ref(null)
@@ -89,9 +101,27 @@ function refreshChapters() {
     noteChapterRef.value.reloadChapters()
 }
 
+// 处理快捷键触发
+const handleShortcut = (actionId) => {
+  console.log('[编辑器] 收到快捷键:', actionId)
+  
+  switch (actionId) {
+    case 'ai-result':
+      // 切换AI生成结果浮窗
+      if (aiSidebarRef.value?.toggleFloatingResult) {
+        aiSidebarRef.value.toggleFloatingResult()
+      }
+      break
+    // 可以在这里添加其他快捷键处理
+    default:
+      console.log('[编辑器] 未处理的快捷键:', actionId)
+  }
+}
+
 // function handleSelectFile(file) {
 //   // 预留：可做高亮、聚焦等
 // }
+
 </script>
 
 <style lang="scss" scoped>
