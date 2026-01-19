@@ -212,8 +212,8 @@ const props = defineProps({
   modelValue: {
     type: Object,
     default: () => ({
-      fontFamily: 'SimHei',
-      fontSize: '16px',
+      fontFamily: 'KaiTi',
+      fontSize: '18px',
       lineHeight: '1.6',
       isBold: false,
       isItalic: false
@@ -231,7 +231,7 @@ const isNoteEditor = computed(() => editorStore.file?.type === 'note')
 // 自定义字体列表（从 localStorage 加载）
 const customFontsList = ref([])
 // 记录上一个有效的字体值
-const lastValidFontFamily = ref('SimHei')
+const lastValidFontFamily = ref('KaiTi')
 // 是否正在选择字体（防止多次弹窗）
 const isSelectingFont = ref(false)
 
@@ -934,7 +934,7 @@ async function handleDeleteCustomFont(font) {
 
       // 如果当前正在使用被删除的字体，切换到默认字体
       if (props.modelValue.fontFamily === font.fontFamily) {
-        const defaultFont = 'SimHei'
+        const defaultFont = 'KaiTi'
         lastValidFontFamily.value = defaultFont
         emit('update:modelValue', { ...props.modelValue, fontFamily: defaultFont })
         emit('update-style')

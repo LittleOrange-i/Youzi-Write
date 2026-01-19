@@ -9,17 +9,14 @@
     
     <!-- 书籍主体 - 9:16 比例 -->
     <div class="book-body relative rounded-xl shadow-xl overflow-hidden">
-      <!-- 背景图片或默认渐变背景 -->
+      <!-- 背景图片或默认淡紫色背景 -->
       <div 
-        class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        class="absolute inset-0 bg-[#c4b5d8] bg-cover bg-center bg-no-repeat"
         :style="coverStyle"
-      >
-        <!-- 半透明遮罩 -->
-        <div class="absolute inset-0 bg-gradient-to-br from-black/30 via-black/20 to-black/40"></div>
-      </div>
+      ></div>
       
       <!-- 渐变光效 -->
-      <div class="absolute inset-0 bg-gradient-to-br bg-gradient-to-r  from-blue-900/20 via-white/0 to-purple-900/30 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div class="absolute inset-0 bg-gradient-to-br   from-blue-900/20 via-white/0 to-purple-900/30 group-hover:opacity-100 transition-opacity duration-500"></div>
       
       <!-- 主要内容区 - 左右分栏布局 -->
       <div class="relative h-full flex">
@@ -170,7 +167,7 @@ const menuVisible = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 
-// 计算封面样式：支持自定义封面URL或默认渐变背景
+// 计算封面样式：支持自定义封面URL或默认紫粉渐变背景
 const coverStyle = computed(() => {
   if (props.coverUrl) {
     // 如果有封面URL
@@ -224,16 +221,13 @@ const coverStyle = computed(() => {
         }
       } else {
         console.warn('不支持的图片格式:', ext)
-        return {
-          background: 'linear-gradient(135deg, #ee9ca7 0%, #ffdde1 50%, #fbc2eb 100%)'
-        }
+        // 不支持的格式也使用紫粉渐变背景
+        return {}
       }
     }
   } else {
-    // 默认渐变背景 - 温暖优雅的创作色调
-    return {
-      background: 'linear-gradient(135deg, #ee9ca7 0%, #ffdde1 50%, #fbc2eb 100%)'
-    }
+    // 默认情况返回空对象，通过 class 应用紫粉渐变背景
+    return {}
   }
 })
 
