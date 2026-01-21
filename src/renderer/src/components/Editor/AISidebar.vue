@@ -92,6 +92,9 @@
       </div>
     </div>
 
+    <!-- 坐牢模式状态容器 -->
+    <div id="jail-mode-container" class="jail-mode-container"></div>
+
     <!-- 添加/编辑模型弹窗 -->
     <el-dialog
       v-model="modelDialogVisible"
@@ -2265,6 +2268,11 @@ const exportableModels = computed(() => {
 </script>
 
 <style lang="scss" scoped>
+.jail-mode-container {
+  margin-top: 20px;
+  width: 100%;
+}
+
 .ai-sidebar {
   width: 100%;
   height: 100%;

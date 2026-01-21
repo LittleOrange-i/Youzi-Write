@@ -261,6 +261,12 @@ if (process.contextIsolated) {
         ipcRenderer.on('shortcut-triggered', (event, actionId) => callback(actionId))
       },
       
+      // --------- 坐牢模式相关 ---------
+      // 开启坐牢模式
+      enableJailMode: (options) => ipcRenderer.invoke('jail-mode:enable', options),
+      // 关闭坐牢模式
+      disableJailMode: () => ipcRenderer.invoke('jail-mode:disable'),
+
       // 退出应用程序
       quitApp: () => ipcRenderer.invoke('quit-app')
     })

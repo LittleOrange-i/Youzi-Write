@@ -43,16 +43,33 @@
       <!-- 段落字数校验按钮 -->
       <el-button
         v-if="editorStore.file?.type === 'chapter'"
-        type="primary"
+        type="soft"
         size="small"
         class="paragraph-check-button"
         @click="checkParagraphLength"
       >
         段落字数校验
       </el-button>
+      <!-- 坐牢模式按钮 -->
+      <el-button
+        v-if="editorStore.file?.type === 'chapter'"
+        type="danger"
+        size="small"
+        class="jail-mode-button"
+        style="margin-left: 10px;"
+        @click="openJailModeDialog"
+      >
+        坐牢模式
+      </el-button>
     </div>
     <!-- 正文内容编辑区 -->
-    <EditorContent class="editor-content" :editor="editor" />
+    <EditorContent 
+      class="editor-content" 
+      :editor="editor" 
+      @keydown="updateActivity" 
+      @mousemove="updateActivity"
+      @click="updateActivity"
+    />
     <!-- 编辑器内容配置组件（隐藏，仅提供逻辑） -->
     <ChapterEditorContent
       ref="chapterEditorContentRef"
@@ -124,16 +141,103 @@
         <el-button type="primary" @click="paragraphCheckDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 坐牢模式设置弹窗 -->
+    <el-dialog
+      v-model="jailModeDialogVisible"
+      title="请谨慎开启本功能"
+      width="500px"
+      :close-on-click-modal="false"
+      class="jail-mode-dialog"
+      append-to-body
+    >
+      <div class="jail-mode-warning" style="margin-bottom: 20px; color: #666; line-height: 1.6;">
+        <p style="margin-bottom: 10px;">当开启坐牢模式后，码字界面将会被锁定，<span style="color: #f56c6c; font-weight: bold;">无法退出码字界面，无法打开电脑其他软件</span>。只有完成设定的字数，或达到设定的时间，才会解除锁定。</p>
+        <p>当设定的目标完成后，1分钟内将会解锁，只有持续正常创作才会计入任务进度，非正常输入、粘贴、闲置等不被计入任务进度。</p>
+      </div>
+
+      <div class="jail-mode-form">
+        <div class="form-item" style="margin-bottom: 20px; display: flex; align-items: center;">
+          <span class="label" style="width: 80px; font-weight: bold;">坐牢模式</span>
+          <div class="radio-group">
+            <el-button 
+              :type="jailModeType === 'word' ? 'primary' : 'default'" 
+              @click="jailModeType = 'word'"
+            >
+              <el-icon v-if="jailModeType === 'word'" style="margin-right: 5px;"><Check /></el-icon>
+              字数模式
+            </el-button>
+            <el-button 
+              :type="jailModeType === 'time' ? 'primary' : 'default'" 
+              @click="jailModeType = 'time'"
+              style="margin-left: 10px;"
+            >
+              <el-icon v-if="jailModeType === 'time'" style="margin-right: 5px;"><Check /></el-icon>
+              时长模式
+            </el-button>
+          </div>
+        </div>
+
+        <div class="form-item" style="display: flex; align-items: center;">
+          <span class="label" style="width: 80px; font-weight: bold;">坐牢目标</span>
+          <el-input 
+            v-model="jailTarget" 
+            :placeholder="jailModeType === 'word' ? '请输入目标，范围1-20000字' : '请输入目标，范围1-360分钟'"
+            type="number"
+            style="flex: 1;"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div style="text-align: right;">
+          <el-button @click="jailModeDialogVisible = false">取消</el-button>
+          <el-button type="info" color="#4b4b4b" @click="startJailMode">开始坐牢</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 坐牢模式状态浮窗 -->
+    <Teleport to="#jail-mode-container" v-if="isMounted">
+      <div v-if="isJailModeActive" class="jail-status-overlay" style="width: 100%; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #ebeef5;">
+         <div class="jail-status-card">
+           <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #303133;">坐牢模式进行中 🔒</h3>
+           <div class="jail-progress">
+              <template v-if="jailModeType === 'word'">
+                <div class="progress-info" style="margin-bottom: 5px; font-size: 14px; color: #606266;">
+                   <span>当前进度: {{ Math.round(jailCurrentWordCount) }} / {{ jailTargetValue }} 字</span>
+                </div>
+                <el-progress :percentage="Math.min(100, Math.max(0, Math.round(jailCurrentWordCount / jailTargetValue * 100)))" :status="jailCurrentWordCount >= jailTargetValue ? 'success' : ''" />
+              </template>
+              <template v-else>
+                <div class="progress-info" style="margin-bottom: 5px; font-size: 14px; color: #606266;">
+                   <span>当前进度: {{ formatTime(jailTotalTime) }} / {{ formatTime(jailTargetValue) }}</span>
+                </div>
+                <el-progress :percentage="Math.min(100, Math.max(0, Math.round(jailTotalTime / jailTargetValue * 100)))" :status="jailTotalTime >= jailTargetValue ? 'success' : ''" />
+              </template>
+           </div>
+           <div v-if="jailUnlockCountdown > 0" class="jail-unlock-countdown" style="margin-top: 10px; color: #f56c6c; font-weight: bold; display: flex; align-items: center; justify-content: space-between;">
+              <span>即将解锁: {{ jailUnlockCountdown }}秒</span>
+              <el-button type="success" size="small" @click="finishJailMode">立即解锁</el-button>
+           </div>
+           <div v-else class="jail-tips" style="margin-top: 10px; font-size: 12px; color: #909399;">
+             <p>加油！只有持续创作才能重获自由！</p>
+           </div>
+         </div>
+      </div>
+    </Teleport>
   </div>
 
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Check } from '@element-plus/icons-vue'
 import { EditorContent } from '@tiptap/vue-3'
 import { TextSelection } from 'prosemirror-state'
 import { useEditorStore } from '@renderer/stores/editor'
+import { useJailStore } from '@renderer/stores/jail'
 import SearchPanel from '@renderer/components/Editor/SearchPanel.vue'
 import EditorMenubar from '@renderer/components/Editor/EditorMenubar.vue'
 import EditorStats from '@renderer/components/Editor/EditorStats.vue'
@@ -147,7 +251,9 @@ const props = defineProps({
   bookName: String
 })
 
-const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready'])
+const isMounted = ref(false)
+
+const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change'])
 
 // 默认高亮颜色（当人物没有设置标记颜色时使用）
 const defaultHighlightColor = '#e198b8'
@@ -635,6 +741,7 @@ function setupCompositionHandlers() {
 }
 
 onMounted(async () => {
+  isMounted.value = true
   // 书籍总字数由 EditorStats 组件通过 watch fileType 自动加载
 
   editorStore.registerExternalSaveHandler(saveFile)
@@ -676,6 +783,12 @@ onBeforeUnmount(async () => {
   editorStore.registerExternalSaveHandler(null)
   // 移除窗口关闭监听器
   window.removeEventListener('beforeunload', handleWindowClose)
+
+  // 坐牢模式清理
+  if (isJailModeActive.value) {
+    await window.electron.disableJailMode()
+  }
+  if (jailTimer) clearInterval(jailTimer)
 
   // 移除输入法事件监听器
   if (editor.value && editor.value.view && editor.value.view.dom) {
@@ -1483,6 +1596,151 @@ watch(
   },
   { immediate: true }
 )
+// ==================== 坐牢模式相关 ====================
+const jailStore = useJailStore()
+const jailModeDialogVisible = ref(false)
+const jailModeType = ref('time') // 'word' | 'time'
+const jailTarget = ref('')
+const isJailModeActive = computed({
+  get: () => jailStore.isJailModeActive,
+  set: (val) => jailStore.setJailMode(val)
+})
+const jailTargetValue = ref(0)
+const jailStartWordCount = ref(0)
+const jailCurrentWordCount = ref(0)
+const jailTotalTime = ref(0) // ms
+const jailUnlockCountdown = ref(0)
+let jailTimer = null
+let lastActivityTime = 0
+
+function openJailModeDialog() {
+  jailModeDialogVisible.value = true
+  jailModeType.value = 'time'
+  jailTarget.value = ''
+}
+
+function updateActivity() {
+  if (isJailModeActive.value) {
+    lastActivityTime = Date.now()
+  }
+}
+
+function formatTime(ms) {
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}分${seconds}秒`
+}
+
+async function startJailMode() {
+  const target = parseInt(jailTarget.value)
+  if (isNaN(target) || target <= 0) {
+    ElMessage.warning('请输入有效的目标')
+    return
+  }
+  
+  if (jailModeType.value === 'word') {
+    if (target < 1 || target > 20000) {
+      ElMessage.warning('字数范围 1-20000')
+      return
+    }
+    jailTargetValue.value = target
+    jailStartWordCount.value = editorStore.contentWordCount
+    jailCurrentWordCount.value = 0
+  } else {
+    if (target < 1 || target > 360) {
+      ElMessage.warning('时长范围 1-360 分钟')
+      return
+    }
+    jailTargetValue.value = target * 60 * 1000
+    jailTotalTime.value = 0
+  }
+
+  try {
+    await window.electron.enableJailMode({
+      target: jailTargetValue.value,
+      type: jailModeType.value
+    })
+    isJailModeActive.value = true
+    jailModeDialogVisible.value = false
+    lastActivityTime = Date.now()
+    jailUnlockCountdown.value = 0
+    
+    // Start timer
+    if (jailTimer) clearInterval(jailTimer)
+    jailTimer = setInterval(checkJailStatus, 1000)
+    
+    ElMessage.success('坐牢模式已开启，加油！')
+  } catch (e) {
+    ElMessage.error('开启坐牢模式失败: ' + e.message)
+  }
+}
+
+function checkJailStatus() {
+  if (!isJailModeActive.value) return
+  
+  // Check if unlocking
+  if (jailUnlockCountdown.value > 0) {
+    jailUnlockCountdown.value--
+    if (jailUnlockCountdown.value <= 0) {
+      finishJailMode()
+    }
+    return
+  }
+
+  // Update progress
+  if (jailModeType.value === 'time') {
+    const now = Date.now()
+    // If active within last 30 seconds, count this second
+    if (now - lastActivityTime < 30000) {
+      jailTotalTime.value += 1000
+    }
+    
+    if (jailTotalTime.value >= jailTargetValue.value) {
+      startUnlockCountdown()
+    }
+  } else {
+    // Word count check
+    if (jailCurrentWordCount.value >= jailTargetValue.value) {
+      startUnlockCountdown()
+    }
+  }
+}
+
+// Watch word count for jail mode
+watch(() => editorStore.contentWordCount, (newVal, oldVal) => {
+  if (!isJailModeActive.value || jailModeType.value !== 'word' || jailUnlockCountdown.value > 0) return
+  
+  const diff = newVal - oldVal
+  if (diff > 0) {
+    // Simple anti-paste check: if > 50 chars in one update, ignore
+    if (diff <= 50) {
+      jailCurrentWordCount.value += diff
+    }
+  }
+})
+
+// Watch jail mode state and emit event
+watch(isJailModeActive, (newVal) => {
+  emit('jail-mode-change', newVal)
+})
+
+function startUnlockCountdown() {
+  if (jailUnlockCountdown.value > 0) return // Already counting
+  jailUnlockCountdown.value = 60 // 60 seconds countdown
+  ElMessage.success('目标达成！1分钟后解锁...')
+}
+
+async function finishJailMode() {
+  clearInterval(jailTimer)
+  try {
+    await window.electron.disableJailMode()
+    isJailModeActive.value = false
+    ElMessage.success('坐牢模式已解除！')
+  } catch (e) {
+    ElMessage.error('解除失败: ' + e.message)
+  }
+}
 </script>
 
 <style lang="scss" scoped>

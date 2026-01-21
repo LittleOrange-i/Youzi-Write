@@ -943,9 +943,51 @@ app.whenReady().then(() => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// 坐牢模式控制
+ipcMain.handle('jail-mode:enable', async (event, options) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    // 开启 Kiosk 模式（全屏且屏蔽部分系统快捷键）
+    window.setKiosk(true)
+    // 始终置顶，级别设为 screen-saver 以覆盖大多数窗口
+    window.setAlwaysOnTop(true, 'screen-saver')
+    // 阻止窗口关闭
+    window.closable = false
+    // 阻止窗口最小化
+    window.minimizable = false
+    // 阻止窗口全屏切换（防止用户按 F11 退出）
+    window.fullScreenable = false
+    
+    // 尝试注册常见切换快捷键以屏蔽它们（仅在窗口获得焦点时有效）
+    // 注意：系统级快捷键如 Alt+Tab, Ctrl+Alt+Del, Win键 无法通过这种方式完全屏蔽
+    // 但 Kiosk 模式通常能处理大部分情况
+    return { success: true }
+  }
+  return { success: false, message: '无法获取窗口实例' }
+})
+
+ipcMain.handle('jail-mode:disable', async (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    // 恢复窗口控制（必须先恢复 fullScreenable，否则 setFullScreen(false) 可能无效）
+    window.closable = true
+    window.minimizable = true
+    window.maximizable = true
+    window.resizable = true
+    window.fullScreenable = true
+
+    // 关闭 Kiosk 模式
+    window.setKiosk(false)
+    // 显式退出全屏
+    window.setFullScreen(false)
+    // 取消置顶
+    window.setAlwaysOnTop(false)
+    
+    return { success: true }
+  }
+  return { success: false, message: '无法获取窗口实例' }
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

@@ -5,7 +5,7 @@
     
     <div class="editor-content">
       <el-splitter style="height: 100%;">
-        <el-splitter-panel :size="200">
+        <el-splitter-panel :size="215">
           <!-- 笔记章节面板 -->
           <NoteChapter ref="noteChapterRef" :book-name="bookName" />
         </el-splitter-panel>
@@ -19,9 +19,10 @@
                 @editor-ready="handleEditorReady"
                 @refresh-notes="refreshNotes"
                 @refresh-chapters="refreshChapters"
+                @jail-mode-change="handleJailModeChange"
               />
             </el-splitter-panel>
-            <el-splitter-panel :size="260">
+            <el-splitter-panel :size="aiSidebarSize">
               <!-- 右侧 AI 操作面板 -->
               <AISidebar ref="aiSidebarRef" />
             </el-splitter-panel>
@@ -80,6 +81,7 @@ onUnmounted(() => {
 const noteChapterRef = ref(null)
 const editorPanelRef = ref(null)
 const aiSidebarRef = ref(null)
+const aiSidebarSize = ref(260)
 
 // 提供编辑器实例给子组件（通过 EditorPanel 的 ref 访问）
 const editorInstance = ref(null)
@@ -89,6 +91,14 @@ provide('editorInstance', editorInstance)
 const handleEditorReady = (editor) => {
   editorInstance.value = editor
   console.log('编辑器已就绪:', editor)
+}
+
+const handleJailModeChange = (isActive) => {
+  if (isActive) {
+    aiSidebarSize.value = 275
+  } else {
+    aiSidebarSize.value = 260
+  }
 }
 
 function refreshNotes() {
