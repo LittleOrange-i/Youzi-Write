@@ -92,8 +92,36 @@
       </div>
     </div>
 
-    <!-- 坐牢模式状态容器 -->
-    <div id="jail-mode-container" class="jail-mode-container"></div>
+    <!-- 使用 flex-spacer 把内容推到底部 -->
+    <div class="flex-spacer"></div>
+
+    <!-- 坐牢模式状态容器 (内嵌式) -->
+    <div v-if="jailStore.isJailModeActive" class="jail-mode-embedded">
+       <div class="jail-status-card">
+         <h3 class="jail-title">坐牢模式进行中 🔒</h3>
+         <div class="jail-progress">
+            <template v-if="jailStore.jailModeType === 'word'">
+              <div class="progress-info">
+                 <span>当前进度: {{ Math.round(jailStore.jailCurrentWordCount) }} / {{ jailStore.jailTargetValue }} 字</span>
+              </div>
+              <el-progress :percentage="Math.min(100, Math.max(0, Math.round(jailStore.jailCurrentWordCount / jailStore.jailTargetValue * 100)))" :status="jailStore.jailCurrentWordCount >= jailStore.jailTargetValue ? 'success' : ''" />
+            </template>
+            <template v-else>
+              <div class="progress-info">
+                 <span>当前进度: {{ formatTime(jailStore.jailTotalTime) }} / {{ formatTime(jailStore.jailTargetValue) }}</span>
+              </div>
+              <el-progress :percentage="Math.min(100, Math.max(0, Math.round(jailStore.jailTotalTime / jailStore.jailTargetValue * 100)))" :status="jailStore.jailTotalTime >= jailStore.jailTargetValue ? 'success' : ''" />
+            </template>
+         </div>
+         <div v-if="jailStore.jailUnlockCountdown > 0" class="jail-unlock-countdown">
+            <span>即将解锁: {{ jailStore.jailUnlockCountdown }}秒</span>
+            <el-button type="success" size="small" @click="jailStore.finishJailMode()">立即解锁</el-button>
+         </div>
+         <div v-else class="jail-tips">
+           <p>加油！只有持续创作才能重获自由！</p>
+         </div>
+       </div>
+    </div>
 
     <!-- 添加/编辑模型弹窗 -->
     <el-dialog
@@ -698,6 +726,18 @@ import {
   InfoFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useJailStore } from '@renderer/stores/jail'
+
+// 引入坐牢模式 store
+const jailStore = useJailStore()
+
+// 格式化时间显示函数
+function formatTime(ms) {
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}分${seconds}秒`
+}
 
 // 各大厂商API配置预设（专注小说/文本生成）
 const apiProviders = [
@@ -2268,9 +2308,52 @@ const exportableModels = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-.jail-mode-container {
-  margin-top: 20px;
+// 坐牢模式嵌入式样式
+.jail-mode-embedded {
   width: 100%;
+  padding: 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-top: auto; // 使其在侧边栏底部
+
+  .jail-status-card {
+    .jail-title {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      color: var(--text-base);
+      font-weight: 600;
+    }
+
+    .jail-progress {
+      .progress-info {
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+    }
+
+    .jail-unlock-countdown {
+      margin-top: 12px;
+      color: var(--el-color-danger);
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+    }
+
+    .jail-tips {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      
+      p {
+        margin: 0;
+        line-height: 1.5;
+      }
+    }
+  }
 }
 
 .ai-sidebar {

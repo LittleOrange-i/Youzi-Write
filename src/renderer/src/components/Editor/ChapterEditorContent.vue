@@ -6,6 +6,9 @@ import TextAlign from '@tiptap/extension-text-align'
 import Highlight from '@tiptap/extension-highlight'
 import { Extension } from '@tiptap/core'
 import { Collapsible } from '@renderer/extensions/Collapsible'
+import { useJailStore } from '@renderer/stores/jail'
+
+const jailStore = useJailStore()
 
 const props = defineProps({
   editorStore: {
@@ -117,6 +120,17 @@ function createEditor() {
           const fontFamilyStyle = `font-family: ${fullFontFamily} !important;`
           return `white-space: pre-wrap; ${fontFamilyStyle} font-size: ${props.menubarState.fontSize} !important; line-height: ${props.menubarState.lineHeight} !important;`
         }
+      },
+      // 监听粘贴事件，通知坐牢模式 store
+      handlePaste: () => {
+        // 标记粘贴操作开始
+        jailStore.markPasteStart()
+        // 粘贴操作完成后标记结束（在 DOM 更新后）
+        setTimeout(() => {
+          jailStore.markPasteEnd()
+        }, 10)
+        // 返回 false 表示继续默认的粘贴处理
+        return false
       }
     },
     onUpdate: ({ editor }) => {

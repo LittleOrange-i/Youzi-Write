@@ -21,6 +21,9 @@ export const useEditorStore = defineStore('editor', () => {
   const paragraphMaxLength = ref(35) // 段落最大字数阈值
   let externalSaveHandler = null
 
+  // 临时存储的会话统计数据（用于在页面切换时保持状态）
+  const sessionStats = ref(null)
+
   // 新增：计算实际内容字数（排除空格、换行符等格式字符）
   const contentWordCount = computed(() => {
     if (!content.value) return 0
@@ -104,6 +107,12 @@ export const useEditorStore = defineStore('editor', () => {
     isInitializing.value = false
     chapterWordBaseline.value = 0
     lastSyncedChapterWords.value = 0
+    // 清除临时保存的统计数据
+    sessionStats.value = null
+  }
+
+  function saveSessionStats(stats) {
+    sessionStats.value = stats
   }
 
   function setContent(newContent, options = {}) {
@@ -278,6 +287,8 @@ export const useEditorStore = defineStore('editor', () => {
     paragraphMaxLength,
     setParagraphMaxLength,
     registerExternalSaveHandler,
-    saveCurrentFileThroughHandler
+    saveCurrentFileThroughHandler,
+    sessionStats,
+    saveSessionStats
   }
 })

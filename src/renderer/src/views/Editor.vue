@@ -37,6 +37,7 @@
 import { ref, onMounted, onUnmounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import { useThemeStore } from '@renderer/stores/theme'
+import { useJailStore } from '@renderer/stores/jail'
 import NoteChapter from '@renderer/components/Editor/NoteChapter.vue'
 import EditorPanel from '@renderer/components/Editor/EditorPanel.vue'
 import EditorToolbar from '@renderer/components/Editor/EditorToolbar.vue'
@@ -44,6 +45,7 @@ import AISidebar from '@renderer/components/Editor/AISidebar.vue'
 
 const route = useRoute()
 const themeStore = useThemeStore()
+const jailStore = useJailStore()
 
 // 解析新窗口参数
 let bookName = null
@@ -65,6 +67,13 @@ onMounted(async () => {
   }
   // 初始化主题
   await themeStore.initTheme()
+  
+  // 初始化侧边栏宽度：根据坐牢模式状态设置初始宽度
+  if (jailStore.isJailModeActive) {
+    aiSidebarSize.value = 275
+  } else {
+    aiSidebarSize.value = 260
+  }
   
   // 监听快捷键触发事件
   if (window.electron?.onShortcutTriggered) {
@@ -93,6 +102,7 @@ const handleEditorReady = (editor) => {
   console.log('编辑器已就绪:', editor)
 }
 
+// 处理坐牢模式状态变化：同步更新侧边栏宽度
 const handleJailModeChange = (isActive) => {
   if (isActive) {
     aiSidebarSize.value = 275

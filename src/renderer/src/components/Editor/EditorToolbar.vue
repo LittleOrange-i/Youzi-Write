@@ -155,10 +155,6 @@ const saveParagraphMaxLength = async () => {
 }
 
 const handleWorldMap = () => {
-  if (jailStore.isJailModeActive) {
-    ElMessage.warning('坐牢模式下无法跳转页面')
-    return
-  }
   const bookName = route.query.name
   // 如果已经在地图列表页面，返回编辑器；否则跳转到地图列表
   if (route.path === '/map-list') {
@@ -169,10 +165,6 @@ const handleWorldMap = () => {
 }
 
 const handleTimeline = () => {
-  if (jailStore.isJailModeActive) {
-    ElMessage.warning('坐牢模式下无法跳转页面')
-    return
-  }
   const bookName = route.query.name
   // 如果已经在时间线页面，返回编辑器；否则跳转到时间线
   if (route.path === '/timeline') {
@@ -183,10 +175,6 @@ const handleTimeline = () => {
 }
 
 const handleEntryDictionary = () => {
-  if (jailStore.isJailModeActive) {
-    ElMessage.warning('坐牢模式下无法跳转页面')
-    return
-  }
   const bookName = route.query.name
   // 如果已经在词条字典页面，返回编辑器；否则跳转到词条字典
   if (route.path === '/dictionary') {
@@ -227,10 +215,6 @@ const handleEventsSequence = () => {
 }
 
 const handleOrganization = () => {
-  if (jailStore.isJailModeActive) {
-    ElMessage.warning('坐牢模式下无法跳转页面')
-    return
-  }
   const bookName = route.query.name
   // 如果已经在组织架构列表页面，返回编辑器；否则跳转到组织架构列表
   if (route.path === '/organization-list') {

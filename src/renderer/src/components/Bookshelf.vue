@@ -434,7 +434,8 @@ function executeOpenBook(book) {
     router.push({
       path: '/editor',
       query: {
-        name: book.name
+        name: book.name,
+        reset: 'true'
       }
     })
   }
