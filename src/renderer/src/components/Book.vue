@@ -198,8 +198,11 @@ const coverStyle = computed(() => {
     else {
       // 本地路径使用 atom:// 协议（Electron 安全协议）
       // 支持多种图片格式：jpg, jpeg, png, gif, bmp, webp
-      const path = require('path')
-      const ext = path.extname(imageUrl).toLowerCase()
+      
+      // 使用浏览器兼容的方式获取文件扩展名
+      const lastDotIndex = imageUrl.lastIndexOf('.')
+      const ext = lastDotIndex !== -1 ? imageUrl.substring(lastDotIndex).toLowerCase() : ''
+      
       const mimeTypes = {
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',

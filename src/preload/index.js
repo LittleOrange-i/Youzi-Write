@@ -267,6 +267,14 @@ if (process.contextIsolated) {
       // 关闭专注模式
       disableJailMode: () => ipcRenderer.invoke('jail-mode:disable'),
 
+      // --------- 窗口状态相关 ---------
+      // 检查窗口是否最大化
+      isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+      // 监听窗口最大化
+      onMaximize: (callback) => ipcRenderer.on('window:maximize', () => callback()),
+      // 监听窗口还原
+      onUnmaximize: (callback) => ipcRenderer.on('window:unmaximize', () => callback()),
+
       // 退出应用程序
       quitApp: () => ipcRenderer.invoke('quit-app')
     })

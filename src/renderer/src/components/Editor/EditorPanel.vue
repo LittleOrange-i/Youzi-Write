@@ -256,7 +256,7 @@ const props = defineProps({
 
 const isMounted = ref(false)
 
-const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change'])
+const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change', 'chapter-word-count-updated'])
 
 // 默认高亮颜色（当人物没有设置标记颜色时使用）
 const defaultHighlightColor = '#e198b8'
@@ -1008,6 +1008,11 @@ async function saveFile(showMessage = false) {
   }
 
   if (result?.success) {
+    // 每次保存成功都更新字数（包括自动保存）
+    if (file.type === 'chapter' && typeof result.wordCount === 'number') {
+      emit('chapter-word-count-updated', { path: file.path, wordCount: result.wordCount })
+    }
+
     if (result.name && result.name !== file.name) {
       editorStore.setFile({ ...file, name: result.name })
       if (file.type === 'note') {

@@ -837,6 +837,14 @@ function createWindow() {
     windowShortcutStates.set(mainWindow.id, true)
   })
 
+  // 监听窗口最大化/还原事件
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send('window:maximize')
+  })
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send('window:unmaximize')
+  })
+
   // 阻止 Alt 键激活菜单栏（仅 Windows）
   if (process.platform === 'win32') {
     mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -986,6 +994,15 @@ ipcMain.handle('jail-mode:disable', async (event) => {
     return { success: true }
   }
   return { success: false, message: '无法获取窗口实例' }
+})
+
+// 获取窗口最大化状态
+ipcMain.handle('window:is-maximized', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    return window.isMaximized()
+  }
+  return false
 })
 
 app.on('window-all-closed', () => {
@@ -2011,6 +2028,15 @@ ipcMain.handle('open-book-editor-window', async (event, { id, name }) => {
     // 编辑器窗口默认启用快捷键
     windowShortcutStates.set(editorWindow.id, true)
   })
+
+  // 监听窗口最大化/还原事件
+  editorWindow.on('maximize', () => {
+    editorWindow.webContents.send('window:maximize')
+  })
+  editorWindow.on('unmaximize', () => {
+    editorWindow.webContents.send('window:unmaximize')
+  })
+
   editorWindow.on('closed', () => {
     bookEditorWindows.delete(id)
     // 清理窗口的快捷键状态
@@ -2136,6 +2162,7 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
   }
 
   const volumes = fs.readdirSync(volumePath, { withFileTypes: true })
+  const stats = readStats()
 
   const chapters = []
   for (const volume of volumes) {
@@ -2150,13 +2177,17 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
         .map((file) => {
           const name = file.name.replace('.txt', '')
           const parsed = parseChapterName(name)
+          const chapterKey = `${bookName}/${volumeName}/${name}`
+          const chapterStat = stats.chapterStats[chapterKey]
+
           return {
             id: file.name,
             name,
             type: 'chapter',
             path: join(bookPath, '正文', volumeName, file.name),
             orderValue: parsed?.number || 0,
-            hasOrderValue: Boolean(parsed?.number)
+            hasOrderValue: Boolean(parsed?.number),
+            wordCount: chapterStat ? chapterStat.totalWords : 0
           }
         })
         .sort((a, b) => {
@@ -2988,6 +3019,7 @@ function updateChapterStats(bookName, volumeName, chapterName, oldContent, newCo
   stats.bookDailyStats[bookName][today].totalWords = newLength
 
   saveStats(stats)
+  return newLength
 }
 
 // 修改保存章节内容的处理函数
@@ -3022,12 +3054,12 @@ ipcMain.handle(
     }
 
     // 3. 更新统计
-    updateChapterStats(bookName, volumeName, chapterName, oldContent, content)
+    const wordCount = updateChapterStats(bookName, volumeName, chapterName, oldContent, content)
 
     // 4. 更新书籍元数据
     await updateBookMetadata(bookName)
 
-    return { success: true, name: newName || chapterName }
+    return { success: true, name: newName || chapterName, wordCount }
   }
 )
 

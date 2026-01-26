@@ -111,6 +111,7 @@ const props = defineProps({
   currentSettings: {
     type: Object,
     default: () => ({
+      chapterFormat: 'number',
       suffixType: '章',
       targetWords: 2000
     })
@@ -176,18 +177,33 @@ watch(
   () => props.visible,
   (newVisible) => {
     if (newVisible) {
-      // 弹框打开时，加载当前设置
-      const incoming = { ...props.currentSettings }
+      // 弹框打开时,加载当前设置
+      // 确保 props.currentSettings 存在且是对象
+      const currentSettings = props.currentSettings && typeof props.currentSettings === 'object' 
+        ? props.currentSettings 
+        : {}
+      
+      const incoming = { ...currentSettings }
+      
+      // 验证并设置 targetWords
       if (incoming.targetWords === undefined || incoming.targetWords === null) {
         incoming.targetWords = 2000
       } else {
         const targetValue = Number(incoming.targetWords)
         incoming.targetWords = Number.isFinite(targetValue) && targetValue > 0 ? targetValue : 2000
       }
+      
+      // 验证并设置 chapterFormat
       incoming.chapterFormat =
         incoming.chapterFormat === 'hanzi' || incoming.chapterFormat === 'number'
           ? incoming.chapterFormat
           : 'number'
+      
+      // 验证并设置 suffixType
+      if (!incoming.suffixType || typeof incoming.suffixType !== 'string') {
+        incoming.suffixType = '章'
+      }
+      
       settings.value = incoming
     }
   }

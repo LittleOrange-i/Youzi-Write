@@ -5,7 +5,7 @@
     
     <div class="editor-content">
       <el-splitter style="height: 100%;">
-        <el-splitter-panel :size="215">
+        <el-splitter-panel :size="NoteChapterSize">
           <!-- 笔记章节面板 -->
           <NoteChapter ref="noteChapterRef" :book-name="bookName" />
         </el-splitter-panel>
@@ -20,6 +20,7 @@
                 @refresh-notes="refreshNotes"
                 @refresh-chapters="refreshChapters"
                 @jail-mode-change="handleJailModeChange"
+                @chapter-word-count-updated="handleChapterWordCountUpdate"
               />
             </el-splitter-panel>
             <el-splitter-panel :size="aiSidebarSize">
@@ -60,6 +61,19 @@ if (!bookName) {
   bookName = route.query.name
 }
 
+const isMaximized = ref(false)
+
+// 更新侧边栏宽度的统一逻辑
+const updateSidebarSizes = () => {
+  if (jailStore.isJailModeActive || isMaximized.value) {
+    aiSidebarSize.value = 275
+    NoteChapterSize.value = 275
+  } else {
+    aiSidebarSize.value = 260
+    NoteChapterSize.value = 230
+  }
+}
+
 // 动态更新窗口标题
 onMounted(async () => {
   if (bookName) {
@@ -68,12 +82,28 @@ onMounted(async () => {
   // 初始化主题
   await themeStore.initTheme()
   
-  // 初始化侧边栏宽度：根据专注模式状态设置初始宽度
-  if (jailStore.isJailModeActive) {
-    aiSidebarSize.value = 275
-  } else {
-    aiSidebarSize.value = 260
+  // 初始化窗口最大化状态
+  if (window.electron?.isMaximized) {
+    isMaximized.value = await window.electron.isMaximized()
   }
+
+  // 监听窗口最大化事件
+  if (window.electron?.onMaximize) {
+    window.electron.onMaximize(() => {
+      isMaximized.value = true
+      updateSidebarSizes()
+    })
+  }
+  
+  if (window.electron?.onUnmaximize) {
+    window.electron.onUnmaximize(() => {
+      isMaximized.value = false
+      updateSidebarSizes()
+    })
+  }
+
+  // 初始化侧边栏宽度
+  updateSidebarSizes()
   
   // 监听快捷键触发事件
   if (window.electron?.onShortcutTriggered) {
@@ -91,6 +121,7 @@ const noteChapterRef = ref(null)
 const editorPanelRef = ref(null)
 const aiSidebarRef = ref(null)
 const aiSidebarSize = ref(260)
+const NoteChapterSize = ref(230)
 
 // 提供编辑器实例给子组件（通过 EditorPanel 的 ref 访问）
 const editorInstance = ref(null)
@@ -104,10 +135,12 @@ const handleEditorReady = (editor) => {
 
 // 处理专注模式状态变化：同步更新侧边栏宽度
 const handleJailModeChange = (isActive) => {
-  if (isActive) {
-    aiSidebarSize.value = 275
+  if (isActive || isMaximized.value) {
+    aiSidebarSize.value = 275;
+    NoteChapterSize.value = 275
   } else {
-    aiSidebarSize.value = 260
+    aiSidebarSize.value = 260;
+    NoteChapterSize.value = 230
   }
 }
 
@@ -119,6 +152,12 @@ function refreshChapters() {
   noteChapterRef.value &&
     noteChapterRef.value.reloadChapters &&
     noteChapterRef.value.reloadChapters()
+}
+
+function handleChapterWordCountUpdate({ path, wordCount }) {
+  noteChapterRef.value &&
+    noteChapterRef.value.updateChapterWordCount &&
+    noteChapterRef.value.updateChapterWordCount(path, wordCount)
 }
 
 // 处理快捷键触发

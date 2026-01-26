@@ -78,7 +78,7 @@
           </el-tooltip>
         </div>
       </div>
-      <div v-show="chaptersExpanded" class="section-content">
+      <div v-show="chaptersExpanded" class="section-content chapter-tree-container">
         <el-tree
           ref="chapterTreeRef"
           :data="chaptersTree"
@@ -109,6 +109,15 @@
                 @blur="confirmEdit(node)"
               />
               <div class="chapter-actions">
+                <span
+                  v-if="
+                    node.data.type === 'chapter' &&
+                    (!editingNode || editingNode.path !== node.data.path)
+                  "
+                  class="chapter-word-count"
+                >
+                  {{ node.data.wordCount || 0 }}字
+                </span>
                 <el-icon
                   v-if="node.data.type === 'volume'"
                   @click.stop="createChapter(node.data.id)"
@@ -201,6 +210,17 @@ const chapterSettings = ref({
   suffixType: '章',
   targetWords: 2000
 })
+
+// 确保 chapterSettings 始终是一个响应式对象,避免传递 null 或 undefined
+watch(chapterSettings, (newVal) => {
+  if (!newVal || typeof newVal !== 'object') {
+    chapterSettings.value = {
+      chapterFormat: 'number',
+      suffixType: '章',
+      targetWords: 2000
+    }
+  }
+}, { immediate: true, deep: true })
 
 watch(
   () => editorStore.chapterTargetWords,
@@ -738,8 +758,24 @@ onMounted(async () => {
 
 defineExpose({
   reloadNotes,
-  reloadChapters: (autoSelectLatest = false) => loadChapters(autoSelectLatest)
+  reloadChapters: (autoSelectLatest = false) => loadChapters(autoSelectLatest),
+  updateChapterWordCount
 })
+
+function updateChapterWordCount(path, wordCount) {
+  if (!path || typeof wordCount !== 'number') return
+
+  // 遍历章节树查找并更新
+  for (const volume of chaptersTree.value) {
+    if (volume.children) {
+      const chapter = volume.children.find((c) => c.path === path)
+      if (chapter) {
+        chapter.wordCount = wordCount
+        return
+      }
+    }
+  }
+}
 
 async function reloadNotes() {
   notesTree.value = await window.electron.loadNotes(props.bookName)
@@ -960,6 +996,28 @@ async function handleSettingsChanged(newSettings) {
   &:hover {
     .chapter-actions {
       opacity: 1;
+    }
+  }
+}
+
+.chapter-tree-container .custom-tree-node {
+  .chapter-actions {
+    opacity: 1;
+    .el-icon {
+      display: none;
+    }
+    .chapter-word-count {
+      font-size: 12px;
+      color: var(--text-secondary, #999);
+      white-space: nowrap;
+    }
+  }
+  &:hover .chapter-actions {
+    .el-icon {
+      display: flex;
+    }
+    .chapter-word-count {
+      display: none;
     }
   }
 }
