@@ -369,12 +369,28 @@ function openReplaceMode() {
     const replaceInput = document.querySelector('.replace-input input')
     if (replaceInput) {
       replaceInput.focus()
+      // 如果有替换文本，全选
+      if (replaceText.value) {
+        replaceInput.select()
+      }
     }
   })
 }
 
+// 设置搜索文本
+function setSearchText(text) {
+  if (text) {
+    searchText.value = text
+    // 自动执行搜索
+    nextTick(() => {
+      performSearch()
+    })
+  }
+}
+
 defineExpose({
-  openReplaceMode
+  openReplaceMode,
+  setSearchText
 })
 
 

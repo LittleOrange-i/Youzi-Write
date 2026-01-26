@@ -117,7 +117,7 @@
     />
 
     <!-- 搜索面板 -->
-    <SearchPanel :visible="searchPanelVisible" :editor="editor" @close="closeSearchPanel" />
+    <SearchPanel ref="searchPanelRef" :visible="searchPanelVisible" :editor="editor" @close="closeSearchPanel" />
     
     <!-- 段落字数校验结果弹窗 -->
     <el-dialog
@@ -355,6 +355,7 @@ async function handleTitleBlur() {
 
 // 搜索面板状态
 const searchPanelVisible = ref(false)
+const searchPanelRef = ref(null)
 
 // 获取当前编辑器内容组件
 function getEditorContentComponent() {
@@ -561,25 +562,49 @@ watch(
   }
 )
 
+// 获取当前选中的文本
+function getSelectedText() {
+  if (!editor.value) return ''
+  const { state } = editor.value
+  const { from, to } = state.selection
+  if (from === to) return '' // 没有选中文本
+  return state.doc.textBetween(from, to, ' ')
+}
+
 // 键盘快捷键处理
 function handleKeydown(event) {
   // Cmd/Ctrl + F: 打开搜索面板
   if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
     event.preventDefault()
+    
+    const selectedText = getSelectedText()
+    
     if (!searchPanelVisible.value) {
       searchPanelVisible.value = true
+    }
+    
+    if (selectedText) {
+      nextTick(() => {
+        searchPanelRef.value?.setSearchText(selectedText)
+      })
     }
   }
 
   // Cmd/Ctrl + H: 打开替换面板
   if ((event.metaKey || event.ctrlKey) && event.key === 'h') {
     event.preventDefault()
+    
+    const selectedText = getSelectedText()
+    
     if (!searchPanelVisible.value) {
       searchPanelVisible.value = true
     }
     // 等待面板显示后切换到替换模式
     nextTick(() => {
       searchPanelRef.value?.openReplaceMode()
+      if (selectedText) {
+        searchPanelRef.value?.setSearchText(selectedText)
+      }
     })
   }
 
