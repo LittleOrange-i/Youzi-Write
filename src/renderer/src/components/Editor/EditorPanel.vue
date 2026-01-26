@@ -50,6 +50,7 @@
       >
         段落字数校验
       </el-button>
+      
       <!-- 坐牢模式按钮：坐牢模式激活时禁用按钮 -->
       <el-button
         v-if="editorStore.file?.type === 'chapter'"
@@ -61,6 +62,17 @@
         @click="openJailModeDialog"
       >
         {{ isJailModeActive ? '坐牢中...' : '坐牢模式' }}
+      </el-button>
+
+      <!-- 更多设置按钮 -->
+      <el-button
+        v-if="editorStore.file?.type === 'chapter'"
+        type="primary"
+        size="small"
+        style="margin-left: 10px;"
+        @click="openMoreSettings"
+      >
+        更多
       </el-button>
     </div>
     <!-- 正文内容编辑区 -->
@@ -198,6 +210,16 @@
 
     <!-- 坐牢模式状态浮窗 -->
     <!-- 浮窗已移至 App.vue 中统一管理 -->
+
+    <!-- 更多设置弹窗 -->
+    <MoreSettingsDialog
+      v-model="moreSettingsDialogVisible"
+      :typing-sound-effect="typingSoundEffect"
+      :typing-sound-volume="typingSoundVolume"
+      @update:typing-sound-effect="handleTypingSoundChange"
+      @update:typing-sound-volume="handleVolumeChange"
+      @play-preview="handlePlayPreviewSound"
+    />
   </div>
 
 </template>
@@ -217,6 +239,7 @@ import EditorStats from '@renderer/components/Editor/EditorStats.vue'
 import EditorProgress from '@renderer/components/Editor/EditorProgress.vue'
 import ChapterEditorContent from '@renderer/components/Editor/ChapterEditorContent.vue'
 import NoteEditorContent from '@renderer/components/Editor/NoteEditorContent.vue'
+import MoreSettingsDialog from '@renderer/components/Editor/MoreSettingsDialog.vue'
 
 const editorStore = useEditorStore()
 const route = useRoute()
@@ -250,6 +273,8 @@ const editor = ref(null)
         loadCharacterHighlightState(name)
         // 书籍切换时，加载对应书籍的禁词提示开关状态
         loadBannedWordsHintState(name)
+        // 书籍切换时，加载对应书籍的码字音效设置
+        loadTypingSoundSettings()
       }
     },
     { immediate: true }
@@ -291,8 +316,12 @@ let saveTimer = ref(null)
 let styleUpdateTimer = null
 let isComposing = false // 是否正在进行输入法输入（composition）
 let compositionStartHandler = null
+let compositionUpdateHandler = null // 输入法更新事件处理器
 let compositionEndHandler = null
+let keyupHandler = null // keyup 事件处理器
+let inputHandler = null // input 事件处理器
 let isTitleSaving = false
+let lastKeydownPlayedSound = false // 标记上一次 keydown 是否播放了音频
 
 // 编辑器内容组件引用
 const chapterEditorContentRef = ref(null)
@@ -542,6 +571,18 @@ function handleKeydown(event) {
     }
   }
 
+  // Cmd/Ctrl + H: 打开替换面板
+  if ((event.metaKey || event.ctrlKey) && event.key === 'h') {
+    event.preventDefault()
+    if (!searchPanelVisible.value) {
+      searchPanelVisible.value = true
+    }
+    // 等待面板显示后切换到替换模式
+    nextTick(() => {
+      searchPanelRef.value?.openReplaceMode()
+    })
+  }
+
   // Cmd/Ctrl + S: 保存内容
   if ((event.metaKey || event.ctrlKey) && event.key === 's') {
     event.preventDefault()
@@ -698,19 +739,43 @@ function setupCompositionHandlers() {
   if (compositionStartHandler) {
     editorElement.removeEventListener('compositionstart', compositionStartHandler)
   }
+  if (compositionUpdateHandler) {
+    editorElement.removeEventListener('compositionupdate', compositionUpdateHandler)
+  }
   if (compositionEndHandler) {
     editorElement.removeEventListener('compositionend', compositionEndHandler)
   }
+  if (keyupHandler) {
+    editorElement.removeEventListener('keyup', keyupHandler)
+  }
+  if (inputHandler) {
+    editorElement.removeEventListener('input', inputHandler)
+  }
 
   // compositionstart: 开始输入法输入
-  compositionStartHandler = () => {
+  compositionStartHandler = (e) => {
     isComposing = true
+    inputCompositionText.value = e.data || ''
+    // 记录事件日志
+    addKeyboardEvent('compositionstart', e.data || '', '', e.data)
   }
   editorElement.addEventListener('compositionstart', compositionStartHandler)
 
+  // compositionupdate: 输入法更新（正在输入拼音或选择候选词）
+  compositionUpdateHandler = (e) => {
+    inputCompositionText.value = e.data || ''
+    // 记录事件日志
+    addKeyboardEvent('compositionupdate', e.data || '', '', e.data)
+  }
+  editorElement.addEventListener('compositionupdate', compositionUpdateHandler)
+
   // compositionend: 输入法确认（回车或选择）
-  compositionEndHandler = () => {
+  compositionEndHandler = (e) => {
     isComposing = false
+    inputCompositionText.value = ''
+    // 记录事件日志
+    addKeyboardEvent('compositionend', e.data || '', '', e.data)
+    
     // 输入法确认后，立即更新字数统计
     if (editor.value) {
       const content = editor.value.getText()
@@ -718,6 +783,38 @@ function setupCompositionHandlers() {
     }
   }
   editorElement.addEventListener('compositionend', compositionEndHandler)
+  
+  // 添加键盘事件监听器，用于播放码字音效和记录日志
+  editorElement.addEventListener('keydown', handleEditorKeydown)
+  
+  // keyup: 按键抬起事件
+  keyupHandler = (e) => {
+    currentPressedKey.value = null
+    
+    // 记录事件日志（无条件记录）
+    addKeyboardEvent('keyup', e.key, e.code)
+    
+    // 在 keyup 时播放音频（仅当 keydown 时没有播放）
+    // 这样可以确保中文输入法模式下也能播放音频
+    // 因为中文输入法下 keydown 时 isComposing=true，不会播放音频
+    if (!lastKeydownPlayedSound && typingSoundEffect.value && isKeyAllowedToPlaySound(e.key)) {
+      console.log('🎵 [keyup] 播放音频:', e.key)
+      playTypingSound(e.key)
+    }
+    
+    // 重置标志
+    lastKeydownPlayedSound = false
+  }
+  editorElement.addEventListener('keyup', keyupHandler)
+
+  // input: 输入事件
+  inputHandler = (e) => {
+    // 只在非输入法状态下记录
+    if (!isComposing && e.data) {
+      addKeyboardEvent('input', e.data, '', e.data)
+    }
+  }
+  editorElement.addEventListener('input', inputHandler)
 }
 
 onMounted(async () => {
@@ -726,6 +823,15 @@ onMounted(async () => {
   // 书籍总字数由 EditorStats 组件通过 watch fileType 自动加载
 
   editorStore.registerExternalSaveHandler(saveFile)
+  
+  // 加载码字音效设置并预加载音效文件
+  if (props.bookName) {
+    await loadTypingSoundSettings()
+    // 如果已设置音效，立即预加载到内存（仅加载一次）
+    if (typingSoundEffect.value) {
+      await preloadSoundFiles(typingSoundEffect.value)
+    }
+  }
 
   // 延迟初始化编辑器，等待文件加载完成
   // 如果 file 已经存在，立即初始化；否则等待 file 变化后再初始化
@@ -777,9 +883,20 @@ onBeforeUnmount(async () => {
     if (compositionStartHandler) {
       editorElement.removeEventListener('compositionstart', compositionStartHandler)
     }
+    if (compositionUpdateHandler) {
+      editorElement.removeEventListener('compositionupdate', compositionUpdateHandler)
+    }
     if (compositionEndHandler) {
       editorElement.removeEventListener('compositionend', compositionEndHandler)
     }
+    if (keyupHandler) {
+      editorElement.removeEventListener('keyup', keyupHandler)
+    }
+    if (inputHandler) {
+      editorElement.removeEventListener('input', inputHandler)
+    }
+    // 移除键盘事件监听器
+    editorElement.removeEventListener('keydown', handleEditorKeydown)
   }
 
   // 停止人物高亮定时器
@@ -1574,6 +1691,343 @@ watch(
   },
   { immediate: true }
 )
+
+// ==================== 码字音效相关 ====================
+const typingSoundEffect = ref('') // 当前选择的音效类型
+const typingSoundVolume = ref(100) // 音量大小（0-100），100%表示与系统音量一致
+const soundCache = new Map() // 音效文件缓存
+const lastPlayTime = ref(0) // 上次播放时间，用于防抖
+
+// 音效类型配置表：定义每种音效的数字文件数量和特殊键文件（仅在程序启动时初始化一次）
+const EFFECT_CONFIG = {
+  'muyu': { maxNum: 1, specialFiles: ['backspace', 'enter'] },
+  'shuidi': { maxNum: 1, specialFiles: [] },
+  'jianqi': { maxNum: 6, specialFiles: ['space', 'enter', 'back'] },
+  'quanshui': { maxNum: 8, specialFiles: ['enter'] },
+  'jixie1': { maxNum: 5, specialFiles: [] },
+  'jixie2': { maxNum: 3, specialFiles: ['Backspace', 'Enter', 'Space'] },
+  'jixie3': { maxNum: 4, specialFiles: ['Backspace', 'Enter', 'Space'] },
+  'Cherry_G80_3000': { maxNum: 5, specialFiles: [] },
+  'Cherry_G80_3494': { maxNum: 3, specialFiles: ['backspace', 'enter', 'space'] },
+  'baoliegushou': { maxNum: 4, specialFiles: ['backspace', 'enter', 'space'] },
+  'daziji': { maxNum: 5, specialFiles: ['backspace', 'enter', 'space', 'up', 'down'] },
+  'gangqin': { // 钢琴音效特殊配置
+    files: [
+      // 字母按键音效（大写）
+      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+      // 特殊按键音效
+      'space', 'enter', 'Backspace',
+      // 标点符号按键音效
+      'Comma', 'Period', 'Semicolon', 'QuoteSingle', 'Slash', 
+      'BracketLeft', 'BracketRight'
+    ]
+  }
+}
+
+// 键盘监听事件日志相关
+const keyboardEvents = ref([]) // 键盘事件日志数组
+let keyboardEventIdCounter = 0 // 事件ID计数器
+const currentPressedKey = ref(null) // 当前按下的按键
+const inputCompositionText = ref("") // 输入法组合文本
+
+// 添加键盘事件日志
+const addKeyboardEvent = (type, key, code, data) => {
+  const newEvent = {
+    id: keyboardEventIdCounter++,
+    type,
+    key,
+    code,
+    data,
+    timestamp: Date.now(),
+  }
+  // 保留最近 100 条记录
+  if (keyboardEvents.value.length >= 100) {
+    keyboardEvents.value.shift()
+  }
+  keyboardEvents.value.push(newEvent)
+  
+  // 在控制台打印事件信息
+  console.log(`⌨️ [键盘监听] ${type}事件:`, {
+    type,
+    key: key || '-',
+    code: code || '-',
+    data: data || '-',
+    timestamp: new Date(newEvent.timestamp).toLocaleTimeString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }) + `.${String(new Date(newEvent.timestamp).getMilliseconds()).padStart(3, '0')}`
+  })
+}
+
+// 定义允许播放音频的按键列表
+const allowedKeys = new Set([
+  // 26个字母键
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  // 空格键
+  ' ', 'Space',
+  // 回车键
+  "Enter",
+  // 退格键
+  'Backspace',
+  // Alt键
+  'Alt',
+  // P后面的三个键: [ ] \
+  '[', ']', '\\',
+  // L后面的三个键: ; ' Enter
+  ';', '\'', 'Enter',
+  // M后面的三个键: , . /
+  ',', '.', '/'
+])
+
+// 检查按键是否允许播放音频
+const isKeyAllowedToPlaySound = (key) => {
+  return allowedKeys.has(key)
+}
+
+// 键盘按键与文件名的映射关系（用于钢琴音效）
+const keyToFileMap = {
+  // 字母键（不区分大小写，统一映射到大写文件名）
+  'a': 'A', 'b': 'B', 'c': 'C', 'd': 'D', 'e': 'E', 'f': 'F', 'g': 'G', 'h': 'H',
+  'i': 'I', 'j': 'J', 'k': 'K', 'l': 'L', 'm': 'M', 'n': 'N', 'o': 'O', 'p': 'P',
+  'q': 'Q', 'r': 'R', 's': 'S', 't': 'T', 'u': 'U', 'v': 'V', 'w': 'W', 'x': 'X',
+  'y': 'Y', 'z': 'Z',
+  'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', 'E': 'E', 'F': 'F', 'G': 'G', 'H': 'H',
+  'I': 'I', 'J': 'J', 'K': 'K', 'L': 'L', 'M': 'M', 'N': 'N', 'O': 'O', 'P': 'P',
+  'Q': 'Q', 'R': 'R', 'S': 'S', 'T': 'T', 'U': 'U', 'V': 'V', 'W': 'W', 'X': 'X',
+  'Y': 'Y', 'Z': 'Z',
+  // 特殊键
+  ' ': 'space',
+  'Enter': 'enter',
+  'Backspace': 'Backspace', // 修正：钢琴音效中退格键文件名是大写的 Backspace.wav
+  ',': 'Comma',
+  '.': 'Period',
+  ';': 'Semicolon',
+  '\'': 'QuoteSingle',
+  '/': 'Slash',
+  '[': 'BracketLeft',
+  ']': 'BracketRight',
+  'ArrowUp': 'up',
+  'ArrowDown': 'down'
+}
+
+// 加载码字音效设置
+async function loadTypingSoundSettings() {
+  if (!props.bookName) return
+  
+  try {
+    const effectKey = `typingSoundEffect_${props.bookName}`
+    const volumeKey = `typingSoundVolume_${props.bookName}`
+    
+    const savedEffect = await window.electronStore.get(effectKey)
+    const savedVolume = await window.electronStore.get(volumeKey)
+    
+    typingSoundEffect.value = savedEffect || ''
+    typingSoundVolume.value = savedVolume !== undefined ? savedVolume : 100
+  } catch (error) {
+    console.error('加载码字音效设置失败:', error)
+  }
+}
+
+// 保存码字音效设置
+async function saveTypingSoundSettings() {
+  if (!props.bookName) return
+  
+  try {
+    const effectKey = `typingSoundEffect_${props.bookName}`
+    const volumeKey = `typingSoundVolume_${props.bookName}`
+    
+    await window.electronStore.set(effectKey, typingSoundEffect.value)
+    await window.electronStore.set(volumeKey, typingSoundVolume.value)
+  } catch (error) {
+    console.error('保存码字音效设置失败:', error)
+  }
+}
+
+// 处理音效选择变化
+async function handleTypingSoundChange(value) {
+  typingSoundEffect.value = value
+  await saveTypingSoundSettings()
+  // 预加载新选择的音效文件（如果尚未缓存）
+  if (typingSoundEffect.value) {
+    await preloadSoundFiles(typingSoundEffect.value)
+  }
+}
+
+// 处理音量变化
+async function handleVolumeChange(value) {
+  typingSoundVolume.value = value
+  await saveTypingSoundSettings()
+}
+
+// 预加载音效文件（仅在首次使用时加载一次，后续从缓存读取）
+async function preloadSoundFiles(effectType) {
+  // 如果已缓存，直接返回
+  if (!effectType || soundCache.has(effectType)) return
+  
+  try {
+    // 构建音效文件夹路径
+    const soundDir = `/sounds/${effectType}`
+    const cache = {}
+    
+    // 从配置表获取音效配置
+    const config = EFFECT_CONFIG[effectType]
+    
+    // 如果是钢琴音效，使用预定义的文件列表
+    if (effectType === 'gangqin' && config?.files) {
+      for (const file of config.files) {
+        cache[file] = `${soundDir}/${file}.wav`
+      }
+    } else {
+      // 其他音效类型：使用配置表中的数字文件数量和特殊文件
+      const effectConfig = config || { maxNum: 5, specialFiles: [] }
+      const maxNum = effectConfig.maxNum
+      
+      // 缓存数字音效文件
+      for (let i = 1; i <= maxNum; i++) {
+        cache[i.toString()] = `${soundDir}/${i}.wav`
+      }
+      
+      // 统一处理特殊键（所有音效类型都适用）
+      const specialKeys = [
+        { keys: ['space', 'Space'], files: ['space', 'Space'] },
+        { keys: ['enter', 'Enter'], files: ['enter', 'Enter'] },
+        { keys: ['backspace', 'Backspace', 'back'], files: ['backspace', 'Backspace', 'back'] },
+        { keys: ['up', 'Up'], files: ['up', 'Up'] },
+        { keys: ['down', 'Down'], files: ['down', 'Down'] }
+      ]
+      
+      // 使用最大数字音频作为默认音频
+      const defaultSound = `${soundDir}/${maxNum}.wav`
+      
+      for (const { keys, files } of specialKeys) {
+        let foundFile = null
+        
+        // 在配置的特殊文件列表中查找匹配的文件
+        for (const file of files) {
+          if (effectConfig.specialFiles.includes(file)) {
+            foundFile = `${soundDir}/${file}.wav`
+            break
+          }
+        }
+        
+        // 为所有相关的键设置音频文件（找到专用文件就用专用文件，否则用默认音频）
+        const soundToUse = foundFile || defaultSound
+        for (const key of keys) {
+          cache[key] = soundToUse
+        }
+      }
+    }
+    
+    // 将配置缓存到内存中，后续直接使用
+    soundCache.set(effectType, cache)
+  } catch (error) {
+    console.error('预加载音效文件失败:', error)
+  }
+}
+
+// 播放码字音效
+async function playTypingSound(key) {
+  if (!typingSoundEffect.value) return
+  
+  // 防抖：限制播放频率（30ms内不重复播放）
+  const now = Date.now()
+  if (now - lastPlayTime.value < 30) {
+    return
+  }
+  lastPlayTime.value = now
+  
+  try {
+    // 预加载音效文件
+    await preloadSoundFiles(typingSoundEffect.value)
+    
+    const cache = soundCache.get(typingSoundEffect.value)
+    if (!cache) return
+    
+    let soundFile = null
+    
+    // 判断音效类型
+    const effectType = typingSoundEffect.value
+    
+    // 钢琴音效：按照键盘字母和标点符号映射
+    if (effectType === 'gangqin') {
+      // 先尝试直接映射
+      const mappedKey = keyToFileMap[key]
+      if (mappedKey && cache[mappedKey]) {
+        soundFile = cache[mappedKey]
+      } else {
+        // 如果钢琴音效中没有对应的按键，播放随机音效
+        const letterKeys = Object.keys(cache).filter(k => /^[A-Z]$/.test(k))
+        if (letterKeys.length > 0) {
+          const randomKey = letterKeys[Math.floor(Math.random() * letterKeys.length)]
+          soundFile = cache[randomKey]
+        }
+      }
+    } else {
+      // 数字命名的音效文件
+      const lowerKey = key.toLowerCase()
+      
+      // 优先检查特殊键映射（space、enter、backspace等）
+      if (cache[key]) {
+        soundFile = cache[key]
+      } else if (cache[lowerKey]) {
+        soundFile = cache[lowerKey]
+      } else if (keyToFileMap[key] && cache[keyToFileMap[key]]) {
+        soundFile = cache[keyToFileMap[key]]
+      } else if (cache[keyToFileMap[lowerKey]]) {
+        soundFile = cache[keyToFileMap[lowerKey]]
+      } else {
+        // 对于所有其他按键（包括P后、L后、M后的键和Alt等），随机选择数字音效
+        const maxNum = Object.keys(cache).filter(k => /^\d+$/.test(k)).length
+        if (maxNum > 0) {
+          const randomNum = Math.floor(Math.random() * maxNum) + 1
+          soundFile = cache[randomNum.toString()]
+        }
+      }
+    }
+    
+    // 播放音效
+    if (soundFile) {
+      const audio = new Audio(soundFile)
+      audio.volume = typingSoundVolume.value / 100
+      audio.play().catch(err => {
+        console.warn('❌ 播放音效失败:', err)
+      })
+    }
+  } catch (error) {
+    console.error('❌ 播放码字音效失败:', error)
+  }
+}
+
+// 处理编辑器键盘事件
+function handleEditorKeydown(event) {
+  // 检查编辑器是否有焦点
+  if (!editor.value || !editor.value.isFocused) {
+    return
+  }
+  
+  // 记录当前按下的按键
+  currentPressedKey.value = event.key
+  
+  // 记录 keydown 事件日志
+  addKeyboardEvent('keydown', event.key, event.code)
+  
+  // 更新活动状态（用于坐牢模式）
+  updateActivity()
+  
+  // 播放码字音效 - 只在非中文输入法状态下且按键在白名单中时播放
+  if (typingSoundEffect.value && !isComposing && isKeyAllowedToPlaySound(event.key)) {
+    playTypingSound(event.key)
+    lastKeydownPlayedSound = true // 标记已播放音频
+  } else {
+    lastKeydownPlayedSound = false // 标记未播放音频
+  }
+}
 // ==================== 坐牢模式相关 ====================
 const jailStore = useJailStore()
 const jailModeDialogVisible = ref(false)
@@ -1581,10 +2035,26 @@ const jailModeType = ref('time') // 'word' | 'time'
 const jailTarget = ref('')
 const isJailModeActive = computed(() => jailStore.isJailModeActive)
 
+// 更多设置弹窗
+const moreSettingsDialogVisible = ref(false)
+
 function openJailModeDialog() {
   jailModeDialogVisible.value = true
   jailModeType.value = 'word'
   jailTarget.value = ''
+}
+
+// 打开更多设置弹窗
+function openMoreSettings() {
+  moreSettingsDialogVisible.value = true
+}
+
+// 播放试听音频
+function handlePlayPreviewSound() {
+  if (typingSoundEffect.value) {
+    // 使用常见按键播放试听音频
+    playTypingSound('a')
+  }
 }
 
 function updateActivity() {

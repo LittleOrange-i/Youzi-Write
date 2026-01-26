@@ -28,6 +28,8 @@ export default defineConfig({
     css: {
       postcss: './postcss.config.js'
     },
+    // 添加静态资源配置，将 resources 文件夹作为公共资源
+    publicDir: resolve('resources'),
     plugins: [
       vue(),
       AutoImport({

@@ -67,6 +67,11 @@ const routes = [
     path: '/organization-design',
     name: 'OrganizationDesign',
     component: () => import('@renderer/views/OrganizationDesign.vue')
+  },
+  {
+    path: '/keyboard-monitor',
+    name: 'KeyboardMonitor',
+    component: () => import('@renderer/components/KeyboardMonitor.vue')
   }
   // 在这里添加更多路由配置
 ]

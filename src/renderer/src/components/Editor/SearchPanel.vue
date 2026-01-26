@@ -330,7 +330,27 @@ function highlightMatch(match, keepSearchFocus = true) {
   })
 
   // 滚动到匹配位置
-  props.editor.commands.scrollIntoView()
+  // props.editor.commands.scrollIntoView() // 原生方法有时不准确，改用DOM滚动
+
+  try {
+    const { view } = props.editor
+    const domAtPos = view.domAtPos(match.from)
+    if (domAtPos && domAtPos.node) {
+      let element = domAtPos.node
+      if (element.nodeType === Node.TEXT_NODE) {
+        element = element.parentElement
+      }
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    } else {
+      // 降级方案
+      props.editor.commands.scrollIntoView()
+    }
+  } catch (e) {
+    console.warn('滚动定位失败:', e)
+    props.editor.commands.scrollIntoView()
+  }
 
   // 如果需要保持搜索框焦点，则重新聚焦搜索框
   if (keepSearchFocus) {
@@ -339,6 +359,24 @@ function highlightMatch(match, keepSearchFocus = true) {
     })
   }
 }
+
+// 暴露给父组件的方法：打开替换模式
+function openReplaceMode() {
+  showReplace.value = true
+  nextTick(() => {
+    // 聚焦替换框，如果没有替换框ref则聚焦搜索框
+    // 这里我们添加一个 replaceInputRef 或者通过类名查找
+    const replaceInput = document.querySelector('.replace-input input')
+    if (replaceInput) {
+      replaceInput.focus()
+    }
+  })
+}
+
+defineExpose({
+  openReplaceMode
+})
+
 
 // 添加所有匹配项的高亮标记
 function highlightAllMatches() {
@@ -538,7 +576,7 @@ function handleKeydown(event) {
   // Cmd/Ctrl + H: 聚焦替换框
   if ((event.metaKey || event.ctrlKey) && event.key === 'h') {
     event.preventDefault()
-    // 可以在这里添加聚焦替换框的逻辑，比如添加一个ref引用
+    openReplaceMode()
   }
 }
 
