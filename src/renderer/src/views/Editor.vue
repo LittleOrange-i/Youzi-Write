@@ -68,7 +68,7 @@ onMounted(async () => {
   // 初始化主题
   await themeStore.initTheme()
   
-  // 初始化侧边栏宽度：根据坐牢模式状态设置初始宽度
+  // 初始化侧边栏宽度：根据专注模式状态设置初始宽度
   if (jailStore.isJailModeActive) {
     aiSidebarSize.value = 275
   } else {
@@ -102,7 +102,7 @@ const handleEditorReady = (editor) => {
   console.log('编辑器已就绪:', editor)
 }
 
-// 处理坐牢模式状态变化：同步更新侧边栏宽度
+// 处理专注模式状态变化：同步更新侧边栏宽度
 const handleJailModeChange = (isActive) => {
   if (isActive) {
     aiSidebarSize.value = 275

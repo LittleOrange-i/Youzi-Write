@@ -943,7 +943,7 @@ app.whenReady().then(() => {
   })
 })
 
-// 坐牢模式控制
+// 专注模式控制
 ipcMain.handle('jail-mode:enable', async (event, options) => {
   const window = BrowserWindow.fromWebContents(event.sender)
   if (window) {

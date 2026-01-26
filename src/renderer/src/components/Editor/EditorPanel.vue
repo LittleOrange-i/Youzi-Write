@@ -51,7 +51,7 @@
         段落字数校验
       </el-button>
       
-      <!-- 坐牢模式按钮：坐牢模式激活时禁用按钮 -->
+      <!-- 专注模式按钮：专注模式激活时禁用按钮 -->
       <el-button
         v-if="editorStore.file?.type === 'chapter'"
         type="danger"
@@ -61,7 +61,7 @@
         :disabled="isJailModeActive"
         @click="openJailModeDialog"
       >
-        {{ isJailModeActive ? '坐牢中...' : '坐牢模式' }}
+        {{ isJailModeActive ? '专注中...' : '专注模式' }}
       </el-button>
 
       <!-- 更多设置按钮 -->
@@ -155,7 +155,7 @@
       </template>
     </el-dialog>
 
-    <!-- 坐牢模式设置弹窗 -->
+    <!-- 专注模式设置弹窗 -->
     <el-dialog
       v-model="jailModeDialogVisible"
       title="请谨慎开启本功能"
@@ -165,13 +165,13 @@
       append-to-body
     >
       <div class="jail-mode-warning" style="margin-bottom: 20px; color: #666; line-height: 1.6;">
-        <p style="margin-bottom: 10px;">当开启坐牢模式后，码字界面将会被锁定，<span style="color: #f56c6c; font-weight: bold;">无法退出码字界面，无法打开电脑其他软件</span>。只有完成设定的字数，或达到设定的时间，才会解除锁定。</p>
+        <p style="margin-bottom: 10px;">当开启专注模式后，码字界面将会被锁定，<span style="color: #f56c6c; font-weight: bold;">无法退出码字界面，无法打开电脑其他软件</span>。只有完成设定的字数，或达到设定的时间，才会解除锁定。</p>
         <p>当设定的目标完成后，30秒内将会解锁，只有持续正常创作才会计入任务进度，非正常输入、粘贴、闲置等不被计入任务进度。</p>
       </div>
 
       <div class="jail-mode-form">
         <div class="form-item" style="margin-bottom: 20px; display: flex; align-items: center;">
-          <span class="label" style="width: 80px; font-weight: bold;">坐牢模式</span>
+          <span class="label" style="width: 80px; font-weight: bold;">专注模式</span>
           <div class="radio-group">
             <el-button 
               :type="jailModeType === 'word' ? 'primary' : 'default'" 
@@ -190,7 +190,7 @@
         </div>
 
         <div class="form-item" style="display: flex; align-items: center;">
-          <span class="label" style="width: 80px; font-weight: bold;">坐牢目标</span>
+          <span class="label" style="width: 80px; font-weight: bold;">专注目标</span>
           <el-input 
             v-model="jailTarget" 
             :placeholder="jailModeType === 'word' ? '请输入目标，范围1-20000字' : '请输入目标，范围1-360分钟'"
@@ -203,12 +203,12 @@
       <template #footer>
         <div style="text-align: right;">
           <el-button @click="jailModeDialogVisible = false">取消</el-button>
-          <el-button type="info" color="#4b4b4b" @click="startJailMode">开始坐牢</el-button>
+          <el-button type="info" color="#4b4b4b" @click="startJailMode">开始专注</el-button>
         </div>
       </template>
     </el-dialog>
 
-    <!-- 坐牢模式状态浮窗 -->
+    <!-- 专注模式状态浮窗 -->
     <!-- 浮窗已移至 App.vue 中统一管理 -->
 
     <!-- 更多设置弹窗 -->
@@ -896,7 +896,7 @@ onBeforeUnmount(async () => {
   // 移除窗口关闭监听器
   window.removeEventListener('beforeunload', handleWindowClose)
 
-  // 坐牢模式清理
+  // 专注模式清理
   // if (isJailModeActive.value) {
   //   await window.electron.disableJailMode()
   // }
@@ -2042,7 +2042,7 @@ function handleEditorKeydown(event) {
   // 记录 keydown 事件日志
   addKeyboardEvent('keydown', event.key, event.code)
   
-  // 更新活动状态（用于坐牢模式）
+  // 更新活动状态（用于专注模式）
   updateActivity()
   
   // 播放码字音效 - 只在非中文输入法状态下且按键在白名单中时播放
@@ -2053,7 +2053,7 @@ function handleEditorKeydown(event) {
     lastKeydownPlayedSound = false // 标记未播放音频
   }
 }
-// ==================== 坐牢模式相关 ====================
+// ==================== 专注模式相关 ====================
 const jailStore = useJailStore()
 const jailModeDialogVisible = ref(false)
 const jailModeType = ref('time') // 'word' | 'time'

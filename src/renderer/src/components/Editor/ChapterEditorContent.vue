@@ -121,7 +121,7 @@ function createEditor() {
           return `white-space: pre-wrap; ${fontFamilyStyle} font-size: ${props.menubarState.fontSize} !important; line-height: ${props.menubarState.lineHeight} !important;`
         }
       },
-      // 监听粘贴事件，通知坐牢模式 store
+      // 监听粘贴事件，通知专注模式 store
       handlePaste: () => {
         // 标记粘贴操作开始
         jailStore.markPasteStart()

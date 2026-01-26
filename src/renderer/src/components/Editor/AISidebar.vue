@@ -95,10 +95,10 @@
     <!-- 使用 flex-spacer 把内容推到底部 -->
     <div class="flex-spacer"></div>
 
-    <!-- 坐牢模式状态容器 (内嵌式) -->
+    <!-- 专注模式状态容器 (内嵌式) -->
     <div v-if="jailStore.isJailModeActive" class="jail-mode-embedded">
        <div class="jail-status-card">
-         <h3 class="jail-title">坐牢模式进行中 🔒</h3>
+         <h3 class="jail-title">专注模式进行中 🔒</h3>
          <div class="jail-progress">
             <template v-if="jailStore.jailModeType === 'word'">
               <div class="progress-info">
@@ -728,7 +728,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJailStore } from '@renderer/stores/jail'
 
-// 引入坐牢模式 store
+// 引入专注模式 store
 const jailStore = useJailStore()
 
 // 格式化时间显示函数
@@ -2308,7 +2308,7 @@ const exportableModels = computed(() => {
 </script>
 
 <style lang="scss" scoped>
-// 坐牢模式嵌入式样式
+// 专注模式嵌入式样式
 .jail-mode-embedded {
   width: 100%;
   padding: 16px;

@@ -100,10 +100,10 @@ export const useJailStore = defineStore('jail', () => {
       if (jailTimer) clearInterval(jailTimer)
       jailTimer = setInterval(checkJailStatus, 1000)
       
-      ElMessage.success('坐牢模式已开启，加油！')
+      ElMessage.success('专注模式已开启，加油！')
       return true
     } catch (e) {
-      ElMessage.error('开启坐牢模式失败: ' + e.message)
+      ElMessage.error('开启专注模式失败: ' + e.message)
       return false
     }
   }
@@ -113,7 +113,7 @@ export const useJailStore = defineStore('jail', () => {
     try {
       await window.electron.disableJailMode()
       isJailModeActive.value = false
-      ElMessage.success('坐牢模式已解除！')
+      ElMessage.success('专注模式已解除！')
     } catch (e) {
       ElMessage.error('解除失败: ' + e.message)
     }
@@ -136,7 +136,7 @@ export const useJailStore = defineStore('jail', () => {
         const isSuspiciousPaste = diff > 50 || (timeSinceLastUpdate < 50 && diff > 10)
         
         if (!isPasting && !isSuspiciousPaste) {
-          // 只有正常输入才计入坐牢模式进度
+          // 只有正常输入才计入专注模式进度
           jailCurrentWordCount.value += diff
         }
       }
