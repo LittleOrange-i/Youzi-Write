@@ -5,15 +5,15 @@ publish: null
 directories:
   buildResources: build
 files:
+  # - out/**/*
   - '!**/.vscode/*'
   - '!src/*'
+  - '!resources/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,pnpm-lock.yaml}'
   - '!**/.venv/**'
   - '!**/venv/**'
-asarUnpack:
-  - resources/**
 win:
   icon: build/icon.ico
   executableName: 柚子写作

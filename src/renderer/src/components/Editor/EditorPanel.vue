@@ -1897,7 +1897,8 @@ async function preloadSoundFiles(effectType) {
   
   try {
     // 构建音效文件夹路径
-    const soundDir = `/sounds/${effectType}`
+    // 修改为相对路径，适配 electron-vite 构建后的目录结构
+    const soundDir = `sounds/${effectType}`
     const cache = {}
     
     // 从配置表获取音效配置
