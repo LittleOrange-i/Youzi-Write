@@ -385,7 +385,7 @@ async function createChapter(volumeId) {
       await new Promise((resolve) => setTimeout(resolve, 100))
 
       // 重新加载章节数据并自动选中新创建的章节
-      await loadChapters(true)
+      await loadChapters(true, volumeId)
 
       // 章节树会自动展开（使用 default-expand-all="true"）
     } else {
@@ -397,7 +397,7 @@ async function createChapter(volumeId) {
 }
 
 // 加载章节数据
-async function loadChapters(autoSelectLatest = false) {
+async function loadChapters(autoSelectLatest = false, targetVolumeId = null) {
   try {
     const chapters = await window.electron.loadChapters(props.bookName)
 
@@ -431,9 +431,27 @@ async function loadChapters(autoSelectLatest = false) {
 
     // 自动选中最新卷的最新章节
     if (autoSelectLatest && chapters.length > 0) {
-      const latestVolume = chapters[chapters.length - 1]
-      if (latestVolume.children && latestVolume.children.length > 0) {
-        const latestChapter = latestVolume.children[latestVolume.children.length - 1]
+      let latestVolume = null
+
+      // 如果指定了卷ID，尝试找到该卷
+      if (targetVolumeId) {
+        latestVolume = chapters.find((v) => v.id === targetVolumeId)
+      }
+
+      // 如果没指定卷ID或没找到，则根据排序规则选择"最新"的卷
+      if (!latestVolume) {
+        // desc: index 0; asc: index length-1
+        const index = sortOrder.value === 'desc' ? 0 : chapters.length - 1
+        latestVolume = chapters[index]
+      }
+
+      if (latestVolume && latestVolume.children && latestVolume.children.length > 0) {
+        // 根据章节排序规则选择"最新"的章节
+        // desc: index 0; asc: index length-1
+        const chapterIndex =
+          chapterSortOrder.value === 'desc' ? 0 : latestVolume.children.length - 1
+        const latestChapter = latestVolume.children[chapterIndex]
+
         const fakeNode = {
           data: latestChapter,
           parent: { data: latestVolume }
