@@ -35,6 +35,16 @@
           >
             <el-icon class="text-lg"><Refresh /></el-icon>
           </button>
+
+          <!-- 更新按钮 -->
+          <button
+            v-if="hasUpdate"
+            @click="updateDialogVisible = true"
+            class="p-2.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-600"
+            title="发现新版本"
+          >
+            <img :src="updateIcon" class="w-[18px] h-[18px]" alt="更新" />
+          </button>
         </div>
         
         <!-- 主题选择器 -->
@@ -270,6 +280,14 @@
     <div class="flex-shrink-0 px-8 pb-6 pt-2">
       <WordCountChart ref="chartRef" height="240px" />
     </div>
+
+    <!-- 更新弹窗 -->
+    <UpdateDialog
+      v-model="updateDialogVisible"
+      :version-info="updateInfo"
+      :current-version="currentVersion"
+      @ignore="handleIgnoreUpdate"
+    />
   </div>
 </template>
 
@@ -278,6 +296,8 @@ import { ref, computed, onMounted, onBeforeUnmount, h } from 'vue'
 import Book from './Book.vue'
 import WordCountChart from './WordCountChart.vue'
 import ThemeSelector from './ThemeSelector.vue'
+import UpdateDialog from './UpdateDialog.vue'
+import updateIcon from '../../../../static/update.png'
 import { Plus, Refresh, Upload, Download } from '@element-plus/icons-vue'
 import { useMainStore } from '@renderer/stores'
 import { BOOK_TYPES } from '@renderer/constants/config'
@@ -287,6 +307,40 @@ import { useRouter } from 'vue-router'
 
 const mainStore = useMainStore()
 const router = useRouter()
+
+// 更新相关
+const updateDialogVisible = ref(false)
+const hasUpdate = ref(false)
+const updateInfo = ref(null)
+const currentVersion = ref('')
+
+async function checkUpdate() {
+  if (!window.electron || !window.electron.checkForUpdates) return
+  
+  try {
+    currentVersion.value = await window.electron.getAppVersion()
+    const result = await window.electron.checkForUpdates()
+    
+    if (result && result.updateAvailable) {
+      updateInfo.value = result
+      hasUpdate.value = true
+      
+      // 检查是否忽略过此版本
+      const ignoredVersion = localStorage.getItem('ignoredUpdateVersion')
+      if (ignoredVersion !== result.version) {
+        updateDialogVisible.value = true
+      }
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
+
+function handleIgnoreUpdate() {
+  if (updateInfo.value?.version) {
+    localStorage.setItem('ignoredUpdateVersion', updateInfo.value.version)
+  }
+}
 
 // 新建书籍弹窗相关
 const dialogVisible = ref(false)
@@ -880,6 +934,7 @@ async function refreshChart() {
 onMounted(() => {
   readBooksDir()
   refreshChart()
+  checkUpdate()
 })
 
 onBeforeUnmount(() => {

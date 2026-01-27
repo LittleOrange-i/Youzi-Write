@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, globalShortcut } from 'electron'
+import { setupUpdater } from './updater.js'
 import { join } from 'path'
 import path from 'path'
 import fs from 'fs'
@@ -938,6 +939,12 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // 设置自动更新
+  setupUpdater()
+
+  // 打印当前应用版本
+  console.log('当前版本:', app.getVersion())
 
   createWindow()
   

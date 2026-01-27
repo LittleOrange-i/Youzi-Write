@@ -271,6 +271,15 @@ if (process.contextIsolated) {
       // 关闭专注模式
       disableJailMode: () => ipcRenderer.invoke('jail-mode:disable'),
 
+      // --------- 自动更新相关 ---------
+      getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+      checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+      startDownloadUpdate: (downloadUrl, fileName) => ipcRenderer.send('start-download-update', downloadUrl, fileName),
+      installUpdate: (filePath) => ipcRenderer.invoke('install-update', filePath),
+      onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_, percent) => callback(percent)),
+      onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (_, filePath) => callback(filePath)),
+      onUpdateError: (callback) => ipcRenderer.on('update-error', (_, error) => callback(error)),
+
       // --------- 窗口状态相关 ---------
       // 检查窗口是否最大化
       isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
