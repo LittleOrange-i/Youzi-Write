@@ -940,7 +940,8 @@ async function loadCustomFont(fontPath, fontFamily) {
 // 暴露方法供父组件调用
 defineExpose({
   globalBoldMode,
-  globalItalicMode
+  globalItalicMode,
+  handleFormatContent
 })
 </script>
 

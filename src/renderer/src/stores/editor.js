@@ -183,7 +183,9 @@ export const useEditorStore = defineStore('editor', () => {
         globalItalicMode: editorSettings.value.globalItalicMode,
         formattingRules: editorSettings.value.formattingRules
       }
-      await window.electronStore.set('editorSettings', plainSettings)
+      // 使用 JSON.parse(JSON.stringify()) 彻底移除 Vue 的 Proxy 代理
+      // 解决 "An object could not be cloned" 错误
+      await window.electronStore.set('editorSettings', JSON.parse(JSON.stringify(plainSettings)))
     } catch (error) {
       console.error('保存编辑器设置失败:', error)
     }

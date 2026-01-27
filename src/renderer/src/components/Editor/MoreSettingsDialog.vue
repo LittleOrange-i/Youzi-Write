@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Rank } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
@@ -106,6 +106,7 @@ const editorStore = useEditorStore()
 const dialogVisible = ref(props.modelValue)
 const activeTab = ref('typingSound')
 const sortableList = ref(null)
+const sortableInstance = ref(null)
 
 // 排版规则列表
 const localRules = ref([])
@@ -122,27 +123,15 @@ const initRules = () => {
   }
 }
 
-// 监听 props 变化
-watch(() => props.modelValue, (newVal) => {
-  dialogVisible.value = newVal
-  if (newVal) {
-    // 打开弹窗时重新加载规则（确保是最新的）
-    initRules()
+// 初始化 Sortable
+const initSortable = () => {
+  if (sortableInstance.value) {
+    sortableInstance.value.destroy()
+    sortableInstance.value = null
   }
-})
 
-// 监听本地状态变化
-watch(dialogVisible, (newVal) => {
-  emit('update:modelValue', newVal)
-})
-
-// 初始化
-onMounted(() => {
-  initRules()
-  
-  // 初始化 Sortable
   if (sortableList.value) {
-    Sortable.create(sortableList.value, {
+    sortableInstance.value = Sortable.create(sortableList.value, {
       handle: '.drag-handle',
       animation: 150,
       onEnd: (evt) => {
@@ -152,6 +141,48 @@ onMounted(() => {
       }
     })
   }
+}
+
+// 监听 props 变化
+watch(() => props.modelValue, (newVal) => {
+  dialogVisible.value = newVal
+  if (newVal) {
+    // 打开弹窗时重新加载规则（确保是最新的）
+    initRules()
+    // 如果当前是排版设置标签，初始化拖拽
+    if (activeTab.value === 'formatting') {
+      nextTick(() => {
+        initSortable()
+        // 重置滚动位置
+        if (sortableList.value) {
+          sortableList.value.scrollTop = 0
+        }
+      })
+    }
+  }
+})
+
+// 监听本地状态变化
+watch(dialogVisible, (newVal) => {
+  emit('update:modelValue', newVal)
+})
+
+// 监听标签页切换
+watch(activeTab, (newVal) => {
+  if (newVal === 'formatting' && dialogVisible.value) {
+    nextTick(() => {
+      initSortable()
+      // 重置滚动位置
+      if (sortableList.value) {
+        sortableList.value.scrollTop = 0
+      }
+    })
+  }
+})
+
+// 初始化
+onMounted(() => {
+  initRules()
 })
 
 // 处理音效更新
@@ -239,8 +270,15 @@ const handleClose = () => {
 
 :deep(.el-tabs__content) {
   flex: 1;
-  overflow-y: auto; /* 内容溢出时显示滚动条 */
-  padding: 20px 0;
+  overflow-y: hidden; /* 改为 hidden，由内部组件控制滚动 */
+  padding: 0;
+  /* 隐藏滚动条 */
+  scrollbar-width: none; /* Firefox */
+
+}
+
+:deep(.el-tab-pane) {
+  height: 100%; /* 确保 tab-pane 占满高度 */
 }
 
 /* 排版设置样式 */
@@ -258,7 +296,9 @@ const handleClose = () => {
 .rules-list {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid #ebeef5;
+  /* border: 1px solid #ebeef5; */
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
   border-radius: 4px;
   padding: 5px;
 }
@@ -267,9 +307,10 @@ const handleClose = () => {
   display: flex;
   align-items: center;
   padding: 8px 10px;
-  border-bottom: 1px solid #f0f2f5;
-  background-color: #fff;
+  border-bottom: 1px solid var(--border-color-soft);
+  background-color: var(--bg-primary);
   transition: background-color 0.2s;
+  color: var(--text-base);
 }
 
 .rule-item:last-child {
@@ -277,19 +318,19 @@ const handleClose = () => {
 }
 
 .rule-item:hover {
-  background-color: #f5f7fa;
+  background-color: var(--bg-mute);
 }
 
 .drag-handle {
   cursor: move;
   margin-right: 10px;
-  color: #909399;
+  color: var(--text-gray);
   display: flex;
   align-items: center;
 }
 
 .drag-handle:hover {
-  color: #409eff;
+  color: var(--accent-color);
 }
 
 .rule-checkbox {
@@ -301,7 +342,7 @@ const handleClose = () => {
 :deep(.el-checkbox__label) {
   white-space: normal;
   line-height: 1.5;
-  color: #606266;
+  color: var(--text-base);
 }
 
 .action-buttons {

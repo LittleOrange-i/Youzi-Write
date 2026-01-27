@@ -2,6 +2,7 @@
   <div class="editor-panel">
     <!-- 菜单栏 -->
     <EditorMenubar
+      ref="editorMenubarRef"
       v-model="menubarState"
       :editor="editor"
       :book-name="bookName"
@@ -309,6 +310,7 @@ function updateCursorPosition() {
 
 // EditorStats 组件引用
 const editorStatsRef = ref(null)
+const editorMenubarRef = ref(null)
 
 const chapterTitle = computed({
   get: () => editorStore.chapterTitle,
@@ -2124,6 +2126,15 @@ function handlePlayPreviewSound() {
 
 // 处理应用格式化
 function handleApplyFormatting(options) {
+  // 如果是章节编辑器，直接调用 EditorMenubar 的一键排版功能（复用逻辑和光标处理）
+  if (editorStore.file?.type === 'chapter' && editorMenubarRef.value) {
+    // handleFormatContent 会使用 store 中的设置，而 MoreSettingsDialog 已经在 emit 前保存了设置
+    editorMenubarRef.value.handleFormatContent()
+    // 立即保存内容
+    saveContent()
+    return
+  }
+
   try {
     // 检查编辑器是否已初始化
     if (!editor.value) {
