@@ -331,8 +331,8 @@ const fontFamilyMap = {
 
 // 菜单栏状态
 const menubarState = ref({
-  fontFamily: 'SimHei',
-  fontSize: '16px',
+  fontFamily: 'KaiTi',
+  fontSize: '18px',
   lineHeight: '1.6',
   isBold: false,
   isItalic: false
@@ -685,7 +685,7 @@ async function initEditor() {
       fontFamily:
         settings.fontFamily !== undefined && settings.fontFamily !== null
           ? settings.fontFamily
-          : 'SimHei',
+          : 'KaiTi',
       fontSize:
         settings.fontSize !== undefined && settings.fontSize !== null ? settings.fontSize : '16px',
       lineHeight:

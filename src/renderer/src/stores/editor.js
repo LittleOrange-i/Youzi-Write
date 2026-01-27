@@ -151,8 +151,8 @@ export const useEditorStore = defineStore('editor', () => {
 
   // 编辑器设置相关
   const editorSettings = ref({
-    fontFamily: 'SimHei',
-    fontSize: '16px',
+    fontFamily: 'KaiTi',
+    fontSize: '18px',
     lineHeight: '1.6',
     globalBoldMode: false,
     globalItalicMode: false
