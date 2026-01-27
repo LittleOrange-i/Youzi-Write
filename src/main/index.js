@@ -2145,6 +2145,24 @@ ipcMain.handle('create-chapter', async (event, { bookName, volumeId }) => {
     console.warn('文件同步失败:', error.message)
   }
 
+  // 保存章节创建时间到元数据
+  const metaPath = join(volumePath, '.chapter_meta.json')
+  let metaData = {}
+  if (fs.existsSync(metaPath)) {
+    try {
+      metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+    } catch (error) {
+      console.error('读取章节元数据失败:', error)
+    }
+  }
+  
+  // 保存创建时间
+  metaData[chapterName] = {
+    createdAt: new Date().toISOString()
+  }
+  
+  fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8')
+
   return { success: true, chapterName, filePath }
 })
 
@@ -2172,6 +2190,17 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
 
       const files = fs.readdirSync(currentVolumePath, { withFileTypes: true })
 
+      // 读取章节元数据（创建时间）
+      const metaPath = join(currentVolumePath, '.chapter_meta.json')
+      let metaData = {}
+      if (fs.existsSync(metaPath)) {
+        try {
+          metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+        } catch (error) {
+          console.error('读取章节元数据失败:', error)
+        }
+      }
+
       const volumeChapters = files
         .filter((file) => file.isFile() && file.name.endsWith('.txt'))
         .map((file) => {
@@ -2179,6 +2208,22 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
           const parsed = parseChapterName(name)
           const chapterKey = `${bookName}/${volumeName}/${name}`
           const chapterStat = stats.chapterStats[chapterKey]
+          
+          // 获取创建时间，如果元数据中没有，则使用文件的创建时间作为后备
+          const filePath = join(currentVolumePath, file.name)
+          let createdAt = metaData[name]?.createdAt
+          if (!createdAt) {
+            try {
+              const fileStats = fs.statSync(filePath)
+              createdAt = fileStats.birthtime.toISOString()
+              // 补充元数据
+              if (!metaData[name]) {
+                metaData[name] = { createdAt }
+              }
+            } catch (error) {
+              createdAt = new Date().toISOString()
+            }
+          }
 
           return {
             id: file.name,
@@ -2187,7 +2232,8 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
             path: join(bookPath, '正文', volumeName, file.name),
             orderValue: parsed?.number || 0,
             hasOrderValue: Boolean(parsed?.number),
-            wordCount: chapterStat ? chapterStat.totalWords : 0
+            wordCount: chapterStat ? chapterStat.totalWords : 0,
+            createdAt // 添加创建时间字段
           }
         })
         .sort((a, b) => {
@@ -2198,6 +2244,15 @@ ipcMain.handle('load-chapters', async (event, bookName) => {
           if (b.hasOrderValue) return 1
           return a.name.localeCompare(b.name)
         })
+
+      // 如果有新添加的元数据，保存回文件
+      if (Object.keys(metaData).length > 0) {
+        try {
+          fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8')
+        } catch (error) {
+          console.error('保存章节元数据失败:', error)
+        }
+      }
 
       for (const chapter of volumeChapters) {
         delete chapter.orderValue
@@ -2684,6 +2739,17 @@ function checkChapterNumbering(chapters) {
 
 ipcMain.handle('set-sort-order', (event, { bookName, order }) => {
   store.set(`sortOrder:${bookName}`, order)
+  return true
+})
+
+// 获取章节时间排序
+ipcMain.handle('get-chapter-sort-order', (event, bookName) => {
+  return store.get(`chapterSortOrder:${bookName}`) || 'desc' // 默认降序
+})
+
+// 设置章节时间排序
+ipcMain.handle('set-chapter-sort-order', (event, { bookName, order }) => {
+  store.set(`chapterSortOrder:${bookName}`, order)
   return true
 })
 

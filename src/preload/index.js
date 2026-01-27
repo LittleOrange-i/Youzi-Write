@@ -49,6 +49,10 @@ if (process.contextIsolated) {
       getSortOrder: (bookName) => ipcRenderer.invoke('get-sort-order', bookName),
       // 设置书籍排序
       setSortOrder: (bookName, order) => ipcRenderer.invoke('set-sort-order', { bookName, order }),
+      // 获取章节时间排序
+      getChapterSortOrder: (bookName) => ipcRenderer.invoke('get-chapter-sort-order', bookName),
+      // 设置章节时间排序
+      setChapterSortOrder: (bookName, order) => ipcRenderer.invoke('set-chapter-sort-order', { bookName, order }),
 
       // 获取章节设置
       getChapterSettings: (bookName) => ipcRenderer.invoke('get-chapter-settings', bookName),

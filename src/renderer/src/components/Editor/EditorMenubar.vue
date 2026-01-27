@@ -199,6 +199,7 @@ import { DocumentCopy, Search, Tickets, Edit, Delete } from '@element-plus/icons
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useEditorStore } from '@renderer/stores/editor'
+import { formatText } from '@renderer/utils/textFormatter'
 
 const props = defineProps({
   editor: {
@@ -526,7 +527,9 @@ function handleFormatContent() {
     const text = props.editor.getText()
 
     // 执行排版处理
-    const formattedText = formatText(text)
+    // 使用 store 中的规则配置
+    const rules = editorStore.editorSettings.formattingRules
+    const formattedText = formatText(text, rules)
 
     // 将排版后的文本设置回编辑器
     // 章节编辑器使用纯文本格式，需要通过 HTML 转换
@@ -552,47 +555,7 @@ function handleFormatContent() {
   }
 }
 
-// 文本排版处理函数
-function formatText(text) {
-  if (!text) return ''
-
-  // 1. 按行分割
-  const lines = text.split('\n')
-
-  // 2. 处理每一行
-  const processedLines = lines.map((line) => {
-    // 清理行首行尾空格
-    return line.trim()
-  })
-
-  // 3. 合并连续空行（最多保留一个空行）
-  const mergedLines = []
-  let lastWasEmpty = false
-
-  for (const line of processedLines) {
-    if (line === '') {
-      // 如果是空行，且上一个不是空行，则添加
-      if (!lastWasEmpty) {
-        mergedLines.push('')
-        lastWasEmpty = true
-      }
-    } else {
-      mergedLines.push(line)
-      lastWasEmpty = false
-    }
-  }
-
-  // 4. 清理开头和结尾的空行
-  while (mergedLines.length > 0 && mergedLines[0] === '') {
-    mergedLines.shift()
-  }
-  while (mergedLines.length > 0 && mergedLines[mergedLines.length - 1] === '') {
-    mergedLines.pop()
-  }
-
-  // 5. 合并为文本
-  return mergedLines.join('\n')
-}
+// 文本排版处理函数已移至 utils/textFormatter.js
 
 // 将纯文本转换为 HTML（用于章节模式）
 function plainTextToHtml(text) {

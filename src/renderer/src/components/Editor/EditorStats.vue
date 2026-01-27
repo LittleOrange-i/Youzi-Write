@@ -9,7 +9,7 @@
       <span class="stat-divider">|</span>
       <span class="stat-item">空闲: {{ formatDuration(typingStats.idleDuration) }}</span>
       <span class="stat-divider">|</span>
-      <span class="stat-item">本章字数: {{ contentWordCount }}字</span>
+      <span class="stat-item">字数: {{ cursorPosition }}/{{ contentWordCount }} 字</span>
     </div>
     <div class="editor-stats-right">
       <span class="current-time">{{ currentTime }}</span>
@@ -30,13 +30,17 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  cursorPosition: {
+    type: Number,
+    default: 0
+  },
   fileType: {
     type: String,
     default: null
   }
 })
 
-const emit = defineEmits(['update-book-words'])
+const emit = defineEmits(['update-book-words', 'update-chapter-word-count'])
 
 const editorStore = useEditorStore()
 
@@ -310,6 +314,14 @@ watch(
   (newVal, oldVal) => {
     if (oldVal === undefined) return
     handleWordCountChange(newVal, oldVal)
+    
+    // 发出章节字数更新事件，用于同步更新章节树显示
+    if (editorStore.file?.type === 'chapter' && editorStore.file?.path) {
+      emit('update-chapter-word-count', {
+        path: editorStore.file.path,
+        wordCount: newVal
+      })
+    }
   }
 )
 

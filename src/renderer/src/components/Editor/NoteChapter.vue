@@ -70,8 +70,8 @@
           <el-tooltip content="创建卷" placement="bottom" :show-after="2000">
             <el-icon @click.stop="createVolume"><FolderAdd /></el-icon>
           </el-tooltip>
-          <el-tooltip content="卷排序" placement="bottom" :show-after="2000">
-            <el-icon @click.stop="sortVolumes"><Sort /></el-icon>
+          <el-tooltip content="排序设置" placement="bottom" :show-after="2000">
+            <el-icon @click.stop="openSortDialog"><Sort /></el-icon>
           </el-tooltip>
           <el-tooltip content="正文设置" placement="bottom" :show-after="2000">
             <el-icon @click.stop="openChapterSettings"><Setting /></el-icon>
@@ -141,6 +141,34 @@
       @settings-changed="handleSettingsChanged"
       @reformat-requested="handleReformatRequested"
     />
+
+    <!-- 排序设置弹框 -->
+    <el-dialog
+      v-model="sortDialogVisible"
+      title="排序设置"
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <div class="sort-settings">
+        <div class="sort-item">
+          <div class="sort-label">卷排序</div>
+          <el-radio-group v-model="sortOrder" @change="handleVolumeSortChange">
+            <el-radio label="asc">升序</el-radio>
+            <el-radio label="desc">降序</el-radio>
+          </el-radio-group>
+        </div>
+        <div class="sort-item">
+          <div class="sort-label">章节排序（按创建时间）</div>
+          <el-radio-group v-model="chapterSortOrder" @change="handleChapterSortChange">
+            <el-radio label="asc">升序（旧的在前）</el-radio>
+            <el-radio label="desc">降序（新的在前）</el-radio>
+          </el-radio-group>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="sortDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -190,6 +218,10 @@ const editingNoteName = ref('')
 
 // 排序状态
 const sortOrder = ref('asc')
+// 章节时间排序状态（'asc' 升序，'desc' 降序，默认降序）
+const chapterSortOrder = ref('desc')
+// 排序对话框显示状态
+const sortDialogVisible = ref(false)
 
 const editorStore = useEditorStore()
 
@@ -371,6 +403,18 @@ async function loadChapters(autoSelectLatest = false) {
 
     if (sortOrder.value === 'desc') {
       chapters.reverse()
+    }
+
+    // 根据章节时间排序状态对每个卷内的章节进行排序
+    for (const volume of chapters) {
+      if (volume.children && volume.children.length > 0) {
+        volume.children.sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime()
+          const timeB = new Date(b.createdAt || 0).getTime()
+          // 默认降序（新的在前）
+          return chapterSortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+        })
+      }
     }
 
     // 验证数据结构
@@ -595,11 +639,29 @@ async function deleteNode(node) {
   }
 }
 
-// 排序按钮
-async function sortVolumes() {
-  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  await window.electron.setSortOrder(props.bookName, sortOrder.value)
+// 打开排序对话框
+function openSortDialog() {
+  sortDialogVisible.value = true
+}
+
+// 处理卷排序改变
+async function handleVolumeSortChange(order) {
+  await window.electron.setSortOrder(props.bookName, order)
   chaptersTree.value = [...chaptersTree.value].reverse()
+  ElMessage.success(`卷已按${order === 'asc' ? '升序' : '降序'}排序`)
+}
+
+// 处理章节排序改变
+async function handleChapterSortChange(order) {
+  // 保存排序状态
+  await window.electron.setChapterSortOrder(props.bookName, order)
+  
+  // 重新加载章节数据
+  await loadChapters()
+  
+  // 提示消息
+  const orderText = order === 'desc' ? '降序（新的在前）' : '升序（旧的在前）'
+  ElMessage.success(`章节已按创建时间${orderText}排序`)
 }
 
 // 创建笔记本
@@ -748,6 +810,9 @@ async function deleteNoteNode(node) {
 onMounted(async () => {
   try {
     sortOrder.value = await window.electron.getSortOrder(props.bookName)
+    // 加载章节时间排序状态（默认降序）
+    const savedChapterSortOrder = await window.electron.getChapterSortOrder(props.bookName)
+    chapterSortOrder.value = savedChapterSortOrder || 'desc'
     await loadChapters(true) // 首次加载时自动选中最新章节
     notesTree.value = await window.electron.loadNotes(props.bookName)
     await loadChapterSettings()
@@ -1020,5 +1085,25 @@ async function handleSettingsChanged(newSettings) {
       display: none;
     }
   }
+}
+
+/* 排序设置对话框样式 */
+.sort-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 12px 0;
+}
+
+.sort-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sort-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-base);
 }
 </style>

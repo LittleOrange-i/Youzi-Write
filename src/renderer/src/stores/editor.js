@@ -180,7 +180,8 @@ export const useEditorStore = defineStore('editor', () => {
         fontSize: editorSettings.value.fontSize,
         lineHeight: editorSettings.value.lineHeight,
         globalBoldMode: editorSettings.value.globalBoldMode,
-        globalItalicMode: editorSettings.value.globalItalicMode
+        globalItalicMode: editorSettings.value.globalItalicMode,
+        formattingRules: editorSettings.value.formattingRules
       }
       await window.electronStore.set('editorSettings', plainSettings)
     } catch (error) {

@@ -81,7 +81,7 @@
       :editor="editor" 
       @keydown="updateActivity" 
       @mousemove="updateActivity"
-      @click="updateActivity"
+      @click="() => { updateActivity(); updateCursorPosition(); }"
     />
     <!-- 编辑器内容配置组件（隐藏，仅提供逻辑） -->
     <ChapterEditorContent
@@ -113,7 +113,9 @@
       ref="editorStatsRef"
       :book-name="bookName"
       :content-word-count="contentWordCount"
+      :cursor-position="cursorPosition"
       :file-type="editorStore.file?.type"
+      @update-chapter-word-count="(data) => emit('chapter-word-count-updated', data)"
     />
 
     <!-- 搜索面板 -->
@@ -219,6 +221,7 @@
       @update:typing-sound-effect="handleTypingSoundChange"
       @update:typing-sound-volume="handleVolumeChange"
       @play-preview="handlePlayPreviewSound"
+      @apply-formatting="handleApplyFormatting"
     />
   </div>
 
@@ -240,6 +243,7 @@ import EditorProgress from '@renderer/components/Editor/EditorProgress.vue'
 import ChapterEditorContent from '@renderer/components/Editor/ChapterEditorContent.vue'
 import NoteEditorContent from '@renderer/components/Editor/NoteEditorContent.vue'
 import MoreSettingsDialog from '@renderer/components/Editor/MoreSettingsDialog.vue'
+import { formatText } from '@renderer/utils/formatText'
 
 const editorStore = useEditorStore()
 const route = useRoute()
@@ -282,6 +286,26 @@ const editor = ref(null)
 
 // 计算属性
 const contentWordCount = computed(() => editorStore.contentWordCount)
+
+// 光标位置（从文档开头算起的字符数）
+const cursorPosition = ref(0)
+
+// 更新光标位置
+function updateCursorPosition() {
+  if (!editor.value) return
+  
+  try {
+    const { state } = editor.value
+    const { selection } = state
+    // 获取光标位置（from 表示选区开始位置）
+    const pos = selection.from
+    // 计算从文档开头到光标位置的纯文本字符数
+    const textBeforeCursor = state.doc.textBetween(0, pos, '')
+    cursorPosition.value = textBeforeCursor.length
+  } catch (error) {
+    console.error('更新光标位置失败:', error)
+  }
+}
 
 // EditorStats 组件引用
 const editorStatsRef = ref(null)
@@ -680,6 +704,16 @@ async function initEditor() {
 
   // 使用组件提供的方法创建编辑器
   editor.value = editorContentComponent.createEditor()
+
+  // 添加光标位置变化监听
+  editor.value.on('selectionUpdate', () => {
+    updateCursorPosition()
+  })
+  
+  // 添加内容更新监听
+  editor.value.on('update', () => {
+    updateCursorPosition()
+  })
 
   // 设置初始内容
   const initialContent = editorStore.content || ''
@@ -2085,6 +2119,52 @@ function handlePlayPreviewSound() {
   if (typingSoundEffect.value) {
     // 使用常见按键播放试听音频
     playTypingSound('a')
+  }
+}
+
+// 处理应用格式化
+function handleApplyFormatting(options) {
+  try {
+    // 检查编辑器是否已初始化
+    if (!editor.value) {
+      ElMessage.warning('编辑器未就绪')
+      return
+    }
+
+    // 获取当前文本内容
+    const currentText = editor.value.getText()
+    
+    if (!currentText || currentText.trim().length === 0) {
+      ElMessage.warning('编辑器内容为空')
+      return
+    }
+    
+    // 应用格式化
+    const formattedText = formatText(currentText, options)
+    
+    // 获取编辑器内容组件
+    const editorContentComponent = getEditorContentComponent()
+    const isNote = editorStore.file?.type === 'note'
+    
+    // 更新编辑器内容
+    if (editorContentComponent) {
+      if (isNote) {
+        editorContentComponent.setNoteContent(editor.value, formattedText)
+      } else {
+        editorContentComponent.setChapterContent(editor.value, formattedText)
+      }
+    } else {
+      // 降级方案：直接设置内容
+      editor.value.commands.setContent(formattedText)
+    }
+    
+    // 保存更改
+    saveContent()
+    
+    // ElMessage.success('文本格式化完成')
+  } catch (error) {
+    console.error('格式化失败:', error)
+    ElMessage.error('格式化失败，请重试')
   }
 }
 
