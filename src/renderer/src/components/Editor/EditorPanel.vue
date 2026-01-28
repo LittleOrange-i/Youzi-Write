@@ -84,7 +84,69 @@
       @keydown="updateActivity" 
       @mousemove="updateActivity"
       @click="() => { updateActivity(); updateCursorPosition(); }"
+      @contextmenu.prevent="showContextMenu"
     />
+
+    <!-- 右键菜单 -->
+    <Teleport to="body">
+      <!-- 使用 Teleport 将菜单渲染到 body 下，避免层级问题 -->
+      <div
+        v-if="menuVisible"
+        ref="contextMenuRef" 
+        class="fixed z-[9999] min-w-[160px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl py-2 animate-in fade-in zoom-in duration-200"
+        :style="{ left: menuX + 'px', top: menuY + 'px' }"
+        @click.stop
+      >
+        <!-- 右键菜单容器，使用 ref 获取高度进行位置调整 -->
+        <!-- 一键排版菜单项 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+          @click="handleQuickFormat"
+        >
+          <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><MagicStick /></el-icon>
+          <span class="text-sm font-medium">一键排版</span>
+        </div>
+        
+        <!-- 复制全文菜单项 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+          @click="handleCopyFullText"
+        >
+          <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><CopyDocument /></el-icon>
+          <span class="text-sm font-medium">复制全文</span>
+        </div>
+
+        <!-- 切分章节菜单项 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+          @click="handleSplitChapter"
+        >
+          <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Scissor /></el-icon>
+          <span class="text-sm font-medium">切分章节</span>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
+
+        <!-- 全选菜单项 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+          @click="handleSelectAll"
+        >
+          <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Select /></el-icon>
+          <span class="text-sm font-medium">全选</span>
+        </div>
+
+        <!-- 查找和替换菜单项 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+          @click="handleOpenReplace"
+        >
+          <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Search /></el-icon>
+          <span class="text-sm font-medium">查找和替换</span>
+        </div>
+      </div>
+    </Teleport>
     <!-- 编辑器内容配置组件（隐藏，仅提供逻辑） -->
     <ChapterEditorContent
       ref="chapterEditorContentRef"
@@ -233,19 +295,40 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
-import { EditorContent } from '@tiptap/vue-3'
-import { TextSelection } from 'prosemirror-state'
-import { useEditorStore } from '@renderer/stores/editor'
-import { useJailStore } from '@renderer/stores/jail'
-import SearchPanel from '@renderer/components/Editor/SearchPanel.vue'
-import EditorMenubar from '@renderer/components/Editor/EditorMenubar.vue'
-import EditorStats from '@renderer/components/Editor/EditorStats.vue'
-import EditorProgress from '@renderer/components/Editor/EditorProgress.vue'
-import ChapterEditorContent from '@renderer/components/Editor/ChapterEditorContent.vue'
-import NoteEditorContent from '@renderer/components/Editor/NoteEditorContent.vue'
-import MoreSettingsDialog from '@renderer/components/Editor/MoreSettingsDialog.vue'
-import { formatText } from '@renderer/utils/formatText'
+import { Check, MagicStick, CopyDocument, Scissor, Select, Search } from '@element-plus/icons-vue' // 导入 Element Plus 图标
+import { EditorContent } from '@tiptap/vue-3' // 导入 Tiptap 编辑器内容组件
+import { TextSelection } from 'prosemirror-state' // 导入 Prosemirror 选区状态
+import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 Store
+import { useJailStore } from '@renderer/stores/jail' // 导入专注模式 Store
+import SearchPanel from '@renderer/components/Editor/SearchPanel.vue' // 导入搜索面板组件
+import EditorMenubar from '@renderer/components/Editor/EditorMenubar.vue' // 导入编辑器菜单栏组件
+import EditorStats from '@renderer/components/Editor/EditorStats.vue' // 导入编辑器统计组件
+import EditorProgress from '@renderer/components/Editor/EditorProgress.vue' // 导入编辑器进度组件
+import ChapterEditorContent from '@renderer/components/Editor/ChapterEditorContent.vue' // 导入章节编辑器内容组件
+import NoteEditorContent from '@renderer/components/Editor/NoteEditorContent.vue' // 导入笔记编辑器内容组件
+import MoreSettingsDialog from '@renderer/components/Editor/MoreSettingsDialog.vue' // 导入更多设置弹窗组件
+import { formatText } from '@renderer/utils/formatText' // 导入文本格式化工具函数
+
+// 全局菜单管理器 - 模块级单例，所有组件实例共享
+let currentCloseHandler = null // 存储当前显示的菜单的关闭函数
+
+const globalMenuManager = {
+  // 设置新的菜单关闭处理器
+  setCloseHandler(handler) {
+    // 如果已有处理器且不是当前处理器，则先执行旧处理器的关闭逻辑
+    if (currentCloseHandler && currentCloseHandler !== handler) {
+      currentCloseHandler()
+    }
+    currentCloseHandler = handler // 更新当前处理器
+  },
+  // 清除指定的菜单关闭处理器
+  clearCloseHandler(handler) {
+    // 只清除匹配的处理器，避免误删
+    if (currentCloseHandler === handler) {
+      currentCloseHandler = null
+    }
+  }
+}
 
 const editorStore = useEditorStore()
 const route = useRoute()
@@ -273,6 +356,227 @@ const defaultHighlightColor = '#e198b8'
 
 // 编辑器实例
 const editor = ref(null)
+
+// 右键菜单状态
+const menuVisible = ref(false) // 控制右键菜单是否显示
+const menuX = ref(0) // 右键菜单的 X 轴坐标
+const menuY = ref(0) // 右键菜单的 Y 轴坐标
+const contextMenuRef = ref(null) // 右键菜单的 DOM 引用
+
+// 显示右键菜单
+function showContextMenu(e) {
+  e.preventDefault() // 阻止系统默认右键菜单
+  e.stopPropagation() // 阻止事件冒泡
+
+  // 通知全局管理器关闭其他菜单
+  globalMenuManager.setCloseHandler(hideContextMenu) // 设置当前关闭处理器
+
+  // 初始位置设为鼠标点击位置
+  const x = e.clientX // 获取鼠标点击的 X 坐标
+  const y = e.clientY // 获取鼠标点击的 Y 坐标
+  
+  menuX.value = x // 设置菜单初始 X 坐标
+  menuY.value = y // 设置菜单初始 Y 坐标
+  menuVisible.value = true // 显示菜单
+
+  // 在下个 tick 调整位置，确保菜单已渲染并能获取其尺寸
+  nextTick(() => {
+    if (contextMenuRef.value) { // 检查菜单 DOM 是否存在
+      const menuHeight = contextMenuRef.value.offsetHeight // 获取菜单实际高度
+      const menuWidth = contextMenuRef.value.offsetWidth // 获取菜单实际宽度
+      
+      // 获取编辑器容器的边界，确保菜单不超出编辑器区域
+      const editorPanel = document.querySelector('.editor-panel') // 获取编辑器面板元素
+      const rect = editorPanel ? editorPanel.getBoundingClientRect() : { bottom: window.innerHeight, right: window.innerWidth } // 获取面板边界或视口边界
+      
+      // 检查下方空间是否足够，如果不足则向上弹出
+      if (y + menuHeight > rect.bottom) { // 如果菜单底部超出边界
+        menuY.value = y - menuHeight // 将菜单向上移动一个菜单高度的位置
+      }
+      
+      // 检查右侧空间是否足够，如果不足则向左弹出
+      if (x + menuWidth > rect.right) { // 如果菜单右侧超出边界
+        menuX.value = x - menuWidth // 将菜单向左移动一个菜单宽度的位置
+      }
+    }
+
+    document.addEventListener('click', hideContextMenu) // 点击其他地方关闭菜单
+    document.addEventListener('contextmenu', hideContextMenu) // 右键其他地方关闭菜单
+  })
+}
+
+// 隐藏右键菜单
+function hideContextMenu() {
+  menuVisible.value = false // 隐藏菜单
+  document.removeEventListener('click', hideContextMenu) // 移除点击监听
+  document.removeEventListener('contextmenu', hideContextMenu) // 移除右键监听
+  globalMenuManager.clearCloseHandler(hideContextMenu) // 清除全局关闭处理器
+}
+
+// 复制全文
+async function handleCopyFullText() {
+  if (!editor.value) return // 如果编辑器不存在则返回
+  try {
+    const text = editor.value.getText() // 获取编辑器纯文本内容
+    await navigator.clipboard.writeText(text) // 写入剪贴板
+    ElMessage.success('已复制全文到剪贴板') // 提示成功
+  } catch (error) {
+    console.error('复制失败:', error) // 记录错误日志
+    ElMessage.error('复制失败') // 提示失败
+  }
+  hideContextMenu() // 关闭右键菜单
+}
+
+// 全选功能处理函数
+function handleSelectAll() {
+  // 如果编辑器实例不存在，则直接返回
+  if (!editor.value) return 
+  // 使用链式调用：先聚焦编辑器，再执行全选命令，最后运行
+  editor.value.chain().focus().selectAll().run() 
+  // 执行完毕后隐藏右键菜单
+  hideContextMenu() 
+}
+
+// 查找和替换
+function handleOpenReplace() {
+  hideContextMenu() // 关闭右键菜单
+  if (!searchPanelVisible.value) { // 如果搜索面板未显示
+    searchPanelVisible.value = true // 显示搜索面板
+  }
+  nextTick(() => {
+    searchPanelRef.value?.openReplaceMode() // 切换到替换模式
+  })
+}
+
+// 一键排版
+function handleQuickFormat() {
+  hideContextMenu() // 关闭右键菜单
+  handleApplyFormatting() // 调用现有的排版功能
+}
+
+// 切分章节
+async function handleSplitChapter() {
+  hideContextMenu() // 隐藏右键菜单
+  
+  if (editorStore.file?.type !== 'chapter') { // 只有章节可以进行切分
+    ElMessage({ // 提示只能切分章节
+      message: '只有章节可以进行切分', // 消息内容
+      type: 'warning', // 警告类型
+      customClass: 'is-center-screen' // 居中显示
+    })
+    return
+  }
+
+  if (!editor.value) return // 检查编辑器是否存在
+
+  try {
+    // 1. 获取当前章节和卷信息
+    const currentFile = editorStore.file // 获取当前编辑的文件信息
+    const bookName = props.bookName // 获取当前书籍名称
+    const volumeName = currentFile.volume // 获取当前所属卷名
+
+    // 2. 获取所有章节，检查当前章节后面是否还有章节
+    const chaptersData = await window.electron.loadChapters(bookName) // 加载所有章节数据
+    const currentVolume = chaptersData.find(v => v.name === volumeName) // 查找当前卷
+    
+    if (!currentVolume) {
+      ElMessage.error('未找到当前卷信息') // 卷信息不存在时报错
+      return
+    }
+
+    // 找到当前章节在卷中的位置
+    const currentIndex = currentVolume.children.findIndex(c => c.name === currentFile.name) // 查找当前章节索引
+    
+    if (currentIndex === -1) {
+      ElMessage.error('未找到当前章节信息') // 章节信息不存在时报错
+      return
+    }
+
+    // 检查是否是最后一个章节
+    if (currentIndex < currentVolume.children.length - 1) { // 如果索引不是最后一个
+      ElMessage({ // 提示不可切分
+        message: '后面有章节不可进行切分', // 消息内容
+        type: 'warning', // 警告类型
+        customClass: 'is-center-screen' // 居中显示
+      })
+      return
+    }
+
+    // 3. 执行切分逻辑
+    const { state } = editor.value // 获取编辑器状态
+    const { selection } = state // 获取选区
+    const pos = selection.from // 获取光标当前位置
+
+    // 获取切分前后的内容
+    const docSize = editor.value.state.doc.content.size // 获取文档总长度
+    
+    // 如果光标在最前面或最后面，不进行切分
+    if (pos <= 1 || pos >= docSize - 1) { // 检查位置是否合法
+      ElMessage({ // 提示无法切分
+        message: '当前位置无法切分', // 消息内容
+        type: 'warning', // 警告类型
+        customClass: 'is-center-screen' // 居中显示
+      })
+      return
+    }
+
+    // 弹出确认框
+    const confirm = await ElMessageBox.confirm(
+      '确定要从当前位置切分章节吗？切分后将自动创建新章节。', // 提示语
+      '切分章节', // 标题
+      {
+        confirmButtonText: '确定', // 确定按钮
+        cancelButtonText: '取消', // 取消按钮
+        type: 'warning' // 警告类型
+      }
+    ).catch(() => false) // 捕获取消行为
+
+    if (!confirm) return // 用户取消则退出
+
+    // 获取前后两部分的纯文本内容（章节模式主要存储纯文本）
+    const textBefore = editor.value.state.doc.textBetween(0, pos, '\n') // 获取前半部分文本
+    const textAfter = editor.value.state.doc.textBetween(pos, docSize, '\n') // 获取后半部分文本
+    
+    // 4. 更新当前章节内容
+    // 先更新编辑器内容，确保 saveFile 读取到的是截断后的内容
+    chapterEditorContentRef.value.setChapterContent(editor.value, textBefore) // 更新编辑器内的内容为前半部分
+    editorStore.setContent(textBefore) // 同时更新 store 内容
+    
+    const saveResult = await saveFile(false) // 自动保存当前文件到磁盘
+    if (!saveResult) {
+      ElMessage.error('保存当前章节失败，无法切分') // 保存失败时报错并返回
+      return
+    }
+
+    // 5. 创建新章节
+    const volumeId = currentVolume.id // 获取卷 ID
+    const createResult = await window.electron.createChapter(bookName, volumeId) // 调用后端接口创建新章节
+    
+    if (createResult.success) { // 如果新章节创建成功
+      // 6. 将后半部分保存到新章节
+      const newChapterName = createResult.chapterName // 获取新生成的章节名
+      const saveNewResult = await window.electron.saveChapter({ // 将后半部分内容保存到新章节
+        bookName,
+        volumeName,
+        chapterName: newChapterName,
+        content: textAfter
+      })
+
+      if (saveNewResult.success) { // 如果新章节内容保存成功
+        ElMessage.success('切分章节成功') // 提示切分成功
+        emit('refresh-chapters') // 触发父组件刷新章节列表
+      } else {
+        ElMessage.error('保存新章节失败') // 新章节保存失败报错
+      }
+    } else {
+      ElMessage.error('创建新章节失败') // 创建新章节接口调用失败报错
+    }
+
+  } catch (error) {
+    console.error('切分章节失败:', error) // 打印错误详情
+    ElMessage.error('切分章节失败') // 提示切分失败
+  }
+}
 
   watch(
     () => props.bookName,
@@ -1071,7 +1375,7 @@ async function saveFile(showMessage = false) {
         emit('refresh-chapters')
       }
     }
-    if (showMessage) ElMessage.success('保存成功')
+    // if (showMessage) ElMessage.success('保存成功')
     return true
   } else {
     if (showMessage) ElMessage.error(result?.message || '保存失败')

@@ -546,3 +546,15 @@
 .el-tree__empty-text {
   color: var(--text-gray) !important;
 }
+
+/* 居中显示的消息提示 */
+.el-message.is-center-screen {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 50% !important;
+  margin: 0 auto !important;
+  width: max-content !important;
+  transform: translateY(-50%) !important;
+  transition: none !important;
+}
