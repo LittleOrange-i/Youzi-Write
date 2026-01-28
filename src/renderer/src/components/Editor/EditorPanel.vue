@@ -4,7 +4,7 @@
     <EditorMenubar
       ref="editorMenubarRef"
       v-model="menubarState"
-      :editor="editor"
+      :editor="lastFocusedEditor || editor"
       :book-name="bookName"
       @toggle-search="toggleSearchPanel"
       @toggle-fullscreen="toggleFullscreen"
@@ -77,15 +77,30 @@
         更多
       </el-button>
     </div>
-    <!-- 正文内容编辑区 -->
-    <EditorContent 
-      class="editor-content" 
-      :editor="editor" 
-      @keydown="updateActivity" 
-      @mousemove="updateActivity"
-      @click="() => { updateActivity(); updateCursorPosition(); }"
-      @contextmenu.prevent="showContextMenu"
-    />
+    <!-- 正文内容编辑区容器，支持视图切分布局 -->
+    <div class="editor-main-area" :class="[`split-${splitMode}`]">
+      <!-- 第一个编辑器视图 -->
+      <EditorContent 
+        class="editor-content first-editor" 
+        :editor="editor" 
+        @keydown="updateActivity" 
+        @mousemove="updateActivity"
+        @click="() => { lastFocusedEditor = editor; updateActivity(); updateCursorPosition(); }"
+        @contextmenu.prevent="showContextMenu"
+      />
+      <!-- 切分模式下的分割线 -->
+      <div v-if="splitMode !== 'none'" class="split-divider"></div>
+      <!-- 第二个编辑器视图，仅在切分模式下显示 -->
+      <EditorContent 
+        v-if="splitMode !== 'none'"
+        class="editor-content second-editor" 
+        :editor="editor2" 
+        @keydown="updateActivity" 
+        @mousemove="updateActivity"
+        @click="() => { lastFocusedEditor = editor2; updateActivity(); updateCursorPosition(); }"
+        @contextmenu.prevent="showContextMenu"
+      />
+    </div>
 
     <!-- 右键菜单 -->
     <Teleport to="body">
@@ -124,6 +139,36 @@
           <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Scissor /></el-icon>
           <span class="text-sm font-medium">切分章节</span>
         </div>
+
+        <!-- 水平切分菜单项 -->
+         <div 
+           v-if="splitMode === 'none' || splitMode === 'vertical'"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+           @click="handleHorizontalSplit"
+         > <!-- 菜单项容器，当处于无切分或垂直切分时显示 -->
+           <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Bottom /></el-icon> <!-- 使用向下图标表示水平切分 -->
+           <span class="text-sm font-medium">水平切分</span> <!-- 菜单文字 -->
+         </div> <!-- 结束水平切分菜单 -->
+ 
+         <!-- 垂直切分菜单项 -->
+         <div 
+           v-if="splitMode === 'none' || splitMode === 'horizontal'"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+           @click="handleVerticalSplit"
+         > <!-- 菜单项容器，当处于无切分或水平切分时显示 -->
+           <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Right /></el-icon> <!-- 使用向右图标表示垂直切分 -->
+           <span class="text-sm font-medium">垂直切分</span> <!-- 菜单文字 -->
+         </div> <!-- 结束垂直切分菜单 -->
+ 
+         <!-- 取消切分菜单项 -->
+         <div 
+           v-if="splitMode !== 'none'"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
+           @click="handleCancelSplit"
+         > <!-- 菜单项容器，仅在处于切分状态时显示 -->
+           <el-icon class="text-base text-red-500 group-hover:scale-110 transition-transform"><Close /></el-icon> <!-- 使用关闭图标 -->
+           <span class="text-sm font-medium text-red-500">取消切分</span> <!-- 红色警告文字 -->
+         </div> <!-- 结束取消切分菜单 -->
 
         <!-- 分隔线 -->
         <div class="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div>
@@ -338,7 +383,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, MagicStick, CopyDocument, Scissor, Select, Search, CaretTop, CaretBottom } from '@element-plus/icons-vue' // 导入 Element Plus 图标，增加置顶和置底图标
+import { Check, MagicStick, CopyDocument, Scissor, Select, Search, CaretTop, CaretBottom, Bottom, Right, Close } from '@element-plus/icons-vue' // 导入 Element Plus 图标，增加置顶、置底、切分视图图标
 import { EditorContent } from '@tiptap/vue-3' // 导入 Tiptap 编辑器内容组件
 import { TextSelection } from 'prosemirror-state' // 导入 Prosemirror 选区状态
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 Store
@@ -399,12 +444,130 @@ const defaultHighlightColor = '#e198b8'
 
 // 编辑器实例
 const editor = ref(null)
+const lastFocusedEditor = ref(null) // 记录最后获得焦点的编辑器实例
+
+// 监听最后聚焦的编辑器变化，同步给父组件，确保 AI 插入等功能指向正确的视图
+watch(lastFocusedEditor, (newEditor) => {
+  if (newEditor) {
+    emit('editor-ready', newEditor) // 触发 editor-ready 事件，通知父组件更新当前活跃的编辑器实例
+  }
+})
 
 // 右键菜单状态
 const menuVisible = ref(false) // 控制右键菜单是否显示
 const menuX = ref(0) // 右键菜单的 X 轴坐标
 const menuY = ref(0) // 右键菜单的 Y 轴坐标
 const contextMenuRef = ref(null) // 右键菜单的 DOM 引用
+
+// 视图切分状态
+const splitMode = ref('none') // 视图切分模式：none (无), horizontal (水平), vertical (垂直)
+const editor2 = ref(null) // 第二个编辑器实例，用于分屏显示
+
+// 初始化第二个编辑器
+async function initEditor2() {
+  if (editor2.value) { // 如果已经存在第二个编辑器
+    editor2.value.destroy() // 销毁旧实例
+    editor2.value = null // 清空引用
+  }
+
+  const editorContentComponent = getEditorContentComponent() // 获取当前编辑器类型组件
+  if (!editorContentComponent) return // 如果组件不存在则返回
+
+  editor2.value = editorContentComponent.createEditor() // 创建新的编辑器实例
+
+  // 添加焦点监听
+  editor2.value.on('focus', () => {
+    lastFocusedEditor.value = editor2.value
+  })
+
+  // 设置初始内容，保持与主编辑器同步
+  const currentContent = editor.value ? getEditorContentComponent().getSaveContent(editor.value) : (editorStore.content || '') // 获取主编辑器内容
+  const isNote = editorStore.file?.type === 'note' // 判断是否为笔记
+  if (isNote) { // 笔记模式
+    noteEditorContentRef.value.setNoteContent(editor2.value, currentContent) // 设置笔记内容
+  } else { // 章节模式
+    chapterEditorContentRef.value.setChapterContent(editor2.value, currentContent) // 设置章节内容
+  }
+
+  // 使用标记位防止同步循环
+  let isSyncing = false
+
+  // 监听主编辑器更新，同步到第二个编辑器
+  editor.value?.on('update', ({ editor: e1, transaction }) => {
+    if (isSyncing || !editor2.value || !transaction.docChanged) return // 如果正在同步或文档未改变则返回
+    
+    isSyncing = true // 开启同步标记
+    const content = getEditorContentComponent().getSaveContent(e1) // 获取主编辑器最新内容
+    if (isNote) { // 笔记模式
+      noteEditorContentRef.value.setNoteContent(editor2.value, content) // 同步到第二个编辑器
+    } else { // 章节模式
+      chapterEditorContentRef.value.setChapterContent(editor2.value, content) // 同步到第二个编辑器
+    }
+    
+    // 同步完成后应用高亮
+    nextTick(() => {
+      if (characterHighlightEnabled.value) applyCharacterHighlights()
+      if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+      isSyncing = false // 关闭同步标记
+    })
+  })
+
+  // 监听第二个编辑器更新，同步到主编辑器
+  editor2.value.on('update', ({ editor: e2, transaction }) => { // 绑定更新事件
+    if (isSyncing || !editor.value || !transaction.docChanged) return // 如果正在同步或文档未改变则返回
+    
+    isSyncing = true // 开启同步标记
+    const content = getEditorContentComponent().getSaveContent(e2) // 获取第二个编辑器最新内容
+    if (isNote) { // 笔记模式
+      noteEditorContentRef.value.setNoteContent(editor.value, content) // 同步到主编辑器
+    } else { // 章节模式
+      chapterEditorContentRef.value.setChapterContent(editor.value, content) // 同步到主编辑器
+    } // 结束判断
+
+    // 同步完成后应用高亮
+    nextTick(() => {
+      if (characterHighlightEnabled.value) applyCharacterHighlights()
+      if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+      isSyncing = false // 关闭同步标记
+    })
+  }) // 结束监听
+
+  // 为第二个编辑器绑定基本事件
+  editor2.value.on('selectionUpdate', () => { // 绑定选区更新事件
+    updateCursorPosition() // 更新光标位置统计
+  }) // 结束监听
+
+  await nextTick() // 等待 DOM 更新
+  updateEditorStyle() // 应用编辑器样式（字体、字号等）
+  
+  // 初始应用高亮
+  if (characterHighlightEnabled.value) applyCharacterHighlights()
+  if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+}
+
+// 处理水平切分
+async function handleHorizontalSplit() { // 定义异步函数
+  splitMode.value = 'horizontal' // 设置切分模式为水平
+  hideContextMenu() // 隐藏右键菜单
+  await initEditor2() // 等待初始化第二个编辑器完成
+} // 结束函数
+
+// 处理垂直切分
+async function handleVerticalSplit() { // 定义异步函数
+  splitMode.value = 'vertical' // 设置切分模式为垂直
+  hideContextMenu() // 隐藏右键菜单
+  await initEditor2() // 等待初始化第二个编辑器完成
+} // 结束函数
+
+// 处理取消切分
+function handleCancelSplit() { // 定义函数
+  splitMode.value = 'none' // 设置切分模式为无
+  if (editor2.value) { // 如果第二个编辑器实例存在
+    editor2.value.destroy() // 销毁该实例
+    editor2.value = null // 清空引用
+  } // 结束判断
+  hideContextMenu() // 隐藏右键菜单
+} // 结束函数
 
 // 显示右键菜单
 function showContextMenu(e) {
@@ -472,10 +635,11 @@ async function handleCopyFullText() {
 
 // 全选功能处理函数
 function handleSelectAll() {
+  const targetEditor = lastFocusedEditor.value || editor.value // 获取目标编辑器
   // 如果编辑器实例不存在，则直接返回
-  if (!editor.value) return 
+  if (!targetEditor) return 
   // 使用链式调用：先聚焦编辑器，再执行全选命令，最后运行
-  editor.value.chain().focus().selectAll().run() 
+  targetEditor.chain().focus().selectAll().run() 
   // 执行完毕后隐藏右键菜单
   hideContextMenu() 
 }
@@ -494,22 +658,30 @@ function handleOpenReplace() {
 // 前往顶部功能处理函数
 function handleGoToTop() {
   hideContextMenu() // 执行完毕后隐藏右键菜单
-  if (!editor.value) return // 如果编辑器实例不存在，则直接返回
-  editor.value.commands.focus('start') // 使用 Tiptap 命令将光标聚焦到文档起始位置
-  const editorContent = document.querySelector('.editor-content') // 获取编辑器的滚动容器 DOM 元素
-  if (editorContent) { // 如果找到了滚动容器
-    editorContent.scrollTo({ top: 0, behavior: 'smooth' }) // 平滑滚动到容器的最顶部
+  const targetEditor = lastFocusedEditor.value || editor.value // 获取目标编辑器
+  if (!targetEditor) return // 如果编辑器实例不存在，则直接返回
+  targetEditor.commands.focus('start') // 使用 Tiptap 命令将光标聚焦到文档起始位置
+  
+  // 查找对应的滚动容器
+  const editorElement = targetEditor.view.dom
+  const scrollContainer = editorElement.closest('.editor-content')
+  if (scrollContainer) {
+    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
 
 // 前往底部功能处理函数
 function handleGoToBottom() {
   hideContextMenu() // 执行完毕后隐藏右键菜单
-  if (!editor.value) return // 如果编辑器实例不存在，则直接返回
-  editor.value.commands.focus('end') // 使用 Tiptap 命令将光标聚焦到文档末尾位置
-  const editorContent = document.querySelector('.editor-content') // 获取编辑器的滚动容器 DOM 元素
-  if (editorContent) { // 如果找到了滚动容器
-    editorContent.scrollTo({ top: editorContent.scrollHeight, behavior: 'smooth' }) // 平滑滚动到容器的最底部
+  const targetEditor = lastFocusedEditor.value || editor.value // 获取目标编辑器
+  if (!targetEditor) return // 如果编辑器实例不存在，则直接返回
+  targetEditor.commands.focus('end') // 使用 Tiptap 命令将光标聚焦到文档末尾位置
+  
+  // 查找对应的滚动容器
+  const editorElement = targetEditor.view.dom
+  const scrollContainer = editorElement.closest('.editor-content')
+  if (scrollContainer) {
+    scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' })
   }
 }
 
@@ -568,12 +740,15 @@ async function handleSplitChapter() {
     }
 
     // 3. 执行切分逻辑
-    const { state } = editor.value // 获取编辑器状态
+    const targetEditor = lastFocusedEditor.value || editor.value // 获取目标编辑器
+    if (!targetEditor) return // 检查编辑器是否存在
+
+    const { state } = targetEditor // 获取编辑器状态
     const { selection } = state // 获取选区
     const pos = selection.from // 获取光标当前位置
 
     // 获取切分前后的内容
-    const docSize = editor.value.state.doc.content.size // 获取文档总长度
+    const docSize = targetEditor.state.doc.content.size // 获取文档总长度
     
     // 如果光标在最前面或最后面，不进行切分
     if (pos <= 1 || pos >= docSize - 1) { // 检查位置是否合法
@@ -599,12 +774,12 @@ async function handleSplitChapter() {
     if (!confirm) return // 用户取消则退出
 
     // 获取前后两部分的纯文本内容（章节模式主要存储纯文本）
-    const textBefore = editor.value.state.doc.textBetween(0, pos, '\n') // 获取前半部分文本
-    const textAfter = editor.value.state.doc.textBetween(pos, docSize, '\n') // 获取后半部分文本
+    const textBefore = targetEditor.state.doc.textBetween(0, pos, '\n') // 获取前半部分文本
+    const textAfter = targetEditor.state.doc.textBetween(pos, docSize, '\n') // 获取后半部分文本
     
     // 4. 更新当前章节内容
     // 先更新编辑器内容，确保 saveFile 读取到的是截断后的内容
-    chapterEditorContentRef.value.setChapterContent(editor.value, textBefore) // 更新编辑器内的内容为前半部分
+    chapterEditorContentRef.value.setChapterContent(targetEditor, textBefore) // 更新编辑器内的内容为前半部分
     editorStore.setContent(textBefore) // 同时更新 store 内容
     
     const saveResult = await saveFile(false) // 自动保存当前文件到磁盘
@@ -667,10 +842,11 @@ const cursorPosition = ref(0)
 
 // 更新光标位置
 function updateCursorPosition() {
-  if (!editor.value) return
+  const targetEditor = lastFocusedEditor.value || editor.value // 获取目标编辑器
+  if (!targetEditor) return
   
   try {
-    const { state } = editor.value
+    const { state } = targetEditor
     const { selection } = state
     // 获取光标位置（from 表示选区开始位置）
     const pos = selection.from
@@ -778,21 +954,19 @@ function getFontFamily(fontKey) {
 
 // 更新编辑器样式
 function updateEditorStyle() {
-  if (!editor.value) return
-
-  // TipTap的DOM结构：editor.view.dom 就是 .tiptap 元素
-  const editorElement = editor.value.view.dom
-  if (editorElement) {
-    // 使用setProperty with 'important' 确保样式优先级最高
-    // 获取完整的字体族配置（包含回退字体）
-    const fullFontFamily = getFontFamily(menubarState.value.fontFamily)
-    editorElement.style.setProperty('font-family', fullFontFamily, 'important')
-    editorElement.style.setProperty('font-size', menubarState.value.fontSize, 'important')
-    editorElement.style.setProperty('line-height', menubarState.value.lineHeight, 'important')
-    // 根据文件类型设置首行缩进（章节：2em；笔记：0）
-    const isChapter = editorStore.file?.type === 'chapter'
-    editorElement.style.setProperty('text-indent', isChapter ? '2em' : '0', 'important')
-  }
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
+  editors.forEach((ed) => { // 遍历每个编辑器应用样式
+    const editorElement = ed.view.dom // 获取编辑器的 DOM 元素
+    if (editorElement) { // 如果元素存在
+      // 使用 setProperty 并设置 important 优先级，确保样式生效
+      const fullFontFamily = getFontFamily(menubarState.value.fontFamily) // 获取完整的字体配置
+      editorElement.style.setProperty('font-family', fullFontFamily, 'important') // 设置字体
+      editorElement.style.setProperty('font-size', menubarState.value.fontSize, 'important') // 设置字号
+      editorElement.style.setProperty('line-height', menubarState.value.lineHeight, 'important') // 设置行高
+      const isChapter = editorStore.file?.type === 'chapter' // 判断是否为章节
+      editorElement.style.setProperty('text-indent', isChapter ? '2em' : '0', 'important') // 设置首行缩进
+    }
+  })
 }
 
 // 处理样式更新
@@ -897,6 +1071,15 @@ watch(
         noteEditorContentRef.value.setNoteContent(editor.value, newContent)
       } else {
         chapterEditorContentRef.value.setChapterContent(editor.value, newContent)
+      }
+
+      // 如果开启了分屏，同步更新第二个编辑器的内容
+      if (editor2.value) {
+        if (isNote) {
+          noteEditorContentRef.value.setNoteContent(editor2.value, newContent)
+        } else {
+          chapterEditorContentRef.value.setChapterContent(editor2.value, newContent)
+        }
       }
 
       // 书籍总字数由 EditorStats 组件通过 watch fileType 自动加载
@@ -1089,6 +1272,12 @@ async function initEditor() {
 
   // 使用组件提供的方法创建编辑器
   editor.value = editorContentComponent.createEditor()
+  lastFocusedEditor.value = editor.value // 默认设置为主编辑器
+
+  // 添加焦点监听
+  editor.value.on('focus', () => {
+    lastFocusedEditor.value = editor.value
+  })
 
   // 添加光标位置变化监听
   editor.value.on('selectionUpdate', () => {
@@ -1124,8 +1313,8 @@ async function initEditor() {
   await nextTick()
   updateEditorStyle()
 
-  // 通知父组件编辑器已就绪
-  emit('editor-ready', editor.value)
+  // 通知父组件编辑器已就绪，使用当前聚焦的编辑器
+  emit('editor-ready', lastFocusedEditor.value || editor.value)
 
   // 如果加载了加粗或倾斜状态，应用到所有内容
   if (menubarState.value.isBold || menubarState.value.isItalic) {
@@ -1369,6 +1558,7 @@ onBeforeUnmount(async () => {
 
   // 销毁编辑器
   editor.value && editor.value.destroy()
+  editor2.value && editor2.value.destroy() // 销毁第二个编辑器实例
 })
 
 // 保存内容的通用函数
@@ -1487,168 +1677,137 @@ async function loadCharacters() {
 
 // 清除所有人物高亮（不改变光标位置）
 function clearCharacterHighlights() {
-  if (!editor.value) return
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
+  editors.forEach((ed) => { // 遍历每个编辑器
+    const { state, view } = ed // 获取编辑器状态和视图
+    const { tr } = state // 获取当前事务
 
-  const { state, view } = editor.value
-  const { tr } = state
+    // 保存当前选择位置（使用数字位置，而不是选择对象）
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
 
-  // 保存当前选择位置（使用数字位置，而不是选择对象）
-  const selectionFrom = state.selection.from
-  const selectionTo = state.selection.to
+    // 获取 highlight mark 类型
+    const highlightType = state.schema.marks.highlight
 
-  // 获取 highlight mark 类型
-  const highlightType = state.schema.marks.highlight
-
-  // 遍历文档，移除所有人物高亮标记（保留段落校验高亮）
-  let removedCount = 0
-  let preservedCount = 0
-  state.doc.descendants((node, pos) => {
-    if (node.marks) {
-      node.marks.forEach((mark) => {
-        if (mark.type.name === 'highlight') {
-          // 只清除人物高亮（character-highlight），保留段落校验高亮（paragraph-check-highlight）
-          const markClass = mark.attrs?.class || ''
-          // console.log('🔍 [清除检查] mark属性:', { 
-          //   class: markClass, 
-          //   allAttrs: mark.attrs,
-          //   位置: pos
-          // })
-          if (markClass !== 'paragraph-check-highlight') {
-            const from = pos
-            const to = pos + node.nodeSize
-            tr.removeMark(from, to, highlightType)
-            removedCount++
-          } else {
-            preservedCount++
+    // 遍历文档，移除所有人物高亮标记（保留段落校验高亮）
+    state.doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'highlight') {
+            // 只清除人物高亮（character-highlight），保留段落校验高亮（paragraph-check-highlight）
+            const markClass = mark.attrs?.class || ''
+            if (markClass !== 'paragraph-check-highlight') {
+              const from = pos
+              const to = pos + node.nodeSize
+              tr.removeMark(from, to, highlightType)
+            }
           }
-        }
-      })
+        })
+      }
+    })
+
+    // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
+    if (tr.steps.length > 0) {
+      const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+      tr.setSelection(newSelection)
+      view.dispatch(tr)
     }
   })
-  
-  // console.log('🗑️ [清除人物高亮]:', { 
-  //   清除数量: removedCount, 
-  //   保留段落高亮: preservedCount,
-  //   时间: new Date().toLocaleTimeString()
-  // })
-
-  // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
-  if (tr.steps.length > 0) {
-    const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
-    tr.setSelection(newSelection)
-    view.dispatch(tr)
-  }
 }
 
 // 应用人物高亮（不改变光标位置）
 function applyCharacterHighlights() {
-  if (!editor.value || !characterHighlightEnabled.value || characters.value.length === 0) {
+  if (!characterHighlightEnabled.value || characters.value.length === 0) {
     return
   }
 
-  const { state, view } = editor.value
-  const { doc, tr, schema } = state
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
+  editors.forEach((ed) => { // 遍历每个编辑器
+    const { state, view } = ed
+    const { doc, tr, schema } = state
 
-  // 保存当前选择位置（使用数字位置）
-  const selectionFrom = state.selection.from
-  const selectionTo = state.selection.to
+    // 保存当前选择位置（使用数字位置）
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
 
-  // 先清除之前的人物高亮（在同一事务中），但保留段落校验高亮
-  const highlightType = schema.marks.highlight
-  let removedCharacterCount = 0
-  let preservedParagraphCount = 0
-  doc.descendants((node, pos) => {
-    if (node.marks) {
-      node.marks.forEach((mark) => {
-        if (mark.type.name === 'highlight') {
-          // 只清除人物高亮（character-highlight），保留段落校验高亮（paragraph-check-highlight）
-          const markClass = mark.attrs?.class || ''
-          if (markClass !== 'paragraph-check-highlight') {
-            const from = pos
-            const to = pos + node.nodeSize
-            tr.removeMark(from, to, highlightType)
-            removedCharacterCount++
-          } else {
-            preservedParagraphCount++
+    // 先清除之前的人物高亮（在同一事务中），但保留段落校验高亮
+    const highlightType = schema.marks.highlight
+    doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'highlight') {
+            // 只清除人物高亮（character-highlight），保留段落校验高亮（paragraph-check-highlight）
+            const markClass = mark.attrs?.class || ''
+            if (markClass !== 'paragraph-check-highlight') {
+              const from = pos
+              const to = pos + node.nodeSize
+              tr.removeMark(from, to, highlightType)
+            }
+          }
+        })
+      }
+    })
+
+    // 为每个人物名创建匹配项
+    const matches = []
+
+    // 转义正则表达式特殊字符的工具函数
+    const escapeRegExp = (string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    // 遍历文档中的所有文本节点，查找人物名匹配
+    characters.value.forEach((character) => {
+      if (!character.name || !character.name.trim()) return
+
+      const characterName = character.name.trim()
+      // 转义特殊字符，用于正则表达式
+      const escapedName = escapeRegExp(characterName)
+      // 创建正则表达式，匹配完整的人物名（不区分大小写）
+      const regex = new RegExp(escapedName, 'gi')
+
+      // 遍历文档中的所有文本节点（使用当前事务的文档）
+      tr.doc.descendants((node, pos) => {
+        if (node.isText) {
+          const text = node.text
+          let match
+
+          // 重置正则表达式的 lastIndex
+          regex.lastIndex = 0
+
+          while ((match = regex.exec(text)) !== null) {
+            matches.push({
+              from: pos + match.index,
+              to: pos + match.index + match[0].length,
+              text: match[0],
+              color: character.markerColor || defaultHighlightColor
+            })
           }
         }
       })
+    })
+
+    // 按位置排序，从后往前应用高亮（避免位置偏移）
+    matches.sort((a, b) => b.from - a.from)
+
+    // 批量应用高亮
+    matches.forEach((match) => {
+      const highlightMark = highlightType.create({ 
+        color: match.color,
+        class: 'character-highlight' // 添加自定义类名用于样式区分
+      })
+      tr.addMark(match.from, match.to, highlightMark)
+    })
+    
+    // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
+    const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+    tr.setSelection(newSelection)
+
+    // 应用事务，但不改变焦点
+    if (tr.steps.length > 0) {
+      view.dispatch(tr)
     }
   })
-  // if (removedCharacterCount > 0 || preservedParagraphCount > 0) {
-  //   console.log('🧹 [人物高亮] 清除旧高亮:', { 
-  //     清除人物高亮数: removedCharacterCount, 
-  //     保留段落高亮数: preservedParagraphCount,
-  //     时间: new Date().toLocaleTimeString()
-  //   })
-  // }
-
-  // 为每个人物名创建匹配项
-  const matches = []
-
-  // 转义正则表达式特殊字符的工具函数
-  const escapeRegExp = (string) => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
-
-  // 遍历文档中的所有文本节点，查找人物名匹配
-  characters.value.forEach((character) => {
-    if (!character.name || !character.name.trim()) return
-
-    const characterName = character.name.trim()
-    // 转义特殊字符，用于正则表达式
-    const escapedName = escapeRegExp(characterName)
-    // 创建正则表达式，匹配完整的人物名（不区分大小写）
-    const regex = new RegExp(escapedName, 'gi')
-
-    // 遍历文档中的所有文本节点（使用当前事务的文档）
-    tr.doc.descendants((node, pos) => {
-      if (node.isText) {
-        const text = node.text
-        let match
-
-        // 重置正则表达式的 lastIndex
-        regex.lastIndex = 0
-
-        while ((match = regex.exec(text)) !== null) {
-          matches.push({
-            from: pos + match.index,
-            to: pos + match.index + match[0].length,
-            text: match[0],
-            color: character.markerColor || defaultHighlightColor
-          })
-        }
-      }
-    })
-  })
-
-  // 按位置排序，从后往前应用高亮（避免位置偏移）
-  matches.sort((a, b) => b.from - a.from)
-
-  // 批量应用高亮
-  matches.forEach((match) => {
-    const highlightMark = highlightType.create({ 
-      color: match.color,
-      class: 'character-highlight' // 添加自定义类名用于样式区分
-    })
-    tr.addMark(match.from, match.to, highlightMark)
-  })
-  
-  // if (matches.length > 0) {
-  //   // console.log('👥 [人物高亮] 应用新高亮:', { 
-  //   //   人物高亮数: matches.length,
-  //   //   时间: new Date().toLocaleTimeString()
-  //   // })
-  // }
-
-  // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
-  const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
-  tr.setSelection(newSelection)
-
-  // 应用事务，但不改变焦点
-  if (tr.steps.length > 0) {
-    view.dispatch(tr)
-  }
 }
 
 // 加载人物高亮开关状态（按书籍）
@@ -1804,90 +1963,56 @@ function jumpToParagraph(item) {
   if (!editor.value) return
   
   const { from, to } = item
-  // console.log('🎯 [段落高亮] 开始跳转:', { from, to, 内容长度: to - from })
   
   // 先关闭弹窗，使用 nextTick 确保弹窗关闭后再应用高亮
   paragraphCheckDialogVisible.value = false
   
   nextTick(() => {
-    if (!editor.value) return
-    
-    const { state, view } = editor.value
-    const { schema } = state
-    
-    // 设置光标位置并聚焦
-    editor.value.chain().focus().setTextSelection(from).run()
-    // console.log('📍 [段落高亮] 光标已设置到位置:', from)
-    
-    // 滚动到视图中
-    const domAtPos = view.domAtPos(from)
-    if (domAtPos && domAtPos.node) {
-      // 找到段落元素
-      let element = domAtPos.node
-      if (element.nodeType === Node.TEXT_NODE) {
-        element = element.parentElement
+    const editors = [editor.value, editor2.value].filter(Boolean)
+    const applyTime = Date.now()
+
+    editors.forEach((ed) => {
+      const { state, view } = ed
+      const { schema } = state
+      
+      // 只有主编辑器执行滚动和聚焦逻辑
+      if (ed === editor.value) {
+        ed.chain().focus().setTextSelection(from).run()
+        
+        // 滚动到视图中
+        const domAtPos = view.domAtPos(from)
+        if (domAtPos && domAtPos.node) {
+          let element = domAtPos.node
+          if (element.nodeType === Node.TEXT_NODE) {
+            element = element.parentElement
+          }
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
       }
       
-      // 滚动到该元素
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      // console.log('📜 [段落高亮] 页面已滚动到目标位置')
-    }
-    
-    // 使用 nextTick 再次确保 DOM 更新完成后再应用高亮
-    nextTick(() => {
-      if (!editor.value) return
+      // 两个编辑器都应用高亮
+      const tr = ed.state.tr
+      const highlightType = ed.state.schema.marks.highlight
       
-      const currentState = editor.value.state
-      const currentSchema = currentState.schema
-      const tr = currentState.tr
-      const highlightType = currentSchema.marks.highlight
-      
-      // 为该段落添加高亮标记（使用橙红色表示段落过长警告）
       const highlightMark = highlightType.create({ 
         color: '#ff6b6b', // 橙红色，表示警告
         class: 'paragraph-check-highlight' // 添加自定义类名用于样式区分
       })
-      // console.log('🔍 [段落高亮] 创建mark:', {
-      //   输入属性: { color: '#ff6b6b', class: 'paragraph-check-highlight' },
-      //   实际mark属性: highlightMark.attrs
-      // })
       tr.addMark(from, to, highlightMark)
-      
-      // 应用事务
-      editor.value.view.dispatch(tr)
-      const applyTime = Date.now()
-      // console.log('✨ [段落高亮] 高亮已应用 (橙红色)', { 
-      //   时间: new Date().toLocaleTimeString(),
-      //   时间戳: applyTime,
-      //   范围: `${from}-${to}`,
-      //   class: 'paragraph-check-highlight'
-      // })
+      ed.view.dispatch(tr)
       
       // 5秒后移除高亮
       setTimeout(() => {
-        if (!editor.value) return
+        if (!ed || ed.isDestroyed) return
         
-        const finalState = editor.value.state
+        const finalState = ed.state
         const finalTr = finalState.tr
         const finalHighlightType = finalState.schema.marks.highlight
         
-        // 移除该范围的高亮标记
         finalTr.removeMark(from, to, finalHighlightType)
-        
-        // 应用事务
-        editor.value.view.dispatch(finalTr)
-        const removeTime = Date.now()
-        const duration = removeTime - applyTime
-        // console.log('🔚 [段落高亮] 高亮已移除', {
-        //   时间: new Date().toLocaleTimeString(),
-        //   时间戳: removeTime,
-        //   持续时间: `${duration}ms (${(duration/1000).toFixed(1)}秒)`,
-        //   范围: `${from}-${to}`
-        // })
+        ed.view.dispatch(finalTr)
       }, 5000)
     })
-    
-    // ElMessage.success('已跳转到该段落')
   })
 }
 
@@ -1912,121 +2037,125 @@ async function loadBannedWords() {
 
 // 清除所有禁词划线（不改变光标位置）
 function clearBannedWordsStrikes() {
-  if (!editor.value) return
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
+  editors.forEach((ed) => { // 遍历每个编辑器
+    const { state, view } = ed
+    const { tr } = state
 
-  const { state, view } = editor.value
-  const { tr } = state
+    // 保存当前选择位置（使用数字位置）
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
 
-  // 保存当前选择位置（使用数字位置）
-  const selectionFrom = state.selection.from
-  const selectionTo = state.selection.to
+    // 获取 strike mark 类型
+    const strikeType = state.schema.marks.strike
 
-  // 获取 strike mark 类型
-  const strikeType = state.schema.marks.strike
+    // 遍历文档，移除所有划线标记
+    state.doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'strike') {
+            // 移除划线标记，但不改变选择
+            const from = pos
+            const to = pos + node.nodeSize
+            tr.removeMark(from, to, strikeType)
+          }
+        })
+      }
+    })
 
-  // 遍历文档，移除所有划线标记
-  state.doc.descendants((node, pos) => {
-    if (node.marks) {
-      node.marks.forEach((mark) => {
-        if (mark.type.name === 'strike') {
-          // 移除划线标记，但不改变选择
-          const from = pos
-          const to = pos + node.nodeSize
-          tr.removeMark(from, to, strikeType)
-        }
-      })
+    // 恢复选择位置
+    if (tr.steps.length > 0) {
+      const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+      tr.setSelection(newSelection)
+      view.dispatch(tr)
     }
   })
-
-  // 恢复选择位置
-  if (tr.steps.length > 0) {
-    const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
-    tr.setSelection(newSelection)
-    view.dispatch(tr)
-  }
 }
 
 // 应用禁词划线（不改变光标位置）
 function applyBannedWordsStrikes() {
-  if (!editor.value || !bannedWordsHintEnabled.value || bannedWords.value.length === 0) {
+  if (!bannedWordsHintEnabled.value || bannedWords.value.length === 0) {
     return
   }
 
-  const { state, view } = editor.value
-  const { doc, tr, schema } = state
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
+  editors.forEach((ed) => { // 遍历每个编辑器
+    const { state, view } = ed
+    const { doc, tr, schema } = state
 
-  // 保存当前选择位置（使用数字位置）
-  const selectionFrom = state.selection.from
-  const selectionTo = state.selection.to
+    // 保存当前选择位置（使用数字位置）
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
 
-  // 先清除之前的禁词划线（在同一事务中）
-  const strikeType = schema.marks.strike
-  doc.descendants((node, pos) => {
-    if (node.marks) {
-      node.marks.forEach((mark) => {
-        if (mark.type.name === 'strike') {
-          const from = pos
-          const to = pos + node.nodeSize
-          tr.removeMark(from, to, strikeType)
-        }
-      })
-    }
-  })
-
-  // 为每个禁词创建匹配项
-  const matches = []
-
-  // 转义正则表达式特殊字符的工具函数
-  const escapeRegExp = (string) => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
-
-  // 遍历文档中的所有文本节点，查找禁词匹配
-  bannedWords.value.forEach((bannedWord) => {
-    if (!bannedWord || !bannedWord.trim()) return
-
-    const word = bannedWord.trim()
-    // 转义特殊字符，用于正则表达式
-    const escapedWord = escapeRegExp(word)
-    // 创建正则表达式，匹配完整的禁词（不区分大小写）
-    const regex = new RegExp(escapedWord, 'gi')
-
-    // 遍历文档中的所有文本节点（使用当前事务的文档）
-    tr.doc.descendants((node, pos) => {
-      if (node.isText) {
-        const text = node.text
-        let match
-
-        // 重置正则表达式的 lastIndex
-        regex.lastIndex = 0
-
-        while ((match = regex.exec(text)) !== null) {
-          matches.push({
-            from: pos + match.index,
-            to: pos + match.index + match[0].length,
-            text: match[0]
-          })
-        }
+    // 先清除之前的禁词划线（在同一事务中）
+    const strikeType = schema.marks.strike
+    doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'strike') {
+            const from = pos
+            const to = pos + node.nodeSize
+            tr.removeMark(from, to, strikeType)
+          }
+        })
       }
     })
+
+    // 为每个禁词创建匹配项
+    const matches = []
+
+    // 转义正则表达式特殊字符的工具函数
+    const escapeRegExp = (string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    // 遍历文档中的所有文本节点，查找禁词匹配
+    bannedWords.value.forEach((bannedWord) => {
+      if (!bannedWord || !bannedWord.trim()) return
+
+      const word = bannedWord.trim()
+      // 转义特殊字符，用于正则表达式
+      const escapedWord = escapeRegExp(word)
+      // 创建正则表达式，匹配完整的禁词（不区分大小写）
+      const regex = new RegExp(escapedWord, 'gi')
+
+      // 遍历文档中的所有文本节点（使用当前事务的文档）
+      tr.doc.descendants((node, pos) => {
+        if (node.isText) {
+          const text = node.text
+          let match
+
+          // 重置正则表达式的 lastIndex
+          regex.lastIndex = 0
+
+          while ((match = regex.exec(text)) !== null) {
+            matches.push({
+              from: pos + match.index,
+              to: pos + match.index + match[0].length,
+              text: match[0]
+            })
+          }
+        }
+      })
+    })
+
+    // 按位置排序，从后往前应用划线（避免位置偏移）
+    matches.sort((a, b) => b.from - a.from)
+
+    // 批量应用划线
+    matches.forEach((match) => {
+      tr.addMark(match.from, match.to, strikeType.create())
+    })
+
+    // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
+    const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+    tr.setSelection(newSelection)
+
+    // 应用事务，但不改变焦点
+    if (tr.steps.length > 0) {
+      view.dispatch(tr)
+    }
   })
-
-  // 按位置排序，从后往前应用划线（避免位置偏移）
-  matches.sort((a, b) => b.from - a.from)
-
-  // 批量应用划线
-  matches.forEach((match) => {
-    tr.addMark(match.from, match.to, strikeType.create())
-  })
-
-  // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
-  const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
-  tr.setSelection(newSelection)
-
-  // 应用事务，但不改变焦点
-  if (tr.steps.length > 0) {
-    view.dispatch(tr)
-  }
 }
 
 // 加载禁词提示开关状态（按书籍）
@@ -2525,13 +2654,14 @@ function handleApplyFormatting(options) {
 
   try {
     // 检查编辑器是否已初始化
-    if (!editor.value) {
+    const targetEditor = lastFocusedEditor.value || editor.value
+    if (!targetEditor) {
       ElMessage.warning('编辑器未就绪')
       return
     }
 
     // 获取当前文本内容
-    const currentText = editor.value.getText()
+    const currentText = targetEditor.getText()
     
     if (!currentText || currentText.trim().length === 0) {
       ElMessage.warning('编辑器内容为空')
@@ -2548,13 +2678,13 @@ function handleApplyFormatting(options) {
     // 更新编辑器内容
     if (editorContentComponent) {
       if (isNote) {
-        editorContentComponent.setNoteContent(editor.value, formattedText)
+        editorContentComponent.setNoteContent(targetEditor, formattedText)
       } else {
-        editorContentComponent.setChapterContent(editor.value, formattedText)
+        editorContentComponent.setChapterContent(targetEditor, formattedText)
       }
     } else {
       // 降级方案：直接设置内容
-      editor.value.commands.setContent(formattedText)
+      targetEditor.commands.setContent(formattedText)
     }
     
     // 保存更改
@@ -2654,6 +2784,44 @@ defineExpose({
 .paragraph-length-check-switch,
 .banned-words-hint-switch {
   flex-shrink: 0;
+}
+.editor-main-area { // 编辑器主区域
+  flex: 1; // 占据剩余空间
+  display: flex; // 使用弹性布局
+  min-height: 0; // 允许收缩
+  overflow: hidden; // 隐藏溢出
+  position: relative; // 相对定位
+
+  &.split-horizontal { // 水平切分模式
+    flex-direction: column; // 垂直排列编辑器
+    .editor-content { // 编辑器内容区
+      height: 50%; // 各占一半高度
+      flex: none; // 禁用自动伸缩
+    }
+  }
+
+  &.split-vertical { // 垂直切分模式
+    flex-direction: row; // 水平排列编辑器
+    .editor-content { // 编辑器内容区
+      width: 50%; // 各占一半宽度
+      flex: none; // 禁用自动伸缩
+    }
+  }
+}
+
+.split-divider { // 切分模式下的分割线
+  background-color: var(--border-color); // 使用主题边框颜色
+  flex-shrink: 0; // 不收缩
+  
+  .split-horizontal & { // 水平模式下的线
+    height: 3px; // 1像素高
+    width: 100%; // 宽度填充
+  }
+  
+  .split-vertical & { // 垂直模式下的线
+    width: 1px; // 1像素宽
+    height: 100%; // 高度填充
+  }
 }
 .editor-content {
   flex: 1;

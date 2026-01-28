@@ -23,6 +23,7 @@
 - **编辑器面板 ([EditorPanel.vue](file:///c:/Users/FN/Desktop/youziwrite/src/renderer/src/components/Editor/EditorPanel.vue))**: 
   - 集成了 TipTap 编辑器 <!-- 实现核心写作功能 -->
   - 提供右键菜单功能（一键排版、全选、前往顶部/底部等） <!-- 增强编辑体验 -->
+  - **分屏视图功能**：支持水平切分和垂直切分视图，方便对比创作 <!-- 实现多视图同步编辑 -->
   - 实时字数统计与码字速度计算 <!-- 辅助作者掌握进度 -->
   - 码字音效支持 <!-- 增强写作氛围感 -->
 - **搜索与替换 ([SearchPanel.vue](file:///c:/Users/FN/Desktop/youziwrite/src/renderer/src/components/Editor/SearchPanel.vue))**: 
