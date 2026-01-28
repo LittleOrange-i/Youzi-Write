@@ -142,9 +142,52 @@
           class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group"
           @click="handleOpenReplace"
         >
+          <!-- 查找图标 -->
           <el-icon class="text-base text-indigo-500 group-hover:scale-110 transition-transform"><Search /></el-icon>
+          <!-- 菜单文字 -->
           <span class="text-sm font-medium">查找和替换</span>
         </div>
+
+        <!-- 分隔线容器 -->
+        <div class="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-2"></div> <!-- 分隔线样式 -->
+
+        <!-- 前往顶部菜单项容器 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group" 
+          @click="handleGoToTop"
+        > <!-- 点击触发前往顶部 -->
+          <!-- 置顶图标 -->
+          <el-icon 
+            class="text-base text-indigo-500 group-hover:scale-110 transition-transform"
+          > <!-- 图标样式 -->
+            <CaretTop /> <!-- 使用置顶图标 -->
+          </el-icon> <!-- 结束图标 -->
+          <!-- 菜单文本 -->
+          <span 
+            class="text-sm font-medium"
+          > <!-- 文本样式 -->
+            前往顶部 <!-- 文本内容 -->
+          </span> <!-- 结束文本 -->
+        </div> <!-- 结束顶部菜单项 -->
+
+        <!-- 前往底部菜单项容器 -->
+        <div 
+          class="flex items-center gap-3 px-4 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors text-gray-700 dark:text-gray-300 group" 
+          @click="handleGoToBottom"
+        > <!-- 点击触发前往底部 -->
+          <!-- 置底图标 -->
+          <el-icon 
+            class="text-base text-indigo-500 group-hover:scale-110 transition-transform"
+          > <!-- 图标样式 -->
+            <CaretBottom /> <!-- 使用置底图标 -->
+          </el-icon> <!-- 结束图标 -->
+          <!-- 菜单文本 -->
+          <span 
+            class="text-sm font-medium"
+          > <!-- 文本样式 -->
+            前往底部 <!-- 文本内容 -->
+          </span> <!-- 结束文本 -->
+        </div> <!-- 结束底部菜单项 -->
       </div>
     </Teleport>
     <!-- 编辑器内容配置组件（隐藏，仅提供逻辑） -->
@@ -295,7 +338,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, MagicStick, CopyDocument, Scissor, Select, Search } from '@element-plus/icons-vue' // 导入 Element Plus 图标
+import { Check, MagicStick, CopyDocument, Scissor, Select, Search, CaretTop, CaretBottom } from '@element-plus/icons-vue' // 导入 Element Plus 图标，增加置顶和置底图标
 import { EditorContent } from '@tiptap/vue-3' // 导入 Tiptap 编辑器内容组件
 import { TextSelection } from 'prosemirror-state' // 导入 Prosemirror 选区状态
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 Store
@@ -446,6 +489,28 @@ function handleOpenReplace() {
   nextTick(() => {
     searchPanelRef.value?.openReplaceMode() // 切换到替换模式
   })
+}
+
+// 前往顶部功能处理函数
+function handleGoToTop() {
+  hideContextMenu() // 执行完毕后隐藏右键菜单
+  if (!editor.value) return // 如果编辑器实例不存在，则直接返回
+  editor.value.commands.focus('start') // 使用 Tiptap 命令将光标聚焦到文档起始位置
+  const editorContent = document.querySelector('.editor-content') // 获取编辑器的滚动容器 DOM 元素
+  if (editorContent) { // 如果找到了滚动容器
+    editorContent.scrollTo({ top: 0, behavior: 'smooth' }) // 平滑滚动到容器的最顶部
+  }
+}
+
+// 前往底部功能处理函数
+function handleGoToBottom() {
+  hideContextMenu() // 执行完毕后隐藏右键菜单
+  if (!editor.value) return // 如果编辑器实例不存在，则直接返回
+  editor.value.commands.focus('end') // 使用 Tiptap 命令将光标聚焦到文档末尾位置
+  const editorContent = document.querySelector('.editor-content') // 获取编辑器的滚动容器 DOM 元素
+  if (editorContent) { // 如果找到了滚动容器
+    editorContent.scrollTo({ top: editorContent.scrollHeight, behavior: 'smooth' }) // 平滑滚动到容器的最底部
+  }
 }
 
 // 一键排版
@@ -2595,6 +2660,8 @@ defineExpose({
   min-height: 0;
   padding: 16px;
   overflow-y: auto;
+  // 隐藏滚动条
+  // scrollbar-width: none; 
   background: var(--bg-primary);
   white-space: pre-wrap; // 保证Tab缩进和换行显示
   font-family: inherit, monospace;

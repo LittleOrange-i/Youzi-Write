@@ -10,6 +10,7 @@
           <!-- 笔记章节面板 -->
           <NoteChapter ref="noteChapterRef" :book-name="bookName" />
         </el-splitter-panel>
+        
         <el-splitter-panel>
           <el-splitter style="height: 100%;">
             <el-splitter-panel>
