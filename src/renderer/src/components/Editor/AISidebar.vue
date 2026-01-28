@@ -79,11 +79,11 @@
         </div>
         <div class="operation-item" @click="handleNaming">
           <el-icon><User /></el-icon>
-          <span>起名助手</span>
+          <span>AI起名助手</span>
         </div>
-        <div class="operation-item" @click="handleEmotions">
+        <div class="operation-item" @click="handleShortcuts">
           <el-icon><Star /></el-icon>
-          <span>情绪列表</span>
+          <span>AI快捷列表</span>
         </div>
         <div class="operation-item" @click="handleQA">
           <el-icon><ChatDotRound /></el-icon>
@@ -349,13 +349,30 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="自定义需求">
-          <el-input
-            v-model="rewriteForm.customRequirement"
-            type="textarea"
-            :rows="2"
-            placeholder="输入额外的自定义需求（可选）..."
-          />
+        <el-form-item label="自定义提示词">
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <el-select
+              v-model="rewriteForm.customRequirement"
+              placeholder="选择快捷提示词"
+              clearable
+              filterable
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="prompt in customPromptList"
+                :key="prompt"
+                :label="prompt"
+                :value="prompt"
+              />
+            </el-select>
+            <el-input
+              v-model="rewriteForm.customRequirement"
+              type="textarea"
+              :rows="2"
+              placeholder="自定义提示词（可选）..."
+              style="width: 100%;"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -398,13 +415,30 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="自定义需求">
-          <el-input
-            v-model="expandForm.customRequirement"
-            type="textarea"
-            :rows="2"
-            placeholder="输入额外的自定义需求（可选）..."
-          />
+        <el-form-item label="自定义提示词">
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <el-select
+              v-model="expandForm.customRequirement"
+              placeholder="选择快捷提示词"
+              clearable
+              filterable
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="prompt in customPromptList"
+                :key="prompt"
+                :label="prompt"
+                :value="prompt"
+              />
+            </el-select>
+            <el-input
+              v-model="expandForm.customRequirement"
+              type="textarea"
+              :rows="2"
+              placeholder="自定义提示词（可选）..."
+              style="width: 100%;"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -447,13 +481,30 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="自定义需求">
-          <el-input
-            v-model="continueForm.customRequirement"
-            type="textarea"
-            :rows="2"
-            placeholder="输入额外的自定义需求（可选）..."
-          />
+        <el-form-item label="自定义提示词">
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <el-select
+              v-model="continueForm.customRequirement"
+              placeholder="选择快捷提示词"
+              clearable
+              filterable
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="prompt in customPromptList"
+                :key="prompt"
+                :label="prompt"
+                :value="prompt"
+              />
+            </el-select>
+            <el-input
+              v-model="continueForm.customRequirement"
+              type="textarea"
+              :rows="2"
+              placeholder="自定义提示词（可选）..."
+              style="width: 100%;"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -487,13 +538,30 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="自定义需求">
-          <el-input
-            v-model="polishForm.customRequirement"
-            type="textarea"
-            :rows="2"
-            placeholder="输入额外的自定义需求（可选）..."
-          />
+        <el-form-item label="自定义提示词">
+          <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <el-select
+              v-model="polishForm.customRequirement"
+              placeholder="选择快捷提示词"
+              clearable
+              filterable
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="prompt in customPromptList"
+                :key="prompt"
+                :label="prompt"
+                :value="prompt"
+              />
+            </el-select>
+            <el-input
+              v-model="polishForm.customRequirement"
+              type="textarea"
+              :rows="2"
+              placeholder="自定义提示词（可选）..."
+              style="width: 100%;"
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -504,10 +572,10 @@
       </template>
     </el-dialog>
 
-    <!-- 起名助手弹窗 -->
+    <!-- AI起名助手弹窗 -->
     <el-dialog
       v-model="namingDialogVisible"
-      title="起名助手"
+      title="AI起名助手"
       width="500px"
       :close-on-click-modal="false"
     >
@@ -578,37 +646,72 @@
       </template>
     </el-dialog>
 
-    <!-- 情绪列表弹窗 -->
+    <!-- AI快捷列表弹窗 -->
     <el-dialog
-      v-model="emotionDialogVisible"
-      title="情绪列表管理"
-      width="600px"
+      v-model="shortcutsDialogVisible"
+      title="AI快捷列表管理"
+      width="700px"
       :close-on-click-modal="false"
     >
-      <div class="emotion-manager">
-        <div class="emotion-input">
-          <el-input
-            v-model="newEmotion"
-            placeholder="输入新情绪..."
-            @keyup.enter="addEmotion"
-          />
-          <el-button type="primary" @click="addEmotion">添加</el-button>
-        </div>
-        <div class="emotion-tags">
-          <el-tag
-            v-for="emotion in emotionList"
-            :key="emotion"
-            closable
-            @close="removeEmotion(emotion)"
-            class="emotion-tag"
-          >
-            {{ emotion }}
-          </el-tag>
-        </div>
-      </div>
+      <el-tabs v-model="activeShortcutTab" class="shortcuts-tabs">
+        <!-- 情绪列表Tab -->
+        <el-tab-pane label="情绪列表" name="emotions">
+          <div class="shortcut-manager">
+            <div class="shortcut-input">
+              <el-input
+                v-model="newEmotion"
+                placeholder="输入新情绪..."
+                @keyup.enter="addEmotion"
+              />
+              <el-button type="primary" @click="addEmotion">添加</el-button>
+            </div>
+            <div class="shortcut-tags">
+              <el-tag
+                v-for="emotion in emotionList"
+                :key="emotion"
+                closable
+                @close="removeEmotion(emotion)"
+                class="shortcut-tag"
+              >
+                {{ emotion }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="tab-footer">
+            <el-button type="primary" @click="resetEmotions">恢复默认</el-button>
+          </div>
+        </el-tab-pane>
+
+        <!-- AI自定义提示词Tab -->
+        <el-tab-pane label="自定义提示词" name="customPrompts">
+          <div class="shortcut-manager">
+            <div class="shortcut-input">
+              <el-input
+                v-model="newCustomPrompt"
+                placeholder="输入自定义提示词..."
+                @keyup.enter="addCustomPrompt"
+              />
+              <el-button type="primary" @click="addCustomPrompt">添加</el-button>
+            </div>
+            <div class="shortcut-tags">
+              <el-tag
+                v-for="prompt in customPromptList"
+                :key="prompt"
+                closable
+                @close="removeCustomPrompt(prompt)"
+                class="shortcut-tag"
+              >
+                {{ prompt }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="tab-footer">
+            <el-button type="primary" @click="resetCustomPrompts">恢复默认</el-button>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
       <template #footer>
-        <el-button @click="emotionDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="resetEmotions">恢复默认</el-button>
+        <el-button @click="shortcutsDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -900,16 +1003,17 @@ const expandDialogVisible = ref(false)
 const continueDialogVisible = ref(false)
 const polishDialogVisible = ref(false)
 const namingDialogVisible = ref(false)
-const emotionDialogVisible = ref(false)
+const shortcutsDialogVisible = ref(false) // 重命名为快捷列表弹窗
 const resultDialogVisible = ref(false)
 const qaDialogVisible = ref(false)
+const activeShortcutTab = ref('emotions') // 当前激活的Tab
 
 // AI 操作表单数据
 const rewriteForm = ref({
   emotion: '',
   style: '', // 风格选择
   customStyle: '', // 自定义风格描述
-  customRequirement: '' // 自定义需求
+  customRequirement: '' // 自定义提示词
 })
 
 // 写作风格列表
@@ -933,18 +1037,18 @@ const writingStyles = [
 const expandForm = ref({
   targetWords: 500,
   emotion: '',
-  customRequirement: '' // 自定义需求
+  customRequirement: '' // 自定义提示词
 })
 
 const continueForm = ref({
   targetWords: 500,
   emotion: '',
-  customRequirement: '' // 自定义需求
+  customRequirement: '' // 自定义提示词
 })
 
 const polishForm = ref({
   emotion: '',
-  customRequirement: '' // 自定义需求
+  customRequirement: '' // 自定义提示词
 })
 
 const namingForm = ref({
@@ -995,6 +1099,17 @@ const emotionList = ref([
   '焦虑', '期待', '平静', '兴奋', '沮丧', '满足',
   '羞愧', '骄傲', '嫉妒', '感激', '同情', '怀疑',
   '紧张', '放松', '困惑', '自信', '绝望', '希望'
+])
+
+// AI自定义提示词列表管理
+const newCustomPrompt = ref('')
+const customPromptList = ref([
+  '增加细节描写',
+  '添加环境氛围',
+  '强化人物情感',
+  '增加对话描写',
+  '补充心理活动',
+  '丰富场景描写'
 ])
 
 // System prompt 配置
@@ -1245,6 +1360,8 @@ onMounted(() => {
   }
   // 加载情绪列表
   loadEmotions()
+  // 加载自定义提示词列表
+  loadCustomPrompts()
   // 初始化浮动窗口位置
   initFloatingPosition()
 })
@@ -1261,9 +1378,6 @@ const loadEmotions = () => {
   }
 }
 
-
-
-
 const saveEmotions = () => {
   try {
     localStorage.setItem('ai_emotions', JSON.stringify(emotionList.value))
@@ -1271,9 +1385,6 @@ const saveEmotions = () => {
     console.error('保存情绪列表失败:', error)
   }
 }
-
-
-
 
 const addEmotion = () => {
   const emotion = newEmotion.value.trim()
@@ -1306,6 +1417,61 @@ const resetEmotions = () => {
   ]
   saveEmotions()
   ElMessage.success('已恢复默认情绪列表')
+}
+
+// AI自定义提示词列表管理函数
+const loadCustomPrompts = () => {
+  try {
+    const saved = localStorage.getItem('ai_custom_prompts')
+    if (saved) {
+      customPromptList.value = JSON.parse(saved)
+    }
+  } catch (error) {
+    console.error('加载自定义提示词列表失败:', error)
+  }
+}
+
+const saveCustomPrompts = () => {
+  try {
+    localStorage.setItem('ai_custom_prompts', JSON.stringify(customPromptList.value))
+  } catch (error) {
+    console.error('保存自定义提示词列表失败:', error)
+  }
+}
+
+const addCustomPrompt = () => {
+  const prompt = newCustomPrompt.value.trim()
+  if (!prompt) {
+    ElMessage.warning('请输入提示词内容')
+    return
+  }
+  if (customPromptList.value.includes(prompt)) {
+    ElMessage.warning('该提示词已存在')
+    return
+  }
+  customPromptList.value.push(prompt)
+  saveCustomPrompts()
+  newCustomPrompt.value = ''
+  ElMessage.success('添加成功')
+}
+
+const removeCustomPrompt = (prompt) => {
+  customPromptList.value = customPromptList.value.filter((p) => p !== prompt)
+  saveCustomPrompts()
+  ElMessage.success('删除成功')
+}
+
+const resetCustomPrompts = () => {
+  customPromptList.value = [
+    '增加细节描写',
+    '添加环境氛围',
+    '强化人物情感',
+    '增加对话描写',
+    '补充心理活动',
+    '丰富场景描写'
+  ]
+  saveCustomPrompts()
+  ElMessage.success('已恢复默认提示词列表')
 }
 
 // 监听编辑器选择变化
@@ -1461,8 +1627,8 @@ const handleNaming = () => {
   namingDialogVisible.value = true
 }
 
-const handleEmotions = () => {
-  emotionDialogVisible.value = true
+const handleShortcuts = () => {
+  shortcutsDialogVisible.value = true
 }
 
 const handleQA = () => {
@@ -1682,7 +1848,7 @@ const executeRewrite = async () => {
       prompt += `\n\n要求：添加【${rewriteForm.value.emotion}】的人物情绪描写。`
     }
 
-    // 添加自定义需求
+    // 添加自定义提示词
     if (rewriteForm.value.customRequirement?.trim()) {
       prompt += `\n\n额外需求：${rewriteForm.value.customRequirement}`
     }
@@ -1736,7 +1902,7 @@ const executeExpand = async () => {
       prompt += `\n\n要求：添加【${expandForm.value.emotion}】的人物情绪描写。`
     }
 
-    // 添加自定义需求
+    // 添加自定义提示词
     if (expandForm.value.customRequirement?.trim()) {
       prompt += `\n\n额外需求：${expandForm.value.customRequirement}`
     }
@@ -1787,7 +1953,7 @@ const executeContinue = async () => {
       prompt += `\n\n要求：添加【${continueForm.value.emotion}】的人物情绪描写。`
     }
 
-    // 添加自定义需求
+    // 添加自定义提示词
     if (continueForm.value.customRequirement?.trim()) {
       prompt += `\n\n额外需求：${continueForm.value.customRequirement}`
     }
@@ -1839,7 +2005,7 @@ const executePolish = async () => {
       prompt += `\n\n要求：强化【${polishForm.value.emotion}】的人物情绪表达。`
     }
 
-    // 添加自定义需求
+    // 添加自定义提示词
     if (polishForm.value.customRequirement?.trim()) {
       prompt += `\n\n额外需求：${polishForm.value.customRequirement}`
     }
@@ -1880,7 +2046,7 @@ const executePolish = async () => {
 
 
 
-// 执行起名助手
+// 执行AI起名助手
 const executeNaming = async () => {
   if (!namingForm.value.nameType) {
     ElMessage.warning('请选择名称类型')
@@ -2759,9 +2925,9 @@ const exportableModels = computed(() => {
 
 
 
-// 情绪管理器样式
-.emotion-manager {
-  .emotion-input {
+// 快捷列表管理器样式（统一样式，用于情绪和自定义提示词）
+.shortcut-manager {
+  .shortcut-input {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
@@ -2771,7 +2937,7 @@ const exportableModels = computed(() => {
     }
   }
 
-  .emotion-tags {
+  .shortcut-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -2781,13 +2947,23 @@ const exportableModels = computed(() => {
     background: var(--bg-soft);
     border-radius: 6px;
 
-    .emotion-tag {
+    .shortcut-tag {
       cursor: pointer;
       
       &:hover {
         transform: scale(1.05);
       }
     }
+  }
+}
+
+// Tab页签样式
+.shortcuts-tabs {
+  .tab-footer {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    text-align: right;
   }
 }
 
