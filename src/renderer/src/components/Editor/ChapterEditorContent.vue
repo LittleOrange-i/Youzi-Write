@@ -78,13 +78,26 @@ function getChapterExtensions() {
         ...this.parent?.(),
         class: {
           default: null,
-          parseHTML: element => element.getAttribute('data-highlight-class'),
-          renderHTML: attributes => {
+          parseHTML: (element) => element.getAttribute('data-highlight-class'),
+          renderHTML: (attributes) => {
             if (!attributes.class) {
               return {}
             }
             return {
               'data-highlight-class': attributes.class
+            }
+          }
+        },
+        color: {
+          default: null,
+          parseHTML: (element) => element.style.backgroundColor,
+          renderHTML: (attributes) => {
+            if (!attributes.color) {
+              return {}
+            }
+            // 默认使用背景色高亮
+            return {
+              style: `background-color: ${attributes.color}`
             }
           }
         }

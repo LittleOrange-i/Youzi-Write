@@ -17,7 +17,7 @@
       <el-input
         v-model="chapterTitle"
         placeholder="章节标题"
-        maxlength="20"
+        maxlength="30"
         class="chapter-title-input"
         @blur="handleTitleBlur"
       />
@@ -25,8 +25,8 @@
       <el-switch
         v-if="editorStore.file?.type === 'chapter'"
         v-model="characterHighlightEnabled"
-        active-text="人物高亮"
-        inactive-text="人物高亮"
+        active-text="人物"
+        inactive-text="人物"
         inline-prompt
         class="character-highlight-switch"
         @change="handleCharacterHighlightChange"
@@ -36,11 +36,22 @@
       <el-switch
         v-if="editorStore.file?.type === 'chapter'"
         v-model="bannedWordsHintEnabled"
-        active-text="禁词提示"
-        inactive-text="禁词提示"
+        active-text="禁词"
+        inactive-text="禁词"
         inline-prompt
         class="banned-words-hint-switch"
         @change="handleBannedWordsHintChange"
+      />
+
+      <!-- 对白高亮开关 -->
+      <el-switch
+        v-if="editorStore.file?.type === 'chapter'"
+        v-model="dialogueHighlightEnabled"
+        active-text="对白"
+        inactive-text="对白"
+        inline-prompt
+        class="dialogue-highlight-switch"
+        @change="handleDialogueHighlightChange"
       />
       <!-- 段落字数校验按钮 -->
       <el-button
@@ -50,7 +61,7 @@
         class="paragraph-check-button"
         @click="checkParagraphLength"
       >
-        段落字数校验
+        段落字数
       </el-button>
       
       <!-- 专注模式按钮：专注模式激活时禁用按钮 -->
@@ -508,6 +519,7 @@ async function initEditor2() {
     nextTick(() => {
       if (characterHighlightEnabled.value) applyCharacterHighlights()
       if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+      if (dialogueHighlightEnabled.value) applyDialogueHighlights()
       isSyncing = false // 关闭同步标记
     })
   })
@@ -528,6 +540,7 @@ async function initEditor2() {
     nextTick(() => {
       if (characterHighlightEnabled.value) applyCharacterHighlights()
       if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+      if (dialogueHighlightEnabled.value) applyDialogueHighlights()
       isSyncing = false // 关闭同步标记
     })
   }) // 结束监听
@@ -543,6 +556,7 @@ async function initEditor2() {
   // 初始应用高亮
   if (characterHighlightEnabled.value) applyCharacterHighlights()
   if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
+  if (dialogueHighlightEnabled.value) applyDialogueHighlights()
 }
 
 // 处理水平切分
@@ -827,6 +841,8 @@ async function handleSplitChapter() {
         loadCharacterHighlightState(name)
         // 书籍切换时，加载对应书籍的禁词提示开关状态
         loadBannedWordsHintState(name)
+        // 书籍切换时，加载对应书籍的对白高亮开关状态
+        loadDialogueHighlightState(name)
         // 书籍切换时，加载对应书籍的码字音效设置
         loadTypingSoundSettings()
       }
@@ -916,6 +932,9 @@ const overLengthParagraphs = ref([]) // 超标段落列表
 const bannedWordsHintEnabled = ref(false) // 禁词提示开关状态，默认关闭
 const bannedWords = ref([]) // 禁词数据列表
 let bannedWordsHintTimer = null // 禁词提示定时器
+
+// 对白高亮相关状态
+const dialogueHighlightEnabled = ref(false) // 对白高亮开关状态
 
 async function handleTitleBlur() {
   const fileType = editorStore.file?.type
@@ -1007,42 +1026,44 @@ watch(
           await nextTick()
           await new Promise((resolve) => setTimeout(resolve, 50))
           await loadCharacterHighlightState(props.bookName)
-          await loadBannedWordsHintState(props.bookName)
-        }
-        return
-      } catch (error) {
-        console.error('初始化编辑器失败:', error)
-        return
+        await loadBannedWordsHintState(props.bookName)
+        await loadDialogueHighlightState(props.bookName)
       }
+      return
+    } catch (error) {
+      console.error('初始化编辑器失败:', error)
+      return
     }
+  }
 
-    if (!newFile) return
+  if (!newFile) return
 
-    // 如果文件类型发生变化，需要重新初始化编辑器
-    const fileTypeChanged = newFile?.type !== oldFile?.type
+  // 如果文件类型发生变化，需要重新初始化编辑器
+  const fileTypeChanged = newFile?.type !== oldFile?.type
 
-    if (fileTypeChanged && editor.value) {
-      try {
-        // 销毁旧编辑器
-        editor.value.destroy()
-        editor.value = null
-        // 等待一下确保完全销毁
+  if (fileTypeChanged && editor.value) {
+    try {
+      // 销毁旧编辑器
+      editor.value.destroy()
+      editor.value = null
+      // 等待一下确保完全销毁
+      await nextTick()
+      // 重新初始化编辑器（initEditor 内部会设置内容）
+      await initEditor()
+      // 等待编辑器完全初始化
+      await nextTick()
+      setupCompositionHandlers()
+      // 重新初始化后，initEditor 已经设置了内容，这里不需要再次设置
+      // 如果是章节编辑器，等待内容渲染完成后加载状态并应用高亮/划线
+      if (newFile?.type === 'chapter' && props.bookName) {
         await nextTick()
-        // 重新初始化编辑器（initEditor 内部会设置内容）
-        await initEditor()
-        // 等待编辑器完全初始化
         await nextTick()
-        setupCompositionHandlers()
-        // 重新初始化后，initEditor 已经设置了内容，这里不需要再次设置
-        // 如果是章节编辑器，等待内容渲染完成后加载状态并应用高亮/划线
-        if (newFile?.type === 'chapter' && props.bookName) {
-          await nextTick()
-          await nextTick()
-          await new Promise((resolve) => setTimeout(resolve, 50))
-          await loadCharacterHighlightState(props.bookName)
-          await loadBannedWordsHintState(props.bookName)
-        }
-        return
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        await loadCharacterHighlightState(props.bookName)
+        await loadBannedWordsHintState(props.bookName)
+        await loadDialogueHighlightState(props.bookName)
+      }
+      return
       } catch (error) {
         console.error('重新初始化编辑器失败:', error)
         // 出错时尝试恢复编辑器
@@ -1285,8 +1306,11 @@ async function initEditor() {
   })
   
   // 添加内容更新监听
-  editor.value.on('update', () => {
+  editor.value.on('update', ({ transaction }) => {
     updateCursorPosition()
+    if (transaction.docChanged && dialogueHighlightEnabled.value) {
+      applyDialogueHighlights()
+    }
   })
 
   // 设置初始内容
@@ -2256,6 +2280,202 @@ function stopBannedWordsHintTimer() {
   }
 }
 
+// ==================== 对白高亮相关函数 ====================
+
+// 清除所有对白高亮
+function clearDialogueHighlights() {
+  const editors = [editor.value, editor2.value].filter(Boolean)
+  editors.forEach((ed) => {
+    const { state, view } = ed
+    const { tr } = state
+
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
+
+    const highlightType = state.schema.marks.highlight
+
+    state.doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'highlight' && mark.attrs?.class === 'dialogue-highlight') {
+            const from = pos
+            const to = pos + node.nodeSize
+            tr.removeMark(from, to, highlightType)
+          }
+        })
+      }
+    })
+
+    if (tr.steps.length > 0) {
+      const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+      tr.setSelection(newSelection)
+      view.dispatch(tr)
+    }
+  })
+}
+
+// 应用对白高亮
+function applyDialogueHighlights() {
+  const settings = editorStore.editorSettings.dialogueHighlight
+  if (!dialogueHighlightEnabled.value || !settings) {
+    return
+  }
+
+  const editors = [editor.value, editor2.value].filter(Boolean)
+  editors.forEach((ed) => {
+    const { state, view } = ed
+    const { doc, tr, schema } = state
+
+    const selectionFrom = state.selection.from
+    const selectionTo = state.selection.to
+
+    // 先清除之前的对白高亮
+    const highlightType = schema.marks.highlight
+    doc.descendants((node, pos) => {
+      if (node.marks) {
+        node.marks.forEach((mark) => {
+          if (mark.type.name === 'highlight' && mark.attrs?.class === 'dialogue-highlight') {
+            const from = pos
+            const to = pos + node.nodeSize
+            tr.removeMark(from, to, highlightType)
+          }
+        })
+      }
+    })
+
+    const enabledSymbols = settings.symbols.filter((s) => s.enabled)
+    if (enabledSymbols.length === 0) return
+
+    // 获取所有文本节点及其位置
+    const textNodes = []
+    doc.descendants((node, pos) => {
+      if (node.isText) {
+        textNodes.push({ text: node.text, pos })
+      } else if (node.type.name === 'paragraph' && textNodes.length > 0) {
+        // 在段落之间添加换行符标记，用于跨行匹配
+        textNodes.push({ text: '\n', pos: pos + node.nodeSize - 1, isSeparator: true })
+      }
+    })
+
+    // 将所有文本拼接成一个大字符串，同时记录每个字符对应的原始位置
+    let fullText = ''
+    const posMap = []
+    textNodes.forEach((item) => {
+      for (let i = 0; i < item.text.length; i++) {
+        fullText += item.text[i]
+        posMap.push(item.pos + i)
+      }
+    })
+
+    enabledSymbols.forEach((symbol) => {
+      const startSym = symbol.start
+      const endSym = symbol.end
+      const color = symbol.color || settings.defaultColor || '#e198b8'
+
+      let searchIndex = 0
+      while (searchIndex < fullText.length) {
+        const startIndex = fullText.indexOf(startSym, searchIndex)
+        if (startIndex === -1) break
+
+        let endIndex = -1
+        if (startSym === endSym) {
+          endIndex = fullText.indexOf(endSym, startIndex + startSym.length)
+        } else {
+          endIndex = fullText.indexOf(endSym, startIndex + startSym.length)
+        }
+
+        const nextNewLineIndex = fullText.indexOf('\n', startIndex)
+
+        // 检查是否跨行
+        const isCrossLine = nextNewLineIndex !== -1 && (endIndex === -1 || endIndex > nextNewLineIndex)
+
+        if (isCrossLine && !settings.allowNewLine) {
+          // 不允许换行，且当前匹配跨行了
+          if (settings.allowNoEnd) {
+            // 允许无结束符，高亮到行末
+            const from = posMap[startIndex]
+            const to = posMap[nextNewLineIndex]
+            tr.addMark(from, to, highlightType.create({ color, class: 'dialogue-highlight' }))
+          }
+          searchIndex = nextNewLineIndex + 1
+          continue
+        }
+
+        if (endIndex !== -1) {
+          // 找到完整的对白
+          const from = posMap[startIndex]
+          // to 位置是结束符最后一个字符的位置 + 1
+          const to = posMap[endIndex + endSym.length - 1] + 1
+          tr.addMark(from, to, highlightType.create({ color, class: 'dialogue-highlight' }))
+          searchIndex = endIndex + endSym.length
+        } else if (settings.allowNoEnd) {
+          // 没找到结束符，但允许无结束符
+          const from = posMap[startIndex]
+          let toIndex = settings.allowNewLine ? fullText.length - 1 : (nextNewLineIndex === -1 ? fullText.length - 1 : nextNewLineIndex - 1)
+          const to = posMap[toIndex] + 1
+          tr.addMark(from, to, highlightType.create({ color, class: 'dialogue-highlight' }))
+          searchIndex = toIndex + 2
+        } else {
+          searchIndex = startIndex + startSym.length
+        }
+      }
+    })
+
+    if (tr.steps.length > 0) {
+      const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
+      tr.setSelection(newSelection)
+      view.dispatch(tr)
+    }
+  })
+}
+
+// 加载对白高亮状态
+async function loadDialogueHighlightState(bookName) {
+  if (!bookName) {
+    dialogueHighlightEnabled.value = false
+    clearDialogueHighlights()
+    return
+  }
+
+  try {
+    const key = `dialogueHighlight_${bookName}`
+    const savedState = await window.electronStore.get(key)
+    const newState = savedState === true
+    dialogueHighlightEnabled.value = newState
+
+    if (newState) {
+      await nextTick()
+      if (editor.value && editorStore.file?.type === 'chapter') {
+        await nextTick()
+        const docSize = editor.value.state.doc.content.size
+        if (docSize > 0) {
+          applyDialogueHighlights()
+        }
+      }
+    } else {
+      clearDialogueHighlights()
+    }
+  } catch (error) {
+    console.error('加载对白高亮状态失败:', error)
+    dialogueHighlightEnabled.value = false
+    clearDialogueHighlights()
+  }
+}
+
+// 处理对白高亮开关变化
+async function handleDialogueHighlightChange(enabled) {
+  if (props.bookName) {
+    const key = `dialogueHighlight_${props.bookName}`
+    await window.electronStore.set(key, enabled)
+  }
+
+  if (enabled) {
+    applyDialogueHighlights()
+  } else {
+    clearDialogueHighlights()
+  }
+}
+
 // 监听当前文件类型，动态设置首行缩进和编辑器模式
 watch(
   () => editorStore.file,
@@ -2883,11 +3103,18 @@ defineExpose({
     color: red;
   }
 
-  // 人物高亮样式 - 蓝色加粗（不用黄色背景）
-  mark.character-highlight {
-    background-color: transparent !important;
-    color: #409eff !important;
-    font-weight: 700 !important;
+  // 人物高亮样式 - 使用人物谱中的标记色作为背景
+  mark.character-highlight,
+  mark[data-highlight-class="character-highlight"] {
+    color: inherit !important;
+    font-weight: inherit !important;
+  }
+
+  // 对白高亮样式 - 保持高亮效果，不闪烁
+  mark.dialogue-highlight,
+  mark[data-highlight-class="dialogue-highlight"] {
+    font-weight: inherit !important;
+    animation: none !important;
   }
 
   // 段落字数高亮样式 - 浅红色背景 + 虚线下划线

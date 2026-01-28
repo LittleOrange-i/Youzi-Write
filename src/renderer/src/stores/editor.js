@@ -155,7 +155,28 @@ export const useEditorStore = defineStore('editor', () => {
     fontSize: '18px',
     lineHeight: '1.6',
     globalBoldMode: false,
-    globalItalicMode: false
+    globalItalicMode: false,
+    dialogueHighlight: {
+      defaultColor: '#e198b8', // 默认高亮颜色设置为 #e198b8
+      allowNewLine: true, // 允许换行
+      allowNoEnd: false, // 不允许无结束符
+      symbols: [
+        { id: 1, label: '“”', start: '“', end: '”', enabled: true, color: '#e198b8', useCustomColor: false }, // 双引号
+        { id: 2, label: '‘’', start: '‘', end: '’', enabled: true, color: '#e198b8', useCustomColor: false }, // 单引号
+        { id: 3, label: '『』', start: '『', end: '』', enabled: true, color: '#e198b8', useCustomColor: false }, // 括号
+        { id: 4, label: '「」', start: '「', end: '」', enabled: true, color: '#e198b8', useCustomColor: false }, // 方括号
+        { id: 5, label: '（）', start: '（', end: '）', enabled: true, color: '#e198b8', useCustomColor: false }, // 圆括号
+        { id: 6, label: '〈〉', start: '〈', end: '〉', enabled: true, color: '#e198b8', useCustomColor: false }, // 尖括号
+        { id: 7, label: '《》', start: '《', end: '》', enabled: true, color: '#e198b8', useCustomColor: false }, // 书名号
+        { id: 8, label: '()', start: '(', end: ')', enabled: true, color: '#e198b8', useCustomColor: false }, // 英文圆括号
+        { id: 9, label: '[]', start: '[', end: ']', enabled: true, color: '#e198b8', useCustomColor: false }, // 英文方括号
+        { id: 10, label: '{}', start: '{', end: '}', enabled: true, color: '#e198b8', useCustomColor: false }, // 英文花括号
+        { id: 11, label: '【】', start: '【', end: '】', enabled: true, color: '#e198b8', useCustomColor: false }, // 粗括号
+        { id: 12, label: '〔〕', start: '〔', end: '〕', enabled: true, color: '#e198b8', useCustomColor: false }, // 龟甲号
+        { id: 13, label: '""', start: '"', end: '"', enabled: true, color: '#e198b8', useCustomColor: false }, // 英文双引号
+        { id: 14, label: "''", start: "'", end: "'", enabled: true, color: '#e198b8', useCustomColor: false } // 英文单引号
+      ]
+    }
   })
 
   // 加载编辑器设置
@@ -181,7 +202,8 @@ export const useEditorStore = defineStore('editor', () => {
         lineHeight: editorSettings.value.lineHeight,
         globalBoldMode: editorSettings.value.globalBoldMode,
         globalItalicMode: editorSettings.value.globalItalicMode,
-        formattingRules: editorSettings.value.formattingRules
+        formattingRules: editorSettings.value.formattingRules,
+        dialogueHighlight: editorSettings.value.dialogueHighlight
       }
       // 使用 JSON.parse(JSON.stringify()) 彻底移除 Vue 的 Proxy 代理
       // 解决 "An object could not be cloned" 错误

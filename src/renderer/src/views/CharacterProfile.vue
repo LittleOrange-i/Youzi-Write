@@ -606,19 +606,20 @@ const previewCharacter = ref(null) // 预览的人物数据
 let sortableInstance = null // 存储 SortableJS 实例
 
 const presetMarkerColors = [
-  '',
-  '#FF4D4F',
-  '#FF9F1C',
-  '#FFD600',
-  '#00C853',
-  '#1890FF',
-  '#B368FF',
-  '#FF6F91',
-  '#8D99AE',
-  '#A3E635',
-  '#00C9A7',
-  '#13C2C2',
-  '#2F54EB'
+  '', // 无颜色
+  '#e198b8', // 默认高亮颜色
+  '#FF4D4F', // 红色
+  '#FF9F1C', // 橙色
+  '#FFD600', // 黄色
+  '#00C853', // 绿色
+  '#1890FF', // 蓝色
+  '#B368FF', // 紫色
+  '#FF6F91', // 粉色
+  '#8D99AE', // 灰色
+  '#A3E635', // 草绿色
+  '#00C9A7', // 青色
+  '#13C2C2', // 湖蓝色
+  '#2F54EB' // 深蓝色
 ]
 
 const colorPickerPredefine = presetMarkerColors.filter((color) => !!color)
@@ -643,17 +644,17 @@ const textEditorMaxLength = ref(500) // 最大字符数
 
 // 表单数据
 const characterForm = reactive({
-  id: '',
-  name: '',
-  age: 18,
-  gender: '男',
-  height: 170,
+  id: '', // 唯一标识符
+  name: '', // 姓名
+  age: 18, // 年龄，默认为 18
+  gender: '男', // 性别，默认为男
+  height: 170, // 身高，默认为 170
   aliases: [], // 别名数组字段
-  tags: [], // 新增标签字段
+  tags: [], // 标签字段
   biography: '', // 生平介绍
   appearance: '', // 形象介绍
   avatar: '', // 头像路径或链接
-  markerColor: '' // 标记色
+  markerColor: '#e198b8' // 标记色，默认设置为 #e198b8
 })
 
 // 新别名输入框
@@ -921,22 +922,22 @@ function saveTextEditor() {
 // 重置表单
 function resetForm() {
   if (formRef.value) {
-    formRef.value.resetFields()
+    formRef.value.resetFields() // 重置表单验证状态
   }
   Object.assign(characterForm, {
-    id: '',
-    name: '',
-    age: 18,
-    gender: '男',
-    height: 170,
+    id: '', // 重置 ID
+    name: '', // 重置姓名
+    age: 18, // 重置年龄为 18
+    gender: '男', // 重置性别为男
+    height: 170, // 重置身高为 170
     aliases: [], // 重置别名数组
     tags: [], // 重置标签
-    biography: '', // 生平介绍
-    appearance: '', // 形象介绍
-    avatar: '', // 头像
-    markerColor: ''
+    biography: '', // 重置生平介绍
+    appearance: '', // 重置形象介绍
+    avatar: '', // 重置头像
+    markerColor: '#e198b8' // 重置标记色为 #e198b8
   })
-  newAliasInput.value = ''
+  newAliasInput.value = '' // 重置别名输入框
 }
 
 function handlePresetMarkerClick(color) {
