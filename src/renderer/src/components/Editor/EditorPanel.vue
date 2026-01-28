@@ -473,6 +473,37 @@ const contextMenuRef = ref(null) // 右键菜单的 DOM 引用
 // 视图切分状态
 const splitMode = ref('none') // 视图切分模式：none (无), horizontal (水平), vertical (垂直)
 const editor2 = ref(null) // 第二个编辑器实例，用于分屏显示
+let isSyncing = false // 全局同步标记，用于在分屏模式下防止两个编辑器之间产生循环同步更新
+
+// 同步两个编辑器内容的通用核心函数
+function syncEditors(sourceEditor, targetEditor, transaction) {
+  // 如果当前正在同步中、目标编辑器尚未初始化、或者本次更新未涉及文档内容改变，则直接跳过
+  if (isSyncing || !targetEditor || !transaction?.docChanged) return 
+  
+  isSyncing = true // 开启同步标记，锁定状态，防止 targetEditor 的更新事件再次触发同步
+  const contentComponent = getEditorContentComponent() // 获取当前适用的编辑器内容组件（章节或笔记）
+  if (!contentComponent) { // 如果没找到对应的组件
+    isSyncing = false // 释放同步锁
+    return // 退出函数
+  }
+  
+  const content = contentComponent.getSaveContent(sourceEditor) // 从源编辑器中提取当前最新的内容（HTML或纯文本）
+  const isNote = editorStore.file?.type === 'note' // 判断当前操作的文件是否为笔记类型
+  
+  if (isNote) { // 如果是笔记模式
+    noteEditorContentRef.value.setNoteContent(targetEditor, content) // 使用笔记组件的方法将内容同步到目标编辑器
+  } else { // 如果是章节模式
+    chapterEditorContentRef.value.setChapterContent(targetEditor, content) // 使用章节组件的方法将内容同步到目标编辑器
+  }
+  
+  // 在内容同步完成后，利用 nextTick 等待 Vue 完成 DOM 更新
+  nextTick(() => { // 开启异步回调处理
+    if (characterHighlightEnabled.value) applyCharacterHighlights() // 如果开启了人物高亮，则重新扫描并应用高亮标记
+    if (bannedWordsHintEnabled.value) applyBannedWordsStrikes() // 如果开启了禁词提示，则重新扫描并应用删除线
+    if (dialogueHighlightEnabled.value) applyDialogueHighlights() // 如果开启了对白高亮，则重新扫描并应用对白颜色
+    isSyncing = false // 所有副作用处理完毕后，正式释放同步锁，允许下一次同步
+  }) // 结束 nextTick 调用
+} // 结束 syncEditors 函数定义
 
 // 初始化第二个编辑器
 async function initEditor2() {
@@ -500,64 +531,24 @@ async function initEditor2() {
     chapterEditorContentRef.value.setChapterContent(editor2.value, currentContent) // 设置章节内容
   }
 
-  // 使用标记位防止同步循环
-  let isSyncing = false
-
-  // 监听主编辑器更新，同步到第二个编辑器
-  editor.value?.on('update', ({ editor: e1, transaction }) => {
-    if (isSyncing || !editor2.value || !transaction.docChanged) return // 如果正在同步或文档未改变则返回
-    
-    isSyncing = true // 开启同步标记
-    const content = getEditorContentComponent().getSaveContent(e1) // 获取主编辑器最新内容
-    if (isNote) { // 笔记模式
-      noteEditorContentRef.value.setNoteContent(editor2.value, content) // 同步到第二个编辑器
-    } else { // 章节模式
-      chapterEditorContentRef.value.setChapterContent(editor2.value, content) // 同步到第二个编辑器
-    }
-    
-    // 同步完成后应用高亮
-    nextTick(() => {
-      if (characterHighlightEnabled.value) applyCharacterHighlights()
-      if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
-      if (dialogueHighlightEnabled.value) applyDialogueHighlights()
-      isSyncing = false // 关闭同步标记
-    })
-  })
-
-  // 监听第二个编辑器更新，同步到主编辑器
-  editor2.value.on('update', ({ editor: e2, transaction }) => { // 绑定更新事件
-    if (isSyncing || !editor.value || !transaction.docChanged) return // 如果正在同步或文档未改变则返回
-    
-    isSyncing = true // 开启同步标记
-    const content = getEditorContentComponent().getSaveContent(e2) // 获取第二个编辑器最新内容
-    if (isNote) { // 笔记模式
-      noteEditorContentRef.value.setNoteContent(editor.value, content) // 同步到主编辑器
-    } else { // 章节模式
-      chapterEditorContentRef.value.setChapterContent(editor.value, content) // 同步到主编辑器
-    } // 结束判断
-
-    // 同步完成后应用高亮
-    nextTick(() => {
-      if (characterHighlightEnabled.value) applyCharacterHighlights()
-      if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
-      if (dialogueHighlightEnabled.value) applyDialogueHighlights()
-      isSyncing = false // 关闭同步标记
-    })
-  }) // 结束监听
-
   // 为第二个编辑器绑定基本事件
-  editor2.value.on('selectionUpdate', () => { // 绑定选区更新事件
-    updateCursorPosition() // 更新光标位置统计
-  }) // 结束监听
+  editor2.value.on('selectionUpdate', () => { // 监听第二个编辑器的选区更新事件
+    updateCursorPosition() // 当选区改变时，同步更新底部的光标位置统计信息
+  }) // 结束监听绑定
 
-  await nextTick() // 等待 DOM 更新
-  updateEditorStyle() // 应用编辑器样式（字体、字号等）
+  // 监听第二个编辑器的内容更新，并同步回主编辑器
+  editor2.value.on('update', ({ transaction }) => { // 绑定 update 事件处理逻辑
+    syncEditors(editor2.value, editor.value, transaction) // 调用核心同步函数，将 editor2 的变更同步给 editor
+  }) // 结束监听绑定
+
+  await nextTick() // 等待 Vue 完成当前的 DOM 渲染周期
+  updateEditorStyle() // 确保第二个编辑器也应用了当前的字体、字号和行高等样式设置
   
-  // 初始应用高亮
-  if (characterHighlightEnabled.value) applyCharacterHighlights()
-  if (bannedWordsHintEnabled.value) applyBannedWordsStrikes()
-  if (dialogueHighlightEnabled.value) applyDialogueHighlights()
-}
+  // 初始切分时，为第二个编辑器应用一次高亮效果
+  if (characterHighlightEnabled.value) applyCharacterHighlights() // 如果开启了人物高亮，则执行高亮逻辑
+  if (bannedWordsHintEnabled.value) applyBannedWordsStrikes() // 如果开启了禁词提示，则执行划线逻辑
+  if (dialogueHighlightEnabled.value) applyDialogueHighlights() // 如果开启了对白高亮，则执行染色逻辑
+} // 结束 initEditor2 函数定义
 
 // 处理水平切分
 async function handleHorizontalSplit() { // 定义异步函数
@@ -1306,12 +1297,14 @@ async function initEditor() {
   })
   
   // 添加内容更新监听
-  editor.value.on('update', ({ transaction }) => {
-    updateCursorPosition()
-    if (transaction.docChanged && dialogueHighlightEnabled.value) {
-      applyDialogueHighlights()
-    }
-  })
+  editor.value.on('update', ({ transaction }) => { // 监听主编辑器内容更新事件
+    updateCursorPosition() // 更新光标位置统计信息
+    if (transaction.docChanged && dialogueHighlightEnabled.value) { // 如果内容发生变化且开启了对白高亮
+      applyDialogueHighlights() // 实时应用对白染色逻辑
+    } // 结束判断
+    // 将变更同步到第二个编辑器（如果存在）
+    syncEditors(editor.value, editor2.value, transaction) // 调用核心同步函数执行单向同步
+  }) // 结束监听绑定
 
   // 设置初始内容
   const initialContent = editorStore.content || ''
