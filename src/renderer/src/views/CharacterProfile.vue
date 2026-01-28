@@ -274,9 +274,11 @@
     :title="isEdit ? '编辑人物' : '创建人物'"
     width="700px"
     align-center
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false"
     @close="resetForm"
     class="edit-dialog"
-  >
+  > <!-- 对话框：创建或编辑人物 -->
     <div ref="editScrollContainer" class="edit-scroll-container">
       <el-form ref="formRef" :model="characterForm" :rules="formRules" label-width="80px">
       <!-- 头像操作区域 -->
@@ -463,8 +465,10 @@
     :title="textEditorTitle"
     width="700px"
     align-center
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false" 
     class="text-editor-dialog"
-  >
+  > <!-- 对话框：文本编辑 -->
     <el-input
       v-model="textEditorContent"
       type="textarea"
@@ -486,8 +490,10 @@
     title="人物详情"
     width="700px"
     align-center
+    :close-on-click-modal="false" <!-- 禁用点击遮罩层关闭对话框 -->
+    :close-on-press-escape="false" <!-- 禁用通过按下 Esc 键关闭对话框 -->
     class="preview-dialog"
-  >
+  > <!-- 对话框：人物详情预览 -->
     <div v-if="previewCharacter" class="preview-content">
       <div ref="previewScrollContainer" class="preview-scroll-container">
         <div class="preview-header">

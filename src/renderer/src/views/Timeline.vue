@@ -79,11 +79,13 @@
       </div>
     </template>
   </LayoutTool>
-  <!-- 新增/编辑节点对话框 -->
+  <!-- 对话框：新增或编辑节点 (禁用点击遮罩层和Esc键关闭) -->
   <el-dialog
     v-model="dialogVisible"
     :title="nodeInfo.id === -1 ? '新增节点' : '编辑节点'"
     width="500px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
     @close="dialogVisible = false"
   >
     <el-form :model="nodeInfo" label-width="80px">
@@ -106,11 +108,13 @@
     </template>
   </el-dialog>
 
-  <!-- 新增时间线对话框 -->
+  <!-- 对话框：新增时间线 (禁用点击遮罩层和Esc键关闭) -->
   <el-dialog
     v-model="timelineDialogVisible"
     title="新增时间线"
     width="500px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
     @close="timelineDialogVisible = false"
   >
     <el-form :model="timelineInfo" label-width="80px">

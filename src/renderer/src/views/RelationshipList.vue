@@ -51,8 +51,13 @@
     v-model="showCreateDialog"
     title="创建新关系图"
     width="500px"
-    :close-on-click-modal="false"
-  >
+    :close-on-click-modal="false"  
+    :close-on-press-escape="false"
+  > 
+    <!-- 禁用通过按下 Esc 键关闭对话框 -->
+
+  
+  <!-- 对话框：创建新关系图 -->
     <el-form ref="createFormRef" :model="createForm" :rules="rules" label-width="80px">
       <el-form-item label="名称" prop="name">
         <el-input
@@ -88,8 +93,9 @@
     v-model="deleteDialogVisible"
     title="确认删除"
     width="500px"
-    :close-on-click-modal="false"
-  >
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false" 
+  > <!-- 对话框：确认删除关系图 -->
     <span>确定要删除关系图 "{{ selectedRelationship?.name }}" 吗？此操作不可恢复。</span>
     <template #footer>
       <span class="dialog-footer">

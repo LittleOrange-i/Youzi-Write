@@ -55,8 +55,10 @@
     v-model="dialogVisible"
     :title="isEdit ? '编辑词条' : '创建词条'"
     width="600px"
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false"
     @close="resetForm"
-  >
+  > <!-- 对话框：创建或编辑词条 -->
     <el-form ref="formRef" :model="entryForm" :rules="formRules" label-width="80px">
       <el-form-item label="名称" prop="name">
         <el-input v-model="entryForm.name" placeholder="请输入词条名称" clearable />

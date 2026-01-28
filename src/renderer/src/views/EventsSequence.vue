@@ -163,7 +163,14 @@
   </LayoutTool>
 
   <!-- 创建事序图弹框 -->
-  <el-dialog v-model="showCreateDialog" title="创建事序图" width="500px" @close="resetForm">
+  <el-dialog
+    v-model="showCreateDialog"
+    title="创建事序图"
+    width="500px"
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false" 
+    @close="resetForm"
+  > <!-- 对话框：创建事序图 -->
     <el-form ref="chartFormRef" :model="chartForm" :rules="chartRules" label-width="100px">
       <el-form-item label="主题名称" prop="title">
         <el-input
@@ -185,10 +192,12 @@
   <!-- 扩展单元格弹框 -->
   <el-dialog
     v-model="showExpandDialog"
-    title="扩展单元格数量"
-    width="500px"
+    title="扩展单元格"
+    width="450px"
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false"
     @close="resetExpandForm"
-  >
+  > <!-- 对话框：扩展单元格 -->
     <el-form ref="expandFormRef" :model="expandForm" :rules="expandRules" label-width="120px">
       <el-form-item label="扩展数量" prop="cellCount">
         <el-input-number
@@ -218,8 +227,10 @@
     v-model="showEventDialog"
     :title="eventDialogMode === 'create' ? '添加事件' : '编辑事件'"
     width="560px"
+    :close-on-click-modal="false" 
+    :close-on-press-escape="false" 
     @close="resetEventForm"
-  >
+  > <!-- 对话框：添加或编辑事件 -->
     <el-form ref="eventFormRef" :model="eventForm" :rules="eventRules" label-width="100px">
       <el-form-item label="简介" prop="introduction">
         <el-input
