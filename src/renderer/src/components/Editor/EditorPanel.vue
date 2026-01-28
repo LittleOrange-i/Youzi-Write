@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-panel">
+  <div class="editor-panel" :class="{ 'fullscreen-panel': isFullscreenMode }">
     <!-- 菜单栏 -->
     <EditorMenubar
       ref="editorMenubarRef"
@@ -7,12 +7,13 @@
       :editor="editor"
       :book-name="bookName"
       @toggle-search="toggleSearchPanel"
+      @toggle-fullscreen="toggleFullscreen"
       @save="saveContent"
       @export="handleExport"
       @update-style="handleStyleUpdate"
     />
-    <!-- 章节标题 -->
-    <div class="chapter-title">
+    <!-- 章节标题 - 全屏模式下隐藏 -->
+    <div v-if="!isFullscreenMode" class="chapter-title">
       <el-input
         v-model="chapterTitle"
         placeholder="章节标题"
@@ -101,16 +102,16 @@
       :get-font-family="getFontFamily"
       :auto-save-content="autoSaveContent"
     />
-    <!-- 码字进度 -->
+    <!-- 码字进度 - 全屏模式下隐藏 -->
     <EditorProgress
-      v-if="editorStore.file?.type === 'chapter'"
+      v-if="!isFullscreenMode && editorStore.file?.type === 'chapter'"
       :current-words="contentWordCount"
       :target-words="editorStore.chapterTargetWords"
       :book-name="bookName"
     />
-    <!-- 编辑器统计 -->
+    <!-- 编辑器统计 - 全屏模式下隐藏 -->
     <EditorStats
-      v-if="editorStore.file?.type === 'chapter'"
+      v-if="!isFullscreenMode && editorStore.file?.type === 'chapter'"
       ref="editorStatsRef"
       :book-name="bookName"
       :content-word-count="contentWordCount"
@@ -256,12 +257,16 @@ if (route.query.reset === 'true') {
 }
 
 const props = defineProps({
-  bookName: String
+  bookName: String,
+  isFullscreenMode: {
+    type: Boolean,
+    default: false
+  }
 })
 
 const isMounted = ref(false)
 
-const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change', 'chapter-word-count-updated'])
+const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change', 'chapter-word-count-updated', 'toggle-fullscreen'])
 
 // 默认高亮颜色（当人物没有设置标记颜色时使用）
 const defaultHighlightColor = '#e198b8'
@@ -599,6 +604,15 @@ function getSelectedText() {
 
 // 键盘快捷键处理
 function handleKeydown(event) {
+  // 如果按下 Esc 键且当前处于全屏模式，则触发退出全屏
+  if (event.key === 'Escape' && props.isFullscreenMode) {
+    event.preventDefault() // 防止 Esc 键的默认行为
+    event.stopPropagation() // 防止冒泡到 Editor.vue 的全局监听器，避免重复处理
+    console.log('[编辑器面板] 检测到 Esc 键，退出全屏模式')
+    emit('toggle-fullscreen', false) // 明确通知父组件退出全屏模式
+    return
+  }
+
   // Cmd/Ctrl + F: 打开搜索面板
   if ((event.metaKey || event.ctrlKey) && event.key === 'f') {
     event.preventDefault()
@@ -1074,6 +1088,11 @@ async function saveContent() {
 // 搜索面板控制
 function toggleSearchPanel() {
   searchPanelVisible.value = !searchPanelVisible.value
+}
+
+// 切换全屏模式
+function toggleFullscreen() {
+  emit('toggle-fullscreen')
 }
 
 function closeSearchPanel() {
@@ -2223,17 +2242,31 @@ watch(isJailModeActive, (newVal) => {
   emit('jail-mode-change', newVal)
 })
 
+defineExpose({
+  saveContent,
+  autoSaveContent
+})
+
 </script>
 
 <style lang="scss" scoped>
 .editor-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background-color: var(--bg-primary);
-  color: var(--text-base);
-  min-height: 0;
-  overflow: hidden;
+  display: flex; // 使用弹性布局
+  flex-direction: column; // 垂直排列子元素
+  height: 100%; // 占据父容器全部高度
+  background-color: var(--bg-primary); // 使用主题背景色
+  color: var(--text-base); // 使用主题文字颜色
+  min-height: 0; // 允许在 flex 容器中收缩
+  overflow: hidden; // 隐藏溢出内容
+
+  /* 全屏模式样式 - 适配比例布局 */
+   &.fullscreen-panel {
+     width: 100%; // 宽度填充父容器（即 Editor.vue 中的 46% 宽度容器）
+     margin: 0 auto; // 水平居中
+     box-shadow: none; // 阴影已在父容器中设置，此处移除
+     border-left: 1px solid var(--border-color); // 保留左侧边框
+     border-right: 1px solid var(--border-color); // 保留右侧边框
+   }
 }
 .chapter-title {
   padding: 8px 15px;

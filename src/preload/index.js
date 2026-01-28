@@ -287,6 +287,12 @@ if (process.contextIsolated) {
       onMaximize: (callback) => ipcRenderer.on('window:maximize', () => callback()),
       // 监听窗口还原
       onUnmaximize: (callback) => ipcRenderer.on('window:unmaximize', () => callback()),
+      // 切换全屏
+      toggleFullscreen: () => ipcRenderer.invoke('window:toggle-fullscreen'),
+      // 设置全屏
+      setFullScreen: (flag) => ipcRenderer.invoke('window:set-fullscreen', flag),
+      // 获取全屏状态
+      isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen'),
 
       // 退出应用程序
       quitApp: () => ipcRenderer.invoke('quit-app')

@@ -831,10 +831,25 @@ onMounted(async () => {
     // 加载章节时间排序状态（默认降序）
     const savedChapterSortOrder = await window.electron.getChapterSortOrder(props.bookName)
     chapterSortOrder.value = savedChapterSortOrder || 'desc'
-    await loadChapters(true) // 首次加载时自动选中最新章节
+    
+    // 如果当前已经打开了文件（例如从全屏模式切回），则不需要自动选中最新章节
+    const hasOpenFile = !!editorStore.file
+    await loadChapters(!hasOpenFile) 
+    
+    // 如果已有打开的文件，同步选中状态到树组件
+    if (hasOpenFile) {
+      if (editorStore.file.type === 'chapter') {
+        currentChapterNodeKey.value = editorStore.file.path
+      } else if (editorStore.file.type === 'note') {
+        currentNoteNodeKey.value = editorStore.file.path
+        notesExpanded.value = true // 确保笔记面板展开
+      }
+    }
+    
     notesTree.value = await window.electron.loadNotes(props.bookName)
     await loadChapterSettings()
-  } catch {
+  } catch (error) {
+    console.error('加载书籍数据失败:', error)
     ElMessage.error('加载书籍数据失败')
   }
 })

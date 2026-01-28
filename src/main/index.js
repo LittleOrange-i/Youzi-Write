@@ -1012,6 +1012,36 @@ ipcMain.handle('window:is-maximized', (event) => {
   return false
 })
 
+// 切换全屏
+ipcMain.handle('window:toggle-fullscreen', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    const isFullScreen = window.isFullScreen()
+    window.setFullScreen(!isFullScreen)
+    return !isFullScreen
+  }
+  return false
+})
+
+// 设置全屏状态
+ipcMain.handle('window:set-fullscreen', (event, flag) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    window.setFullScreen(flag)
+    return true
+  }
+  return false
+})
+
+// 获取全屏状态
+ipcMain.handle('window:is-fullscreen', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender)
+  if (window) {
+    return window.isFullScreen()
+  }
+  return false
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()

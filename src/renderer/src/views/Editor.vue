@@ -1,10 +1,11 @@
 <template>
-  <div class="editor-container">
-    <!-- 顶部工具栏 -->
-    <EditorToolbar class="top-toolbar" />
+  <div class="editor-container" :class="{ 'fullscreen-mode': isFullscreenMode }">
+    <!-- 顶部工具栏 - 全屏模式下隐藏 -->
+    <EditorToolbar v-if="!isFullscreenMode" class="top-toolbar" />
     
     <div class="editor-content">
-      <el-splitter style="height: 100%;">
+      <!-- 正常模式 -->
+      <el-splitter v-if="!isFullscreenMode" style="height: 100%;">
         <el-splitter-panel :size="NoteChapterSize">
           <!-- 笔记章节面板 -->
           <NoteChapter ref="noteChapterRef" :book-name="bookName" />
@@ -16,11 +17,13 @@
               <EditorPanel
                 ref="editorPanelRef"
                 :book-name="bookName"
+                :is-fullscreen-mode="false"
                 @editor-ready="handleEditorReady"
                 @refresh-notes="refreshNotes"
                 @refresh-chapters="refreshChapters"
                 @jail-mode-change="handleJailModeChange"
                 @chapter-word-count-updated="handleChapterWordCountUpdate"
+                @toggle-fullscreen="toggleFullscreen"
               />
             </el-splitter-panel>
             <el-splitter-panel :size="aiSidebarSize">
@@ -30,6 +33,25 @@
           </el-splitter>
         </el-splitter-panel>
       </el-splitter>
+      
+      <!-- 全屏模式 - 纯内容显示 -->
+      <div v-else class="fullscreen-content-wrapper">
+        <div class="fullscreen-editor-content">
+          <EditorPanel
+            ref="editorPanelRef"
+            :book-name="bookName"
+            :is-fullscreen-mode="true"
+            @editor-ready="handleEditorReady"
+            @refresh-notes="refreshNotes"
+            @refresh-chapters="refreshChapters"
+            @jail-mode-change="handleJailModeChange"
+            @chapter-word-count-updated="handleChapterWordCountUpdate"
+            @toggle-fullscreen="toggleFullscreen"
+          />
+        </div>
+        <!-- 右下角时间显示 -->
+        <div class="fullscreen-clock">{{ currentTime }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -62,6 +84,70 @@ if (!bookName) {
 }
 
 const isMaximized = ref(false)
+
+// 全屏模式状态
+const isFullscreenMode = ref(false)
+// 当前时间（用于全屏模式显示）
+const currentTime = ref('')
+let timeUpdateInterval = null
+
+// 更新时间显示
+function updateTime() {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  currentTime.value = `${hours}:${minutes}`
+}
+
+// 切换全屏模式
+async function toggleFullscreen(forceState) {
+  // 如果提供了 forceState，则使用该值；否则切换当前状态
+  const newState = typeof forceState === 'boolean' ? forceState : !isFullscreenMode.value
+  
+  // 如果状态没有变化，则不做任何操作（防止重复触发）
+  if (isFullscreenMode.value === newState) return
+  
+  // 在切换模式前，尝试保存当前编辑器的内容到 store 中，确保状态同步
+  if (editorPanelRef.value && editorPanelRef.value.saveContent) {
+    try {
+      await editorPanelRef.value.saveContent()
+      console.log('[编辑器] 切换模式前已保存内容')
+    } catch (error) {
+      console.error('[编辑器] 切换模式前保存内容失败:', error)
+    }
+  }
+  
+  isFullscreenMode.value = newState
+  
+  // 同步 Electron 窗口的全屏状态
+  if (window.electron) {
+    if (newState) {
+      // 进入全屏模式：如果当前不是全屏，则设置为全屏
+      const isCurrentlyFullScreen = await window.electron.isFullScreen()
+      if (!isCurrentlyFullScreen) {
+        await window.electron.setFullScreen(true)
+      }
+    } else {
+      // 退出全屏模式：如果当前是全屏，则退出全屏
+      const isCurrentlyFullScreen = await window.electron.isFullScreen()
+      if (isCurrentlyFullScreen) {
+        await window.electron.setFullScreen(false)
+      }
+    }
+  }
+  
+  if (isFullscreenMode.value) {
+    // 进入全屏模式，启动时间更新
+    updateTime()
+    timeUpdateInterval = setInterval(updateTime, 1000)
+  } else {
+    // 退出全屏模式，停止时间更新
+    if (timeUpdateInterval) {
+      clearInterval(timeUpdateInterval)
+      timeUpdateInterval = null
+    }
+  }
+}
 
 // 更新侧边栏宽度的统一逻辑
 const updateSidebarSizes = () => {
@@ -109,12 +195,24 @@ onMounted(async () => {
   if (window.electron?.onShortcutTriggered) {
     window.electron.onShortcutTriggered(handleShortcut)
   }
+
+  // 注册全局键盘监听，用于 Esc 退出全屏
+  window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 onUnmounted(() => {
+  // 清理全局键盘监听
+  window.removeEventListener('keydown', handleGlobalKeydown)
+  
   // 清理快捷键监听器
   // 注意：preload中的实现是直接on，没有提供off方法
   // 如果需要清理，需要在preload中添加对应的removeListener
+  
+  // 清理时间更新定时器
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval)
+    timeUpdateInterval = null
+  }
 })
 
 const noteChapterRef = ref(null)
@@ -177,6 +275,15 @@ const handleShortcut = (actionId) => {
   }
 }
 
+// 处理全局按键事件
+const handleGlobalKeydown = (event) => {
+  // 如果按下 Esc 键且当前处于全屏阅读模式，则退出全屏
+  if (event.key === 'Escape' && isFullscreenMode.value) {
+    console.log('[编辑器] 检测到 Esc 键，退出全屏阅读模式')
+    toggleFullscreen(false) // 明确指定退出全屏
+  }
+}
+
 // function handleSelectFile(file) {
 //   // 预留：可做高亮、聚焦等
 // }
@@ -197,8 +304,50 @@ const handleShortcut = (actionId) => {
   }
 
   .editor-content {
-    flex: 1;
-    overflow: hidden;
+    flex: 1; // 占据剩余空间
+    overflow: hidden; // 隐藏溢出内容
+  }
+  
+  // 全屏模式样式
+  &.fullscreen-mode {
+    .editor-content {
+      background-color: #1a1a1a; // 全屏模式下的深色背景（关灯效果）
+      display: flex; // 使用弹性布局
+      justify-content: center; // 水平居中内容
+      align-items: stretch; // 垂直方向拉伸填充
+    }
+    
+    .fullscreen-content-wrapper {
+      width: 100%; // 占据全部宽度
+      height: 100%; // 占据全部高度
+      display: flex; // 使用弹性布局
+      justify-content: center; // 水平居中编辑器
+      align-items: stretch; // 垂直方向拉伸填充
+      position: relative; // 相对定位，用于内部绝对定位元素
+    }
+    
+    .fullscreen-editor-content {
+      width: 46%; // 设置编辑器宽度占屏幕总宽度的 46%
+      min-width: 800px; // 设置最小宽度，防止在窄屏幕上过窄
+      height: 100%; // 占据全部高度
+      background-color: var(--bg-primary); // 使用编辑器主题背景色
+      display: flex; // 使用弹性布局
+      flex-direction: column; // 垂直排列子元素
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); // 增加阴影深度，强化视觉分割
+    }
+    
+    .fullscreen-clock {
+      position: fixed;
+      right: 40px;
+      bottom: 40px;
+      font-size: 24px;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.3); // 半透明白色
+      font-family: 'Arial', sans-serif;
+      user-select: none;
+      pointer-events: none;
+      z-index: 10;
+    }
   }
 }
 </style>

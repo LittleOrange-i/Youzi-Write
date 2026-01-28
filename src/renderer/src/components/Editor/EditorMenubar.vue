@@ -175,6 +175,9 @@
       <el-button size="small" class="toolbar-item" title="搜索" @click="handleToggleSearchPanel">
         <el-icon><Search /></el-icon>
       </el-button>
+      <el-button size="small" class="toolbar-item" title="沉浸式阅读" @click="handleToggleFullscreen">
+        <el-icon><FullScreen /></el-icon>
+      </el-button>
     </div>
     <div class="toolbar-right">
       <el-button size="small" class="toolbar-item" title="保存" @click="handleSave">
@@ -195,7 +198,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { DocumentCopy, Search, Tickets, Edit, Delete } from '@element-plus/icons-vue'
+import { DocumentCopy, Search, Tickets, Edit, Delete, FullScreen } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useEditorStore } from '@renderer/stores/editor'
@@ -222,7 +225,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'toggle-search', 'save', 'export', 'update-style'])
+const emit = defineEmits(['update:modelValue', 'toggle-search', 'save', 'export', 'update-style', 'toggle-fullscreen'])
 
 const editorStore = useEditorStore()
 
@@ -584,6 +587,11 @@ function handleCopyContent() {
 
 function handleToggleSearchPanel() {
   emit('toggle-search')
+}
+
+// 全屏模式切换 - 通知父组件处理
+async function handleToggleFullscreen() {
+  emit('toggle-fullscreen')
 }
 
 function handleSave() {
