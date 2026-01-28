@@ -32,6 +32,8 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 Store
+import { storeToRefs } from 'pinia' // 导入 storeToRefs
 
 const props = defineProps({
   bookName: {
@@ -40,9 +42,10 @@ const props = defineProps({
   }
 })
 
-const visible = ref(false)
-const newWord = ref('')
-const bannedWords = ref([])
+const editorStore = useEditorStore() // 获取编辑器 store 实例
+const { bannedWords } = storeToRefs(editorStore) // 获取 store 中的响应式禁词列表
+const visible = ref(false) // 抽屉可见性状态
+const newWord = ref('') // 新禁词输入内容
 
 // 打开抽屉
 const open = () => {
@@ -57,14 +60,7 @@ const close = () => {
 // 加载禁词列表
 const loadBannedWords = async () => {
   if (!props.bookName) return
-  try {
-    const result = await window.electron.getBannedWords(props.bookName)
-    if (result.success) {
-      bannedWords.value = result.data || []
-    }
-  } catch (error) {
-    console.error('加载禁词失败:', error)
-  }
+  await editorStore.fetchBannedWords(props.bookName)
 }
 
 // 新增禁词
@@ -84,9 +80,8 @@ const handleAddWord = async () => {
   }
 
   try {
-    const result = await window.electron.addBannedWord(props.bookName, word)
+    const result = await editorStore.addBannedWord(props.bookName, word)
     if (result.success) {
-      bannedWords.value.unshift(word)
       newWord.value = ''
       ElMessage.success('添加成功')
     } else {
@@ -101,12 +96,8 @@ const handleAddWord = async () => {
 // 删除禁词
 const handleDeleteWord = async (word) => {
   try {
-    const result = await window.electron.removeBannedWord(props.bookName, word)
+    const result = await editorStore.removeBannedWord(props.bookName, word)
     if (result.success) {
-      const index = bannedWords.value.indexOf(word)
-      if (index > -1) {
-        bannedWords.value.splice(index, 1)
-      }
       ElMessage.success('删除成功')
     } else {
       ElMessage.error(result.message || '删除失败')

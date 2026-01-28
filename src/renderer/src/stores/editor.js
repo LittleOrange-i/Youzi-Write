@@ -7,6 +7,7 @@ export const useEditorStore = defineStore('editor', () => {
   const file = ref(null)
   const chapterTitle = ref('')
   const currentBookName = ref('')
+  const bannedWords = ref([]) // 禁词列表
 
   // 初始化标记
   const isInitializing = ref(false) // 是否正在初始化（加载已有内容）
@@ -287,6 +288,54 @@ export const useEditorStore = defineStore('editor', () => {
     return bookTotalWords.value
   }
 
+  // 加载禁词列表
+  async function fetchBannedWords(bookName) {
+    if (!bookName) return // 如果没有书名则直接返回
+    try {
+      const result = await window.electron.getBannedWords(bookName) // 从后端获取禁词列表
+      if (result.success) {
+        bannedWords.value = result.data || [] // 更新 store 中的禁词列表数据
+      }
+    } catch (error) {
+      console.error('加载禁词失败:', error) // 打印错误日志
+    }
+  }
+
+  // 添加禁词
+  async function addBannedWord(bookName, word) {
+    if (!bookName || !word) return { success: false } // 校验参数合法性
+    try {
+      const result = await window.electron.addBannedWord(bookName, word) // 调用后端接口添加禁词
+      if (result.success) {
+        if (!bannedWords.value.includes(word)) {
+          bannedWords.value.unshift(word) // 添加成功后同步更新 store 列表
+        }
+      }
+      return result // 返回操作结果
+    } catch (error) {
+      console.error('添加禁词失败:', error) // 打印错误日志
+      return { success: false, message: error.message } // 返回错误信息
+    }
+  }
+
+  // 删除禁词
+  async function removeBannedWord(bookName, word) {
+    if (!bookName || !word) return { success: false } // 校验参数合法性
+    try {
+      const result = await window.electron.removeBannedWord(bookName, word) // 从后端删除禁词
+      if (result.success) {
+        const index = bannedWords.value.indexOf(word) // 查找该词在列表中的索引
+        if (index > -1) {
+          bannedWords.value.splice(index, 1) // 从 store 列表中移除该词
+        }
+      }
+      return result // 返回操作结果
+    } catch (error) {
+      console.error('删除禁词失败:', error) // 打印错误日志
+      return { success: false, message: error.message } // 返回错误信息
+    }
+  }
+
   return {
     content,
     file,
@@ -297,6 +346,7 @@ export const useEditorStore = defineStore('editor', () => {
     currentBookName,
     bookTotalWords,
     bookWordsLoaded,
+    bannedWords,
     setContent,
     setFile,
     setChapterTitle,
@@ -307,6 +357,9 @@ export const useEditorStore = defineStore('editor', () => {
     setBookTotalWords,
     resetBookWordStats,
     fetchBookTotalWords,
+    fetchBannedWords,
+    addBannedWord,
+    removeBannedWord,
     chapterTargetWords,
     setChapterTargetWords,
     paragraphMaxLength,

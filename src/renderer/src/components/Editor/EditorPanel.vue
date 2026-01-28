@@ -930,7 +930,7 @@ const overLengthParagraphs = ref([]) // 超标段落列表
 
 // 禁词提示相关状态
 const bannedWordsHintEnabled = ref(false) // 禁词提示开关状态，默认关闭
-const bannedWords = ref([]) // 禁词数据列表
+const bannedWords = computed(() => editorStore.bannedWords) // 使用 store 中的禁词列表
 let bannedWordsHintTimer = null // 禁词提示定时器
 
 // 对白高亮相关状态
@@ -2043,20 +2043,21 @@ function jumpToParagraph(item) {
 // ==================== 禁词提示相关函数 ====================
 
 
+// 监听禁词列表变化，立即重新应用划线
+watch(
+  () => editorStore.bannedWords, // 监听 store 中的禁词列表
+  () => {
+    if (bannedWordsHintEnabled.value && editor.value) {
+      applyBannedWordsStrikes() // 如果开启了禁词提示且编辑器已就绪，则重新应用划线
+    }
+  },
+  { deep: true } // 深度监听数组变化
+)
+
 // 加载禁词数据
 async function loadBannedWords() {
   if (!props.bookName) return
-  try {
-    const result = await window.electron.getBannedWords(props.bookName)
-    if (result.success) {
-      bannedWords.value = result.data || []
-    } else {
-      bannedWords.value = []
-    }
-  } catch (error) {
-    console.error('加载禁词数据失败:', error)
-    bannedWords.value = []
-  }
+  await editorStore.fetchBannedWords(props.bookName)
 }
 
 // 清除所有禁词划线（不改变光标位置）
@@ -2098,7 +2099,13 @@ function clearBannedWordsStrikes() {
 
 // 应用禁词划线（不改变光标位置）
 function applyBannedWordsStrikes() {
-  if (!bannedWordsHintEnabled.value || bannedWords.value.length === 0) {
+  if (!bannedWordsHintEnabled.value) {
+    return
+  }
+
+  // 如果没有禁词，则清除所有现有的禁词划线
+  if (bannedWords.value.length === 0) {
+    clearBannedWordsStrikes()
     return
   }
 
