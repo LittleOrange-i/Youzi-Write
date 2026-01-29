@@ -172,11 +172,36 @@ function createEditor() {
 }
 
 // 设置章节编辑器内容
+/**
+ * 设置章节内容（带有光标保持逻辑）
+ * @param {Object} editor - Tiptap 编辑器实例
+ * @param {String} content - 新的内容文本
+ */
 function setChapterContent(editor, content) {
-  if (!editor) return
-  // 即使内容为空，也要清空编辑器，确保显示空内容而不是保留之前的内容
-  const htmlContent = content ? plainTextToHtml(content) : ''
-  editor.commands.setContent(htmlContent)
+  if (!editor) return // 如果编辑器实例不存在则返回
+  
+  const htmlContent = content ? plainTextToHtml(content) : '' // 将纯文本转换为 HTML 格式
+  
+  // 性能优化：如果新内容与当前内容完全一致，则跳过更新
+  // 这样可以避免不必要的 DOM 重绘，并彻底解决内容一致时的光标抖动问题
+  if (editor.getHTML() === htmlContent) return // 结束判断
+  
+  // 记录当前的光标位置和选区状态
+  const { from, to } = editor.state.selection // 获取当前的选区范围
+  
+  // 执行内容更新，第二个参数 false 表示不触发某些内部副作用（如果 Tiptap 版本支持）
+  editor.commands.setContent(htmlContent) // 更新编辑器内容
+  
+  // 尝试恢复光标位置
+  // 注意：如果文档结构发生了巨大变化，恢复可能会失效，但对于普通的文字输入同步，这能有效防止光标跳到末尾
+  try {
+    const docSize = editor.state.doc.content.size // 获取新文档的总长度
+    const safeFrom = Math.min(from, docSize) // 确保光标起始位置不越界
+    const safeTo = Math.min(to, docSize) // 确保光标结束位置不越界
+    editor.commands.setTextSelection({ from: safeFrom, to: safeTo }) // 恢复选区
+  } catch (e) {
+    console.warn('[章节编辑器] 恢复光标位置失败:', e) // 记录警告信息
+  } // 结束尝试恢复
 }
 
 // 获取章节编辑器保存内容

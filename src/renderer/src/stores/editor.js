@@ -8,6 +8,7 @@ export const useEditorStore = defineStore('editor', () => {
   const chapterTitle = ref('')
   const currentBookName = ref('')
   const bannedWords = ref([]) // 禁词列表
+  const splitMode = ref('none') // 视图切分模式：none (无), horizontal (水平), vertical (垂直)
 
   // 初始化标记
   const isInitializing = ref(false) // 是否正在初始化（加载已有内容）
@@ -110,6 +111,8 @@ export const useEditorStore = defineStore('editor', () => {
     lastSyncedChapterWords.value = 0
     // 清除临时保存的统计数据
     sessionStats.value = null
+    // 重置切分模式
+    splitMode.value = 'none'
   }
 
   function saveSessionStats(stats) {
@@ -347,6 +350,7 @@ export const useEditorStore = defineStore('editor', () => {
     bookTotalWords,
     bookWordsLoaded,
     bannedWords,
+    splitMode,
     setContent,
     setFile,
     setChapterTitle,

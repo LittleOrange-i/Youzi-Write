@@ -458,43 +458,65 @@ function createEditor() {
   return editor
 }
 
-// 设置笔记编辑器内容
+/**
+ * 设置笔记编辑器内容（带有光标保持逻辑）
+ * @param {Object} editor - Tiptap 编辑器实例
+ * @param {String} content - 新的内容文本（HTML 或纯文本）
+ */
 function setNoteContent(editor, content) {
-  if (!editor) return
+  if (!editor) return // 如果编辑器实例不存在则返回
+  
+  let htmlContent = '' // 初始化待设置的 HTML 内容
+  
   // 即使内容为空，也要清空编辑器，确保显示空内容而不是保留之前的内容
-  if (!content) {
-    editor.commands.setContent('<p data-note-outline data-level="0"></p>')
-    return
+  if (!content) { // 如果内容为空
+    htmlContent = '<p data-note-outline data-level="0"></p>' // 设置默认的笔记大纲段落
+  } else if (isHtmlContent(content)) { // 如果输入的是 HTML 格式
+    // 笔记模式：如果内容是 HTML，直接加载
+    htmlContent = content // 使用原始 HTML
+    // 确保 HTML 内容格式正确，必须包含 data-note-outline 属性
+    if (!htmlContent.includes('data-note-outline')) { // 如果缺失大纲属性
+      // 可能是旧的 HTML 格式，尝试批量转换 p 标签
+      htmlContent = htmlContent.replace(/<p([^>]*)>/gi, (match, attrs) => {
+        if (attrs.includes('data-note-outline')) return match // 已包含则跳过
+        return `<p data-note-outline data-level="0"${attrs}>` // 补齐属性
+      }) // 结束正则替换
+    } // 结束属性补齐
+  } else { // 如果输入的是纯文本格式
+    // 笔记模式：如果是纯文本，按行转换为笔记大纲格式
+    const lines = content.split('\n') // 按行拆分
+    htmlContent = lines
+      .map((line) => {
+        const trimmed = line.trim() // 去除两端空格
+        if (!trimmed) return '<p data-note-outline data-level="0"></p>' // 空行返回默认段落
+        // 检测缩进级别（Tab 或空格），用于自动设置层级
+        const indentMatch = line.match(/^(\t| {2,})*/) // 匹配前导空格或制表符
+        const level = indentMatch ? Math.floor(indentMatch[0].replace(/\t/g, '  ').length / 2) : 0 // 计算层级
+        return `<p data-note-outline data-level="${Math.min(level, 10)}">${trimmed}</p>` // 返回带层级的段落
+      })
+      .join('') // 合并 HTML
+    if (!htmlContent) htmlContent = '<p data-note-outline data-level="0"></p>' // 兜底处理
   }
 
-  if (isHtmlContent(content)) {
-    // 笔记模式：如果内容是 HTML，直接加载
-    // 确保 HTML 内容格式正确
-    let htmlContent = content
-    // 如果 HTML 中没有 note-outline 段落，尝试转换
-    if (!htmlContent.includes('data-note-outline')) {
-      // 可能是旧的 HTML 格式，尝试转换
-      htmlContent = htmlContent.replace(/<p([^>]*)>/gi, (match, attrs) => {
-        if (attrs.includes('data-note-outline')) return match
-        return `<p data-note-outline data-level="0"${attrs}>`
-      })
-    }
-    editor.commands.setContent(htmlContent)
-  } else {
-    // 笔记模式：如果是纯文本，转换为笔记大纲格式
-    const lines = (content || '').split('\n')
-    const htmlContent = lines
-      .map((line) => {
-        const trimmed = line.trim()
-        if (!trimmed) return '<p data-note-outline data-level="0"></p>'
-        // 检测缩进级别（Tab 或空格）
-        const indentMatch = line.match(/^(\t| {2,})*/)
-        const level = indentMatch ? Math.floor(indentMatch[0].replace(/\t/g, '  ').length / 2) : 0
-        return `<p data-note-outline data-level="${Math.min(level, 10)}">${trimmed}</p>`
-      })
-      .join('')
-    editor.commands.setContent(htmlContent || '<p data-note-outline data-level="0"></p>')
-  }
+  // 性能优化：如果新生成的 HTML 与当前编辑器内容一致，则跳过更新
+  // 这样可以避免不必要的 DOM 重绘，并防止光标位置被意外重置
+  if (editor.getHTML() === htmlContent) return // 结束优化判断
+  
+  // 记录当前的光标位置和选区状态
+  const { from, to } = editor.state.selection // 获取当前的选区范围
+  
+  // 执行内容更新
+  editor.commands.setContent(htmlContent) // 调用 Tiptap 指令设置内容
+  
+  // 尝试恢复光标位置
+  try {
+    const docSize = editor.state.doc.content.size // 获取新文档的总长度
+    const safeFrom = Math.min(from, docSize) // 确保光标起始位置不越界
+    const safeTo = Math.min(to, docSize) // 确保光标结束位置不越界
+    editor.commands.setTextSelection({ from: safeFrom, to: safeTo }) // 恢复选区位置
+  } catch (e) {
+    console.warn('[笔记编辑器] 恢复光标位置失败:', e) // 记录警告日志
+  } // 结束光标恢复逻辑
 }
 
 // 获取笔记编辑器保存内容

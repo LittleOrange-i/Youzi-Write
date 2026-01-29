@@ -101,16 +101,55 @@
       />
       <!-- 切分模式下的分割线 -->
       <div v-if="splitMode !== 'none'" class="split-divider"></div>
-      <!-- 第二个编辑器视图，仅在切分模式下显示 -->
-      <EditorContent 
-        v-if="splitMode !== 'none'"
-        class="editor-content second-editor" 
-        :editor="editor2" 
-        @keydown="updateActivity" 
-        @mousemove="updateActivity"
-        @click="() => { lastFocusedEditor = editor2; updateActivity(); updateCursorPosition(); }"
-        @contextmenu.prevent="showContextMenu"
-      />
+      <!-- 第二个编辑器视图容器，增加鼠标移入移出监听以控制章节选择器的显示 -->
+      <div 
+        v-if="splitMode !== 'none'" 
+        class="editor-content-wrapper second-editor-wrapper relative flex flex-col h-full overflow-hidden"
+        @mouseleave="startSelectorTimer"
+      >
+        <!-- 顶部触发区域：鼠标移到此处显示选择器 -->
+        <div 
+          class="absolute top-0 left-0 right-0 h-4 z-30 cursor-pointer"
+          @mouseenter="handleTriggerMouseEnter"
+          @mouseleave="startSelectorTimer"
+        ></div>
+
+        <!-- 浮动章节选择器：仅在 splitMode 不为 none 且 showEditor2Selector 为 true 时显示 -->
+        <Transition name="fade-slide">
+          <div 
+            v-if="showEditor2Selector"
+            class="absolute top-0 left-0 right-0 z-20 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-b border-indigo-100 dark:border-indigo-900/30 px-4 py-2 flex items-center gap-3 shadow-md transition-all duration-300"
+            @mouseenter="clearSelectorTimer"
+            @mouseleave="startSelectorTimer"
+          >
+            <!-- 章节选择下拉框 -->
+            <el-cascader
+              v-model="editor2ChapterValue"
+              :options="allChaptersOptions"
+              placeholder="切换对比章节"
+              size="small"
+              class="flex-1"
+              :props="{ label: 'name', value: 'name', children: 'children' }"
+              @change="handleEditor2ChapterChange"
+              @visible-change="handleCascaderVisibleChange"
+            />
+            <!-- 当前章节提示 -->
+            <span class="text-xs text-indigo-500 font-medium whitespace-nowrap">
+              当前: {{ editor2File?.name || '未选择' }}
+            </span>
+          </div>
+        </Transition>
+
+        <!-- 第二个编辑器视图 -->
+        <EditorContent 
+          class="editor-content second-editor flex-1" 
+          :editor="editor2" 
+          @keydown="updateActivity" 
+          @mousemove="updateActivity"
+          @click="() => { lastFocusedEditor = editor2; updateActivity(); updateCursorPosition(); }"
+          @contextmenu.prevent="showContextMenu"
+        />
+      </div>
     </div>
 
     <!-- 右键菜单 -->
@@ -263,16 +302,16 @@
       :get-font-family="getFontFamily"
       :auto-save-content="autoSaveContent"
     />
-    <!-- 码字进度 - 全屏模式下隐藏 -->
+    <!-- 码字进度 - 全屏模式下或切分模式下隐藏 -->
     <EditorProgress
-      v-if="!isFullscreenMode && editorStore.file?.type === 'chapter'"
+      v-if="!isFullscreenMode && splitMode === 'none' && editorStore.file?.type === 'chapter'"
       :current-words="contentWordCount"
       :target-words="editorStore.chapterTargetWords"
       :book-name="bookName"
     />
-    <!-- 编辑器统计 - 全屏模式下隐藏 -->
+    <!-- 编辑器统计 - 全屏模式下或切分模式下隐藏 -->
     <EditorStats
-      v-if="!isFullscreenMode && editorStore.file?.type === 'chapter'"
+      v-if="!isFullscreenMode && splitMode === 'none' && editorStore.file?.type === 'chapter'"
       ref="editorStatsRef"
       :book-name="bookName"
       :content-word-count="contentWordCount"
@@ -470,15 +509,178 @@ const menuX = ref(0) // 右键菜单的 X 轴坐标
 const menuY = ref(0) // 右键菜单的 Y 轴坐标
 const contextMenuRef = ref(null) // 右键菜单的 DOM 引用
 
-// 视图切分状态
-const splitMode = ref('none') // 视图切分模式：none (无), horizontal (水平), vertical (垂直)
+// 视图切分状态管理
+const splitMode = computed({ // 使用计算属性对接 store 中的切分模式，实现跨组件状态持久化
+  get: () => editorStore.splitMode, // 获取 store 中的切分状态
+  set: (val) => { // 设置 store 中的切分状态
+    editorStore.splitMode = val // 同步更新 store
+  }
+})
 const editor2 = ref(null) // 第二个编辑器实例，用于分屏显示
+const editor2File = ref(null) // 第二个编辑器当前显示的文件信息
+const allChaptersOptions = ref([]) // 所有卷和章节的级联选择器选项
+const editor2ChapterValue = ref([]) // 级联选择器当前选中的值 [volumeName, chapterName]
+const showEditor2Selector = ref(false) // 是否显示第二个编辑器的章节选择器
+const isCascaderVisible = ref(false) // 级联选择器弹出层是否可见
+let selectorTimer = null // 章节选择器的自动隐藏定时器
+let editor2SaveTimer = null // 第二个编辑器的自动保存定时器
 let isSyncing = false // 全局同步标记，用于在分屏模式下防止两个编辑器之间产生循环同步更新
+
+// 开始计时器，1秒后隐藏选择器
+function startSelectorTimer() {
+  clearSelectorTimer() // 先清除已有的定时器
+  // 如果下拉框正处于展开状态，则不启动隐藏计时器
+  if (isCascaderVisible.value) return 
+  
+  selectorTimer = setTimeout(() => { // 设置 1 秒定时器
+    showEditor2Selector.value = false // 隐藏选择器
+  }, 500) // 500 毫秒即 0.5 秒
+}
+
+// 清除隐藏选择器的计时器
+function clearSelectorTimer() {
+  if (selectorTimer) { // 如果定时器存在
+    clearTimeout(selectorTimer) // 清除定时器
+    selectorTimer = null // 设为 null
+  }
+}
+
+// 处理顶部触发区域的鼠标移入事件
+function handleTriggerMouseEnter() {
+  showEditor2Selector.value = true // 鼠标移入顶部触发区时显示选择器
+  clearSelectorTimer() // 停止自动隐藏计时
+}
+
+// 处理级联选择器弹出层可见性变化
+function handleCascaderVisibleChange(visible) {
+  isCascaderVisible.value = visible // 同步弹出层状态
+  if (visible) {
+    clearSelectorTimer() // 展开时确保不计时
+  } else {
+    // 关闭时，如果鼠标不在选择器范围内，则开始计时隐藏
+    startSelectorTimer()
+  }
+}
+
+// 加载所有章节选项，用于级联选择器
+async function loadAllChaptersOptions() {
+  if (!props.bookName) return // 没书名直接返回
+  try {
+    const chaptersData = await window.electron.loadChapters(props.bookName) // 获取所有卷和章节
+    allChaptersOptions.value = chaptersData || [] // 更新选项数据
+  } catch (error) {
+    console.error('加载章节选项失败:', error) // 打印错误日志
+  }
+}
+
+// 处理第二个编辑器切换章节
+async function handleEditor2ChapterChange(value) {
+  if (!value || value.length < 2) return // 确保选择了章节
+  const [volumeName, chapterName] = value // 解构卷名和章节名
+  
+  try { // 开始异常处理
+    // 查找对应的章节对象以获取正确路径
+    const volume = allChaptersOptions.value.find((v) => v.name === volumeName) // 在所有章节选项中查找对应卷
+    const chapter = volume?.children?.find((c) => c.name === chapterName) // 在卷中查找对应章节
+    const correctPath = chapter?.path || `books/${props.bookName}/${volumeName}/${chapterName}.txt` // 获取章节的绝对路径，若未找到则拼接一个路径作为兜底
+
+    // 切换前先尝试保存当前第二个编辑器的内容（如果是独立章节）
+    if (editor2.value && editor2File.value && editor2File.value.path !== editorStore.file?.path) {
+      await saveEditor2File(false) // 静默保存当前第二个编辑器的内容
+    } // 结束保存逻辑
+
+    // 加载目标章节内容
+    const result = await window.electron.readChapter(props.bookName, volumeName, chapterName) // 调用后端接口读取章节内容
+    if (result.success && editor2.value) { // 如果读取成功且编辑器实例存在
+      // 更新第二个编辑器的文件信息
+      editor2File.value = { // 设置新的文件对象
+        name: chapterName, // 章节名
+        volume: volumeName, // 卷名
+        type: 'chapter', // 类型为章节
+        path: correctPath // 使用查找到的绝对路径，确保与主编辑器路径格式一致
+      } // 结束文件信息更新
+      
+      // 【新增同步逻辑】如果第二个编辑器切换后的章节正好是主编辑器正在编辑的章节
+      // 则优先从主编辑器获取可能已被修改但尚未保存到磁盘的内容，实现即时同步
+      let contentToSet = result.content // 默认使用从磁盘读取的内容
+      if (editor.value && editorStore.file?.path === correctPath) { // 如果主编辑器路径与新路径一致
+        contentToSet = chapterEditorContentRef.value.getSaveContent(editor.value) // 从主编辑器提取最新内容
+      } // 结束同步内容获取
+
+      // 更新编辑器内容
+      chapterEditorContentRef.value.setChapterContent(editor2.value, contentToSet) // 将内容设置到第二个编辑器中
+      
+      // 提示加载成功
+      ElMessage.success(`已切换至章节: ${chapterName}`) // 弹出成功提示
+    } else { // 如果读取失败
+      ElMessage.error('加载章节内容失败') // 弹出错误提示
+    } // 结束读取结果处理
+  } catch (error) { // 捕获执行过程中的错误
+    console.error('切换章节失败:', error) // 打印错误详情到控制台
+    ElMessage.error('切换章节失败') // 弹出通用错误提示
+  } // 结束异常处理
+} // 结束 handleEditor2ChapterChange 函数
+
+// 第二个编辑器的保存函数
+async function saveEditor2File(showMessage = false) {
+  if (!editor2.value || !editor2File.value) return false // 没实例或没文件直接返回
+
+  // 如果第二个编辑器显示的内容和主编辑器一致，则由主编辑器的保存逻辑负责
+  if (editor2File.value.path === editorStore.file?.path) {
+    return true 
+  }
+
+  try {
+    const contentToSave = chapterEditorContentRef.value.getSaveContent(editor2.value) // 获取编辑器内容
+    
+    const result = await window.electron.saveChapter({ // 调用保存接口
+      bookName: props.bookName,
+      volumeName: editor2File.value.volume,
+      chapterName: editor2File.value.name,
+      content: contentToSave
+    })
+
+    if (result.success) { // 保存成功
+      if (showMessage) ElMessage.success(`[分屏] 章节 ${editor2File.value.name} 已保存`)
+      return true
+    } else {
+      if (showMessage) ElMessage.error(`[分屏] 保存失败: ${result.message}`)
+      return false
+    }
+  } catch (error) {
+    console.error('第二个编辑器保存失败:', error)
+    return false
+  }
+}
+
+// 处理第二个编辑器的内容更新
+function handleEditor2Update({ transaction }) {
+  // 1. 处理内容同步（如果章节相同）
+  syncEditors(editor2.value, editor.value, transaction)
+  
+  // 2. 如果章节不同，则开启自动保存计时器
+  if (transaction.docChanged && editor2File.value?.path !== editorStore.file?.path) {
+    if (editor2SaveTimer) clearTimeout(editor2SaveTimer) // 清除旧定时器
+    editor2SaveTimer = setTimeout(() => { // 设置新定时器，3秒后自动保存
+      saveEditor2File(false) // 静默保存
+    }, 3000)
+  }
+}
 
 // 同步两个编辑器内容的通用核心函数
 function syncEditors(sourceEditor, targetEditor, transaction) {
+  // 核心同步函数：将源编辑器的内容同步到目标编辑器
   // 如果当前正在同步中、目标编辑器尚未初始化、或者本次更新未涉及文档内容改变，则直接跳过
   if (isSyncing || !targetEditor || !transaction?.docChanged) return 
+  
+  // 关键：只有当两个编辑器显示的章节一致时才同步内容
+  // 如果 editor2 显示的是其他参考章节，则禁止同步
+  const editor1File = editorStore.file // 获取主编辑器文件
+  if (editor1File?.path !== editor2File.value?.path) return // 路径不一致不同步
+  
+  // 关键修复：如果目标编辑器当前正处于聚焦状态（用户正在其中输入），则不从另一个编辑器同步内容
+  // 这可以防止在分屏模式下，后台定时任务（如高亮、统计）触发的同步导致用户正在输入的编辑器光标跳到末尾
+  if (targetEditor.isFocused) return // 结束判断
   
   isSyncing = true // 开启同步标记，锁定状态，防止 targetEditor 的更新事件再次触发同步
   const contentComponent = getEditorContentComponent() // 获取当前适用的编辑器内容组件（章节或笔记）
@@ -488,6 +690,15 @@ function syncEditors(sourceEditor, targetEditor, transaction) {
   }
   
   const content = contentComponent.getSaveContent(sourceEditor) // 从源编辑器中提取当前最新的内容（HTML或纯文本）
+  
+  // 优化：检查目标编辑器的当前内容是否已与源内容一致
+  // 如果内容已经一致，则无需再次 setContent，这样可以保留目标编辑器的光标和滚动位置
+  const targetContent = contentComponent.getSaveContent(targetEditor) // 获取目标编辑器内容
+  if (targetContent === content) { // 如果内容完全一致
+    isSyncing = false // 释放同步锁
+    return // 直接返回，不做冗余更新
+  } // 结束优化判断
+
   const isNote = editorStore.file?.type === 'note' // 判断当前操作的文件是否为笔记类型
   
   if (isNote) { // 如果是笔记模式
@@ -517,6 +728,15 @@ async function initEditor2() {
 
   editor2.value = editorContentComponent.createEditor() // 创建新的编辑器实例
 
+  // 初始化第二个编辑器的文件信息，默认为当前主编辑器的文件
+  if (editorStore.file) { // 如果主编辑器有文件
+    editor2File.value = { ...editorStore.file } // 复制一份文件信息
+    editor2ChapterValue.value = [editorStore.file.volume, editorStore.file.name] // 设置选择器的初始值
+  }
+
+  // 加载书籍所有章节选项，供切换使用
+  await loadAllChaptersOptions()
+
   // 添加焦点监听
   editor2.value.on('focus', () => {
     lastFocusedEditor.value = editor2.value
@@ -536,10 +756,8 @@ async function initEditor2() {
     updateCursorPosition() // 当选区改变时，同步更新底部的光标位置统计信息
   }) // 结束监听绑定
 
-  // 监听第二个编辑器的内容更新，并同步回主编辑器
-  editor2.value.on('update', ({ transaction }) => { // 绑定 update 事件处理逻辑
-    syncEditors(editor2.value, editor.value, transaction) // 调用核心同步函数，将 editor2 的变更同步给 editor
-  }) // 结束监听绑定
+  // 监听第二个编辑器的内容更新
+  editor2.value.on('update', handleEditor2Update) // 使用重构后的处理函数
 
   await nextTick() // 等待 Vue 完成当前的 DOM 渲染周期
   updateEditorStyle() // 确保第二个编辑器也应用了当前的字体、字号和行高等样式设置
@@ -551,25 +769,42 @@ async function initEditor2() {
 } // 结束 initEditor2 函数定义
 
 // 处理水平切分
-async function handleHorizontalSplit() { // 定义异步函数
-  splitMode.value = 'horizontal' // 设置切分模式为水平
-  hideContextMenu() // 隐藏右键菜单
-  await initEditor2() // 等待初始化第二个编辑器完成
+async function handleHorizontalSplit() { // 定义异步函数处理水平切分请求
+  const isAlreadySplit = splitMode.value !== 'none' // 检查当前是否已经处于某种切分模式（水平或垂直）
+  splitMode.value = 'horizontal' // 将切分模式状态更新为水平切分
+  hideContextMenu() // 执行完毕后隐藏右键菜单
+  
+  // 关键逻辑：如果当前已经处于切分模式，则只切换布局，不重新初始化编辑器，从而保留第二个编辑器的内容
+  if (!isAlreadySplit) { // 如果之前不是切分模式
+    await initEditor2() // 则需要执行完整的第二个编辑器初始化逻辑
+  } // 结束判断
 } // 结束函数
 
 // 处理垂直切分
-async function handleVerticalSplit() { // 定义异步函数
-  splitMode.value = 'vertical' // 设置切分模式为垂直
-  hideContextMenu() // 隐藏右键菜单
-  await initEditor2() // 等待初始化第二个编辑器完成
+async function handleVerticalSplit() { // 定义异步函数处理垂直切分请求
+  const isAlreadySplit = splitMode.value !== 'none' // 检查当前是否已经处于某种切分模式（水平或垂直）
+  splitMode.value = 'vertical' // 将切分模式状态更新为垂直切分
+  hideContextMenu() // 执行完毕后隐藏右键菜单
+  
+  // 关键逻辑：如果当前已经处于切分模式，则只切换布局，不重新初始化编辑器，从而保留第二个编辑器的内容
+  if (!isAlreadySplit) { // 如果之前不是切分模式
+    await initEditor2() // 则需要执行完整的第二个编辑器初始化逻辑
+  } // 结束判断
 } // 结束函数
 
 // 处理取消切分
-function handleCancelSplit() { // 定义函数
+async function handleCancelSplit() { // 改为异步函数
+  // 1. 如果第二个编辑器在编辑不同的章节，先保存
+  if (editor2.value && editor2File.value && editor2File.value.path !== editorStore.file?.path) {
+    await saveEditor2File(false) // 静默保存
+  }
+
+  // 2. 重置切分状态
   splitMode.value = 'none' // 设置切分模式为无
   if (editor2.value) { // 如果第二个编辑器实例存在
     editor2.value.destroy() // 销毁该实例
     editor2.value = null // 清空引用
+    editor2File.value = null // 清空文件信息
   } // 结束判断
   hideContextMenu() // 隐藏右键菜单
 } // 结束函数
@@ -1001,161 +1236,164 @@ function handleExport() {
 }
 
 // 监听 store 内容变化，回显到编辑器
-watch(
-  () => editorStore.file,
-  async (newFile, oldFile) => {
+watch( // 开启监听
+  () => editorStore.file, // 监听 store 中的文件对象
+  async (newFile, oldFile) => { // 异步回调处理
     // 如果编辑器不存在且新文件存在，初始化编辑器
-    if (!editor.value && newFile) {
-      try {
-        await initEditor()
-        await nextTick()
-        setupCompositionHandlers()
-        // 初始化后，initEditor 已经设置了内容，这里不需要再次设置
+    if (!editor.value && newFile) { // 如果主编辑器未初始化但有新文件
+      try { // 开启异常处理
+        await initEditor() // 执行初始化
+        await nextTick() // 等待 DOM 更新
+        setupCompositionHandlers() // 设置输入法处理器
         // 如果是章节编辑器，等待内容渲染完成后加载状态并应用高亮/划线
-        if (newFile?.type === 'chapter' && props.bookName) {
-          await nextTick()
-          await nextTick()
-          await new Promise((resolve) => setTimeout(resolve, 50))
-          await loadCharacterHighlightState(props.bookName)
-        await loadBannedWordsHintState(props.bookName)
-        await loadDialogueHighlightState(props.bookName)
-      }
-      return
-    } catch (error) {
-      console.error('初始化编辑器失败:', error)
-      return
-    }
-  }
+        if (newFile?.type === 'chapter' && props.bookName) { // 如果是章节类型
+          await nextTick() // 再次等待
+          await nextTick() // 再次等待，确保 TipTap 准备好
+          await new Promise((resolve) => setTimeout(resolve, 50)) // 延迟 50ms 确保稳定
+          await loadCharacterHighlightState(props.bookName) // 加载人物高亮
+          await loadBannedWordsHintState(props.bookName) // 加载禁词提示
+          await loadDialogueHighlightState(props.bookName) // 加载对白高亮
+        } // 结束章节处理
+        return // 初始化完成，直接返回
+      } catch (error) { // 捕获错误
+        console.error('初始化编辑器失败:', error) // 打印错误
+        return // 退出
+      } // 结束异常处理
+    } // 结束初始化逻辑
 
-  if (!newFile) return
+    if (!newFile) return // 如果没有新文件，直接返回
 
-  // 如果文件类型发生变化，需要重新初始化编辑器
-  const fileTypeChanged = newFile?.type !== oldFile?.type
+    // 如果文件类型发生变化，需要重新初始化编辑器
+    const fileTypeChanged = newFile?.type !== oldFile?.type // 判断类型是否改变
 
-  if (fileTypeChanged && editor.value) {
-    try {
-      // 销毁旧编辑器
-      editor.value.destroy()
-      editor.value = null
-      // 等待一下确保完全销毁
-      await nextTick()
-      // 重新初始化编辑器（initEditor 内部会设置内容）
-      await initEditor()
-      // 等待编辑器完全初始化
-      await nextTick()
-      setupCompositionHandlers()
-      // 重新初始化后，initEditor 已经设置了内容，这里不需要再次设置
-      // 如果是章节编辑器，等待内容渲染完成后加载状态并应用高亮/划线
-      if (newFile?.type === 'chapter' && props.bookName) {
-        await nextTick()
-        await nextTick()
-        await new Promise((resolve) => setTimeout(resolve, 50))
-        await loadCharacterHighlightState(props.bookName)
-        await loadBannedWordsHintState(props.bookName)
-        await loadDialogueHighlightState(props.bookName)
-      }
-      return
-      } catch (error) {
-        console.error('重新初始化编辑器失败:', error)
+    if (fileTypeChanged && editor.value) { // 如果类型改变且编辑器已存在
+      try { // 开启异常处理
+        // 销毁旧编辑器
+        editor.value.destroy() // 销毁实例
+        editor.value = null // 清空引用
+        // 等待一下确保完全销毁
+        await nextTick() // 等待 DOM 回收
+        // 重新初始化编辑器（initEditor 内部会设置内容）
+        await initEditor() // 重新初始化
+        // 等待编辑器完全初始化
+        await nextTick() // 等待更新
+        setupCompositionHandlers() // 重新设置输入法处理器
+        // 如果是章节编辑器，等待内容渲染完成后加载状态并应用高亮/划线
+        if (newFile?.type === 'chapter' && props.bookName) { // 如果是章节类型
+          await nextTick() // 等待
+          await nextTick() // 再次等待
+          await new Promise((resolve) => setTimeout(resolve, 50)) // 延迟
+          await loadCharacterHighlightState(props.bookName) // 加载人物高亮
+          await loadBannedWordsHintState(props.bookName) // 加载禁词提示
+          await loadDialogueHighlightState(props.bookName) // 加载对白高亮
+        } // 结束章节处理
+        return // 重新初始化完成
+      } catch (error) { // 捕获错误
+        console.error('重新初始化编辑器失败:', error) // 打印错误
         // 出错时尝试恢复编辑器
-        if (oldFile) {
-          try {
-            await initEditor()
-          } catch (retryError) {
-            console.error('恢复编辑器失败:', retryError)
-          }
-        }
-        return
-      }
-    }
+        if (oldFile) { // 如果有旧文件
+          try { // 尝试恢复
+            await initEditor() // 执行初始化
+          } catch (retryError) { // 恢复失败
+            console.error('恢复编辑器失败:', retryError) // 打印恢复错误
+          } // 结束恢复尝试
+        } // 结束判断
+        return // 退出
+      } // 结束异常处理
+    } // 结束类型变化处理
 
     // 只有在文件路径变化且编辑器已存在时才设置内容
-    if (editor.value && newFile?.path !== oldFile?.path) {
+    if (editor.value && newFile?.path !== oldFile?.path) { // 如果路径变化
       // 文件变化时，先开始编辑会话（设置初始化标志），再设置内容
-      const newContent = editorStore.content || ''
-      const isNote = newFile?.type === 'note'
+      let newContent = editorStore.content || '' // 默认从 store 获取内容
+      const isNote = newFile?.type === 'note' // 判断是否为笔记
+
+      // 【关键修复】如果主编辑器新选择的章节正好是第二个编辑器正在编辑的章节
+      // 则优先从第二个编辑器获取可能已被修改的内容，而不是从 store/磁盘读取旧内容
+      if (editor2.value && editor2File.value?.path === newFile?.path) { // 如果第二个编辑器存在且路径匹配
+        isSyncing = true // 开启同步锁，防止触发冗余更新
+        newContent = chapterEditorContentRef.value.getSaveContent(editor2.value) // 从第二个编辑器提取最新内容
+        // 更新 store，确保字数统计和主编辑器状态同步
+        editorStore.setContent(newContent) // 同步 store 中的内容
+      } // 结束路径匹配逻辑
 
       // 先开始编辑会话，设置 isInitializing = true，避免加载已有内容时被计入码字速度
-      editorStore.startEditingSession(newContent)
+      editorStore.startEditingSession(newContent) // 开始编辑会话
 
       // 根据文件类型使用对应的内容设置方法
-      if (isNote) {
-        noteEditorContentRef.value.setNoteContent(editor.value, newContent)
-      } else {
-        chapterEditorContentRef.value.setChapterContent(editor.value, newContent)
-      }
+      if (isNote) { // 如果是笔记模式
+        noteEditorContentRef.value.setNoteContent(editor.value, newContent) // 设置笔记内容
+      } else { // 如果是章节模式
+        chapterEditorContentRef.value.setChapterContent(editor.value, newContent) // 设置章节内容
+      } // 结束内容设置
 
-      // 如果开启了分屏，同步更新第二个编辑器的内容
-      if (editor2.value) {
-        if (isNote) {
-          noteEditorContentRef.value.setNoteContent(editor2.value, newContent)
-        } else {
-          chapterEditorContentRef.value.setChapterContent(editor2.value, newContent)
-        }
-      }
-
-      // 书籍总字数由 EditorStats 组件通过 watch fileType 自动加载
+      // 释放同步锁
+      if (isSyncing) { // 如果开启了锁
+        nextTick(() => { // 在下个渲染周期
+          isSyncing = false // 释放锁
+        }) // 结束异步操作
+      } // 结束同步锁释放
 
       // 更新样式
-      updateEditorStyle()
+      updateEditorStyle() // 刷新编辑器样式
 
       // 如果开启了人物高亮，重新应用高亮
-      if (characterHighlightEnabled.value && !isNote) {
-        nextTick(() => {
-          loadCharacters().then(() => {
-            applyCharacterHighlights()
+      if (characterHighlightEnabled.value && !isNote) { // 如果开启了人物高亮且非笔记
+        nextTick(() => { // 等待渲染
+          loadCharacters().then(() => { // 加载人物数据
+            applyCharacterHighlights() // 应用高亮
             // 确保定时器在运行
-            if (!characterHighlightTimer) {
-              startCharacterHighlightTimer()
-            }
-          })
-        })
-      }
+            if (!characterHighlightTimer) { // 如果定时器未启动
+              startCharacterHighlightTimer() // 启动定时器
+            } // 结束判断
+          }) // 结束异步加载
+        }) // 结束 nextTick
+      } // 结束人物高亮应用
 
       // 如果开启了禁词提示，重新应用划线
-      if (bannedWordsHintEnabled.value && !isNote) {
-        nextTick(() => {
-          loadBannedWords().then(() => {
-            applyBannedWordsStrikes()
+      if (bannedWordsHintEnabled.value && !isNote) { // 如果开启了禁词提示且非笔记
+        nextTick(() => { // 等待渲染
+          loadBannedWords().then(() => { // 加载禁词数据
+            applyBannedWordsStrikes() // 应用删除线
             // 确保定时器在运行
-            if (!bannedWordsHintTimer) {
-              startBannedWordsHintTimer()
-            }
-          })
-        })
-      }
+            if (!bannedWordsHintTimer) { // 如果定时器未启动
+              startBannedWordsHintTimer() // 启动定时器
+            } // 结束判断
+          }) // 结束异步加载
+        }) // 结束 nextTick
+      } // 结束禁词提示应用
 
       // 如果全局格式模式开启，应用到新内容
-      nextTick(() => {
-        if (!editor.value) return
-        const docSize = editor.value.state.doc.content.size
-        if (docSize === 0) return
+      nextTick(() => { // 异步处理格式
+        if (!editor.value) return // 校验实例
+        const docSize = editor.value.state.doc.content.size // 获取内容长度
+        if (docSize === 0) return // 内容为空跳过
 
-        if (menubarState.value.isBold || menubarState.value.isItalic) {
-          setTimeout(() => {
-            if (!editor.value) return
-            const currentDocSize = editor.value.state.doc.content.size
-            if (currentDocSize === 0) return
+        if (menubarState.value.isBold || menubarState.value.isItalic) { // 如果开启了加粗或倾斜
+          setTimeout(() => { // 延迟应用
+            if (!editor.value) return // 校验实例
+            const currentDocSize = editor.value.state.doc.content.size // 再次校验长度
+            if (currentDocSize === 0) return // 为空跳过
 
-            let chain = editor.value.chain().focus().selectAll()
-            if (menubarState.value.isBold) {
-              chain = chain.setBold()
-            }
-            if (menubarState.value.isItalic) {
-              chain = chain.setItalic()
-            }
-            chain.run()
+            let chain = editor.value.chain().focus().selectAll() // 开启命令链并全选
+            if (menubarState.value.isBold) { // 处理加粗
+              chain = chain.setBold() // 应用加粗
+            } // 结束加粗处理
+            if (menubarState.value.isItalic) { // 处理倾斜
+              chain = chain.setItalic() // 应用倾斜
+            } // 结束倾斜处理
+            chain.run() // 执行命令链
 
             // 恢复光标到末尾
-            if (currentDocSize > 0) {
-              editor.value.chain().focus().setTextSelection(currentDocSize).run()
-            }
-          }, 100)
-        }
-      })
-    }
-  }
-)
+            if (currentDocSize > 0) { // 如果有内容
+              editor.value.chain().focus().setTextSelection(currentDocSize).run() // 聚焦到末尾
+            } // 结束光标恢复
+          }, 100) // 结束延迟
+        } // 结束格式处理
+      }) // 结束格式异步
+    } // 结束路径变化逻辑
+  } // 结束 watch 回调
+) // 结束 watch 监听
 
 // 获取当前选中的文本
 function getSelectedText() {
@@ -1333,6 +1571,11 @@ async function initEditor() {
   // 通知父组件编辑器已就绪，使用当前聚焦的编辑器
   emit('editor-ready', lastFocusedEditor.value || editor.value)
 
+  // 恢复切分视图状态：如果 store 中记录了切分模式，则自动初始化第二个编辑器
+  if (splitMode.value !== 'none') { // 判断是否处于切分模式
+    await initEditor2() // 异步执行第二个编辑器的初始化
+  } // 结束切分视图恢复
+
   // 如果加载了加粗或倾斜状态，应用到所有内容
   if (menubarState.value.isBold || menubarState.value.isItalic) {
     if (initialContent) {
@@ -1502,7 +1745,7 @@ onMounted(async () => {
 
     // 在编辑器初始化完成后，加载当前书籍的人物高亮、段落字数校验和禁词提示开关状态
     // 这样各个 load 函数中的自动应用逻辑才能正常工作
-    if (props.bookName && editor.value && editorStore.file?.type === 'chapter') {
+    if (editorStore.file && editor.value && editorStore.file?.type === 'chapter') {
       await loadCharacterHighlightState(props.bookName)
       await loadBannedWordsHintState(props.bookName)
     }
@@ -3014,16 +3257,20 @@ defineExpose({
 
   &.split-horizontal { // 水平切分模式
     flex-direction: column; // 垂直排列编辑器
-    .editor-content { // 编辑器内容区
+    .first-editor,
+    .second-editor-wrapper { // 编辑器内容区及其包装容器
       height: 50%; // 各占一半高度
+      width: 100%; // 宽度填充
       flex: none; // 禁用自动伸缩
     }
   }
 
   &.split-vertical { // 垂直切分模式
     flex-direction: row; // 水平排列编辑器
-    .editor-content { // 编辑器内容区
+    .first-editor,
+    .second-editor-wrapper { // 编辑器内容区及其包装容器
       width: 50%; // 各占一半宽度
+      height: 100%; // 高度填充
       flex: none; // 禁用自动伸缩
     }
   }
@@ -3318,6 +3565,18 @@ mark.paragraph-length-highlight {
     opacity: 0.4;
     transform: scaleY(1.2);
   }
+}
+
+/* 章节选择器动画 */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease; // 动画时长 0.3 秒
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0; // 初始/结束透明度为 0
+  transform: translateY(-20px); // 初始/结束位置向上偏移 20 像素
 }
 
 /* 段落字数校验结果弹窗样式 */
