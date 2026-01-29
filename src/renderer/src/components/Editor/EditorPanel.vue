@@ -347,6 +347,9 @@
           >
             <div class="paragraph-header">
               <span class="paragraph-index">段落 {{ index + 1 }}</span>
+              <el-tag v-if="splitMode !== 'none'" size="small" type="info" class="editor-label-tag">
+                {{ item.editorLabel }}
+              </el-tag>
               <span class="paragraph-length">{{ item.length }} 字</span>
               <span class="over-length">超出 {{ item.length - editorStore.paragraphMaxLength }} 字</span>
             </div>
@@ -517,9 +520,19 @@ const splitMode = computed({ // 使用计算属性对接 store 中的切分模�
   }
 })
 const editor2 = ref(null) // 第二个编辑器实例，用于分屏显示
-const editor2File = ref(null) // 第二个编辑器当前显示的文件信息
+const editor2File = computed({
+  get: () => editorStore.editor2File,
+  set: (val) => {
+    editorStore.editor2File = val
+  }
+})
 const allChaptersOptions = ref([]) // 所有卷和章节的级联选择器选项
-const editor2ChapterValue = ref([]) // 级联选择器当前选中的值 [volumeName, chapterName]
+const editor2ChapterValue = computed({
+  get: () => editorStore.editor2ChapterValue,
+  set: (val) => {
+    editorStore.editor2ChapterValue = val
+  }
+})
 const showEditor2Selector = ref(false) // 是否显示第二个编辑器的章节选择器
 const isCascaderVisible = ref(false) // 级联选择器弹出层是否可见
 let selectorTimer = null // 章节选择器的自动隐藏定时器
@@ -658,7 +671,12 @@ function handleEditor2Update({ transaction }) {
   // 1. 处理内容同步（如果章节相同）
   syncEditors(editor2.value, editor.value, transaction)
   
-  // 2. 如果章节不同，则开启自动保存计时器
+  // 2. 如果开启了对白高亮，且内容发生变化，则应用高亮
+  if (transaction.docChanged && dialogueHighlightEnabled.value) {
+    applyDialogueHighlights()
+  }
+
+  // 3. 如果章节不同，则开启自动保存计时器
   if (transaction.docChanged && editor2File.value?.path !== editorStore.file?.path) {
     if (editor2SaveTimer) clearTimeout(editor2SaveTimer) // 清除旧定时器
     editor2SaveTimer = setTimeout(() => { // 设置新定时器，3秒后自动保存
@@ -728,10 +746,34 @@ async function initEditor2() {
 
   editor2.value = editorContentComponent.createEditor() // 创建新的编辑器实例
 
-  // 初始化第二个编辑器的文件信息，默认为当前主编辑器的文件
-  if (editorStore.file) { // 如果主编辑器有文件
-    editor2File.value = { ...editorStore.file } // 复制一份文件信息
-    editor2ChapterValue.value = [editorStore.file.volume, editorStore.file.name] // 设置选择器的初始值
+  // 初始化第二个编辑器的文件信息
+  // 优先使用 store 中记录的第二个编辑器的文件信息，实现跨全屏模式的状态保持
+  if (editorStore.editor2File) {
+    // 已经在 computed setter 中处理了同步，这里直接读取即可
+    console.log('[分屏] 恢复第二个编辑器的章节:', editorStore.editor2File.name)
+  } else if (editorStore.file) {
+    // 如果 store 中没有记录，则默认为当前主编辑器的文件
+    editor2File.value = { ...editorStore.file }
+    editor2ChapterValue.value = [editorStore.file.volume, editorStore.file.name]
+  }
+
+  // 根据当前确定的 editor2File 加载内容
+  let currentContent = ''
+  if (editor2File.value) {
+    if (editor2File.value.path === editorStore.file?.path) {
+      // 如果路径一致，直接从主编辑器或 store 获取
+      currentContent = editor.value ? getEditorContentComponent().getSaveContent(editor.value) : (editorStore.content || '')
+    } else {
+      // 如果路径不一致，说明是不同的章节，需要从磁盘读取
+      try {
+        const result = await window.electron.readChapter(props.bookName, editor2File.value.volume, editor2File.value.name)
+        if (result.success) {
+          currentContent = result.content
+        }
+      } catch (error) {
+        console.error('[分屏] 恢复第二个编辑器内容失败:', error)
+      }
+    }
   }
 
   // 加载书籍所有章节选项，供切换使用
@@ -742,13 +784,12 @@ async function initEditor2() {
     lastFocusedEditor.value = editor2.value
   })
 
-  // 设置初始内容，保持与主编辑器同步
-  const currentContent = editor.value ? getEditorContentComponent().getSaveContent(editor.value) : (editorStore.content || '') // 获取主编辑器内容
-  const isNote = editorStore.file?.type === 'note' // 判断是否为笔记
-  if (isNote) { // 笔记模式
-    noteEditorContentRef.value.setNoteContent(editor2.value, currentContent) // 设置笔记内容
-  } else { // 章节模式
-    chapterEditorContentRef.value.setChapterContent(editor2.value, currentContent) // 设置章节内容
+  // 设置初始内容
+  const isNote = editorStore.file?.type === 'note'
+  if (isNote) {
+    noteEditorContentRef.value.setNoteContent(editor2.value, currentContent)
+  } else {
+    chapterEditorContentRef.value.setChapterContent(editor2.value, currentContent)
   }
 
   // 为第二个编辑器绑定基本事件
@@ -1883,6 +1924,14 @@ async function saveFile(showMessage = false) {
       emit('chapter-word-count-updated', { path: file.path, wordCount: result.wordCount })
     }
 
+    // 如果处于切分模式，且第二个编辑器正在编辑不同的章节，也需要执行保存逻辑
+    if (splitMode.value !== 'none' && editor2.value && editor2File.value) {
+      if (editor2File.value.path !== file.path) {
+        // 静默保存第二个编辑器的内容
+        await saveEditor2File(false)
+      }
+    }
+
     if (result.name && result.name !== file.name) {
       editorStore.setFile({ ...file, name: result.name })
       if (file.type === 'note') {
@@ -2175,38 +2224,53 @@ function stopCharacterHighlightTimer() {
 
 // 执行段落字数校验（一键校验）
 function checkParagraphLength() {
-  if (!editor.value) {
-    ElMessage.warning('编辑器未初始化')
-    return
-  }
-
-  const { state } = editor.value
-  const { doc } = state
-  
   // 清空之前的结果
   overLengthParagraphs.value = []
   
-  // 遍历所有段落节点，检查字数
-  doc.descendants((node, pos) => {
-    // 只处理段落节点
-    if (node.type.name === 'paragraph') {
-      const text = node.textContent
-      // 排除空格和换行符，只计算实际字符
-      const textLength = text.replace(/[\s\n\r\t]/g, '').length
-      
-      // 如果段落字数超过阈值，记录该段落
-      if (textLength > editorStore.paragraphMaxLength) {
-        // 获取段落预览文本（前50个字符）
-        const preview = text.length > 50 ? text.substring(0, 50) + '...' : text
+  // 根据切分模式确定标签
+  const label1 = splitMode.value === 'horizontal' ? '上方' : (splitMode.value === 'vertical' ? '左侧' : '主编辑器')
+  const label2 = splitMode.value === 'horizontal' ? '下方' : '右侧'
+
+  // 准备需要校验的编辑器列表
+  const editorsToCheck = [
+    { instance: editor.value, label: label1, id: 'first' }
+  ]
+  
+  // 如果处于切分模式且第二个编辑器存在，也加入校验
+  if (splitMode.value !== 'none' && editor2.value) {
+    editorsToCheck.push({ instance: editor2.value, label: label2, id: 'second' })
+  }
+
+  editorsToCheck.forEach(({ instance, label, id }) => {
+    if (!instance) return
+    
+    const { state } = instance
+    const { doc } = state
+    
+    // 遍历所有段落节点，检查字数
+    doc.descendants((node, pos) => {
+      // 只处理段落节点
+      if (node.type.name === 'paragraph') {
+        const text = node.textContent
+        // 排除空格和换行符，只计算实际字符
+        const textLength = text.replace(/[\s\n\r\t]/g, '').length
         
-        overLengthParagraphs.value.push({
-          from: pos + 1, // +1 跳过段落节点本身
-          to: pos + node.nodeSize - 1, // -1 跳过结束标记
-          length: textLength,
-          preview: preview
-        })
+        // 如果段落字数超过阈值，记录该段落
+        if (textLength > editorStore.paragraphMaxLength) {
+          // 获取段落预览文本（前50个字符）
+          const preview = text.length > 50 ? text.substring(0, 50) + '...' : text
+          
+          overLengthParagraphs.value.push({
+            editorId: id,
+            editorLabel: label,
+            from: pos + 1, // +1 跳过段落节点本身
+            to: pos + node.nodeSize - 1, // -1 跳过结束标记
+            length: textLength,
+            preview: preview
+          })
+        }
       }
-    }
+    })
   })
   
   // 显示结果弹窗
@@ -2221,7 +2285,9 @@ function checkParagraphLength() {
 // 跳转到指定段落（锚点跳转并高亮）
 // 使用和人物高亮相同的原理：通过 ProseMirror 的 highlight mark 标记来实现临时高亮效果
 function jumpToParagraph(item) {
-  if (!editor.value) return
+  // 根据 item 携带的 editorId 确定目标编辑器
+  const ed = item.editorId === 'second' ? editor2.value : editor.value
+  if (!ed) return
   
   const { from, to } = item
   
@@ -2229,51 +2295,44 @@ function jumpToParagraph(item) {
   paragraphCheckDialogVisible.value = false
   
   nextTick(() => {
-    const editors = [editor.value, editor2.value].filter(Boolean)
-    const applyTime = Date.now()
-
-    editors.forEach((ed) => {
-      const { state, view } = ed
-      const { schema } = state
-      
-      // 只有主编辑器执行滚动和聚焦逻辑
-      if (ed === editor.value) {
-        ed.chain().focus().setTextSelection(from).run()
-        
-        // 滚动到视图中
-        const domAtPos = view.domAtPos(from)
-        if (domAtPos && domAtPos.node) {
-          let element = domAtPos.node
-          if (element.nodeType === Node.TEXT_NODE) {
-            element = element.parentElement
-          }
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
+    const { state, view } = ed
+    const { schema } = state
+    
+    // 设置焦点并定位光标
+    ed.chain().focus().setTextSelection(from).run()
+    
+    // 滚动到视图中
+    const domAtPos = view.domAtPos(from)
+    if (domAtPos && domAtPos.node) {
+      let element = domAtPos.node
+      if (element.nodeType === Node.TEXT_NODE) {
+        element = element.parentElement
       }
-      
-      // 两个编辑器都应用高亮
-      const tr = ed.state.tr
-      const highlightType = ed.state.schema.marks.highlight
-      
-      const highlightMark = highlightType.create({ 
-        color: '#ff6b6b', // 橙红色，表示警告
-        class: 'paragraph-check-highlight' // 添加自定义类名用于样式区分
-      })
-      tr.addMark(from, to, highlightMark)
-      ed.view.dispatch(tr)
-      
-      // 5秒后移除高亮
-      setTimeout(() => {
-        if (!ed || ed.isDestroyed) return
-        
-        const finalState = ed.state
-        const finalTr = finalState.tr
-        const finalHighlightType = finalState.schema.marks.highlight
-        
-        finalTr.removeMark(from, to, finalHighlightType)
-        ed.view.dispatch(finalTr)
-      }, 5000)
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    
+    // 应用高亮标记
+    const tr = ed.state.tr
+    const highlightType = ed.state.schema.marks.highlight
+    
+    const highlightMark = highlightType.create({ 
+      color: '#ff6b6b', // 橙红色，表示警告
+      class: 'paragraph-check-highlight' // 添加自定义类名用于样式区分
     })
+    tr.addMark(from, to, highlightMark)
+    ed.view.dispatch(tr)
+    
+    // 5秒后移除高亮
+    setTimeout(() => {
+      if (!ed || ed.isDestroyed) return
+      
+      const finalState = ed.state
+      const finalTr = finalState.tr
+      const finalHighlightType = finalState.schema.marks.highlight
+      
+      finalTr.removeMark(from, to, finalHighlightType)
+      ed.view.dispatch(finalTr)
+    }, 5000)
   })
 }
 
@@ -3625,6 +3684,10 @@ mark.paragraph-length-highlight {
       .paragraph-index {
         font-weight: bold;
         color: var(--text-base, #333);
+      }
+
+      .editor-label-tag {
+        margin-right: 4px;
       }
       
       .paragraph-length {

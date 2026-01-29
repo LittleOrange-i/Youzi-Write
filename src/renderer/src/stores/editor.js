@@ -9,6 +9,8 @@ export const useEditorStore = defineStore('editor', () => {
   const currentBookName = ref('')
   const bannedWords = ref([]) // 禁词列表
   const splitMode = ref('none') // 视图切分模式：none (无), horizontal (水平), vertical (垂直)
+  const editor2File = ref(null) // 第二个编辑器的文件信息
+  const editor2ChapterValue = ref([]) // 第二个编辑器的级联选择器值
 
   // 初始化标记
   const isInitializing = ref(false) // 是否正在初始化（加载已有内容）
@@ -121,6 +123,8 @@ export const useEditorStore = defineStore('editor', () => {
     sessionStats.value = null
     // 重置切分模式
     splitMode.value = 'none'
+    editor2File.value = null
+    editor2ChapterValue.value = []
   }
 
   function saveSessionStats(stats) {
@@ -359,6 +363,8 @@ export const useEditorStore = defineStore('editor', () => {
     bookWordsLoaded,
     bannedWords,
     splitMode,
+    editor2File,
+    editor2ChapterValue,
     setContent,
     setFile,
     setChapterTitle,
