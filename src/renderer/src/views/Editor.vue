@@ -36,23 +36,23 @@
       </el-splitter>
       
       <!-- 全屏模式 - 纯内容显示 -->
-      <div v-else class="fullscreen-content-wrapper">
-        <div class="fullscreen-editor-content">
-          <EditorPanel
-            ref="editorPanelRef"
-            :book-name="bookName"
-            :is-fullscreen-mode="true"
-            @editor-ready="handleEditorReady"
-            @refresh-notes="refreshNotes"
-            @refresh-chapters="refreshChapters"
-            @jail-mode-change="handleJailModeChange"
-            @chapter-word-count-updated="handleChapterWordCountUpdate"
-            @toggle-fullscreen="toggleFullscreen"
-          />
-        </div>
-        <!-- 右下角时间显示 -->
-        <div class="fullscreen-clock">{{ currentTime }}</div>
-      </div>
+      <div v-else class="fullscreen-content-wrapper"> <!-- 全屏内容包装容器 -->
+        <div class="fullscreen-editor-content"> <!-- 全屏编辑器内容容器 -->
+          <EditorPanel  
+            ref="editorPanelRef"  
+            :book-name="bookName"   
+            :is-fullscreen-mode="true"  
+            @editor-ready="handleEditorReady"   
+            @refresh-notes="refreshNotes" 
+            @refresh-chapters="refreshChapters"   
+            @jail-mode-change="handleJailModeChange"  
+            @chapter-word-count-updated="handleChapterWordCountUpdate"  
+            @toggle-fullscreen="toggleFullscreen"   
+          /> <!-- 结束编辑器面板 -->
+          <!-- 右下角时间显示 - 已移至编辑器容器内部 -->
+          <div class="fullscreen-clock">{{ currentTime }}</div> <!-- 显示当前时间 -->
+        </div> <!-- 结束全屏编辑器内容容器 -->
+      </div> <!-- 结束全屏内容包装容器 -->
     </div>
   </div>
 </template>
@@ -312,43 +312,44 @@ const handleGlobalKeydown = (event) => {
   // 全屏模式样式
   &.fullscreen-mode {
     .editor-content {
-      background-color: #1a1a1a; // 全屏模式下的深色背景（关灯效果）
-      display: flex; // 使用弹性布局
-      justify-content: center; // 水平居中内容
-      align-items: stretch; // 垂直方向拉伸填充
+      background-color: var(--bg-primary); /* 全屏模式背景色设为编辑器主背景色，移除关灯效果 */
+      display: flex; /* 使用弹性布局 */
+      justify-content: center; /* 水平居中内容 */
+      align-items: stretch; /* 垂直方向拉伸填充 */
     }
     
     .fullscreen-content-wrapper {
-      width: 100%; // 占据全部宽度
-      height: 100%; // 占据全部高度
-      display: flex; // 使用弹性布局
-      justify-content: center; // 水平居中编辑器
-      align-items: stretch; // 垂直方向拉伸填充
-      position: relative; // 相对定位，用于内部绝对定位元素
+      width: 100%; /* 占据全部宽度 */
+      height: 100%; /* 占据全部高度 */
+      display: flex; /* 使用弹性布局 */
+      justify-content: center; /* 水平居中编辑器 */
+      align-items: stretch; /* 垂直方向拉伸填充 */
+      position: relative; /* 相对定位，用于内部绝对定位元素 */
     }
     
-    .fullscreen-editor-content {
-      width: 46%; // 设置编辑器宽度占屏幕总宽度的 46%
-      min-width: 800px; // 设置最小宽度，防止在窄屏幕上过窄
-      height: 100%; // 占据全部高度
-      background-color: var(--bg-primary); // 使用编辑器主题背景色
-      display: flex; // 使用弹性布局
-      flex-direction: column; // 垂直排列子元素
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); // 增加阴影深度，强化视觉分割
-    }
+    .fullscreen-editor-content { /* 全屏编辑器内容样式 */
+      width: 100%; /* 设置编辑器宽度占满整个屏幕宽度 */
+      height: 100%; /* 占据全部高度 */
+      background-color: var(--bg-primary); /* 使用编辑器主题背景色 */
+      display: flex; /* 使用弹性布局 */
+      flex-direction: column; /* 垂直排列子元素 */
+      box-shadow: none; /* 移除阴影 */
+      position: relative; /* 设置相对定位，用于内部元素定位 */
+    } /* 结束全屏编辑器内容样式 */
     
-    .fullscreen-clock {
-      position: fixed;
-      right: 40px;
-      bottom: 40px;
-      font-size: 24px;
-      font-weight: 300;
-      color: rgba(255, 255, 255, 0.3); // 半透明白色
-      font-family: 'Arial', sans-serif;
-      user-select: none;
-      pointer-events: none;
-      z-index: 10;
-    }
+    .fullscreen-clock { /* 全屏模式下的时间显示样式 */
+      position: absolute; /* 使用绝对定位 */
+      right: 20px; /* 距离编辑器右边 20px */
+      bottom: 20px; /* 距离编辑器底部 20px */
+      font-size: 18px; /* 调整字体大小 */
+      font-weight: 300; /* 设置字体粗细 */
+      color: var(--text-secondary); /* 使用主题次要文字颜色 */
+      opacity: 0.5;   
+      font-family: 'Arial', sans-serif;   
+      user-select: none;  
+      pointer-events: none;   
+      z-index: 10;  
+    }   
   }
 }
 </style>

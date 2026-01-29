@@ -2980,11 +2980,11 @@ defineExpose({
 
   /* 全屏模式样式 - 适配比例布局 */
    &.fullscreen-panel {
-     width: 100%; // 宽度填充父容器（即 Editor.vue 中的 46% 宽度容器）
-     margin: 0 auto; // 水平居中
-     box-shadow: none; // 阴影已在父容器中设置，此处移除
-     border-left: 1px solid var(--border-color); // 保留左侧边框
-     border-right: 1px solid var(--border-color); // 保留右侧边框
+     width: 100%; /* 宽度填充父容器 */
+     margin: 0 auto; /* 水平居中 */
+     box-shadow: none; /* 移除阴影 */
+     border-left: none; /* 移除左侧边框，实现全屏覆盖 */
+     border-right: none; /* 移除右侧边框，实现全屏覆盖 */
    }
 }
 .chapter-title {
