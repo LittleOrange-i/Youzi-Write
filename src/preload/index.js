@@ -16,6 +16,8 @@ if (process.contextIsolated) {
       selectBooksDir: () => ipcRenderer.invoke('select-books-dir'),
       // 选择图片文件
       selectImage: () => ipcRenderer.invoke('select-image'),
+      // 读取本地图片
+      readLocalImage: (path) => ipcRenderer.invoke('read-local-image', path),
       // 显示保存文件对话框
       showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
       // 写入导出文件

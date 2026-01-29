@@ -1101,6 +1101,31 @@ ipcMain.handle('select-image', async () => {
   return null
 })
 
+// 读取本地图片并转换为 base64
+ipcMain.handle('read-local-image', async (_, filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null
+    }
+    const imageBuffer = fs.readFileSync(filePath)
+    const base64Image = imageBuffer.toString('base64')
+    const ext = path.extname(filePath).toLowerCase()
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp'
+    }
+    const mimeType = mimeTypes[ext] || 'image/jpeg'
+    return `data:${mimeType};base64,${base64Image}`
+  } catch (error) {
+    console.error('读取本地图片失败:', error)
+    return null
+  }
+})
+
 // 选择保存文件路径
 ipcMain.handle('show-save-dialog', async (event, options) => {
   const result = await dialog.showSaveDialog({

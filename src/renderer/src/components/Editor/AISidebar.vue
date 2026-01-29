@@ -83,7 +83,7 @@
         </div>
         <div class="operation-item" @click="handleShortcuts">
           <el-icon><Star /></el-icon>
-          <span>AI快捷列表</span>
+          <span>AI配置</span>
         </div>
         <div class="operation-item" @click="handleQA">
           <el-icon><ChatDotRound /></el-icon>
@@ -646,14 +646,54 @@
       </template>
     </el-dialog>
 
-    <!-- AI快捷列表弹窗 -->
+    <!-- AI配置弹窗：集成快捷列表与默认字数设置 -->
     <el-dialog
       v-model="shortcutsDialogVisible"
-      title="AI快捷列表管理"
+      title="AI配置"
       width="700px"
       :close-on-click-modal="false"
     >
+      <!-- 设置面板选项卡 -->
       <el-tabs v-model="activeShortcutTab" class="shortcuts-tabs">
+        <!-- 默认字数Tab：配置续写/扩写的默认生成长度 -->
+        <el-tab-pane label="默认字数" name="defaultWords">
+          <div class="shortcut-manager">
+            <el-form label-width="120px">
+              <!-- 扩写默认字数设置 -->
+              <el-form-item label="扩写默认字数">
+                <el-input-number
+                  v-model="defaultExpandWords"
+                  :min="100"
+                  :max="10000"
+                  :step="100"
+                  placeholder="请输入扩写默认字数"
+                  @change="saveDefaultSettings"
+                />
+                <div class="setting-hints">
+                  <div class="setting-hint">提示：此设置将作为每次打开“扩写”功能时的初始字数限制。</div>
+                  <div class="setting-remark">备注：字数请不要超过10000，避免上下文生成失败</div>
+                </div>
+              </el-form-item>
+
+              <!-- 续写默认字数设置 -->
+              <el-form-item label="续写默认字数">
+                <el-input-number
+                  v-model="defaultContinueWords"
+                  :min="100"
+                  :max="10000"
+                  :step="100"
+                  placeholder="请输入续写默认字数"
+                  @change="saveDefaultSettings"
+                />
+                <div class="setting-hints">
+                  <div class="setting-hint">提示：此设置将作为每次打开“续写”功能时的初始字数限制。</div>
+                  <div class="setting-remark">备注：字数请不要超过10000，避免上下文生成失败</div>
+                </div>
+              </el-form-item>
+            </el-form>
+          </div>
+        </el-tab-pane>
+
         <!-- 情绪列表Tab -->
         <el-tab-pane label="情绪列表" name="emotions">
           <div class="shortcut-manager">
@@ -1003,10 +1043,10 @@ const expandDialogVisible = ref(false)
 const continueDialogVisible = ref(false)
 const polishDialogVisible = ref(false)
 const namingDialogVisible = ref(false)
-const shortcutsDialogVisible = ref(false) // 重命名为快捷列表弹窗
+const shortcutsDialogVisible = ref(false) // AI配置弹窗
 const resultDialogVisible = ref(false)
 const qaDialogVisible = ref(false)
-const activeShortcutTab = ref('emotions') // 当前激活的Tab
+const activeShortcutTab = ref('defaultWords') // 当前激活的Tab
 
 // AI 操作表单数据
 const rewriteForm = ref({
@@ -1034,17 +1074,24 @@ const writingStyles = [
   { value: 'custom', label: '自定义', description: '自行输入风格要求' }
 ]
 
-const expandForm = ref({
-  targetWords: 500,
-  emotion: '',
-  customRequirement: '' // 自定义提示词
-})
-
-const continueForm = ref({
-  targetWords: 500,
-  emotion: '',
-  customRequirement: '' // 自定义提示词
-})
+// 扩写默认字数配置，初始值为500
+  const defaultExpandWords = ref(500)
+  // 续写默认字数配置，初始值为500
+  const defaultContinueWords = ref(500)
+  
+  // 扩写表单数据
+  const expandForm = ref({
+    targetWords: defaultExpandWords.value, // 使用扩写默认字数
+    emotion: '',
+    customRequirement: '' // 自定义提示词
+  })
+  
+  // 续写表单数据
+  const continueForm = ref({
+    targetWords: defaultContinueWords.value, // 使用续写默认字数
+    emotion: '',
+    customRequirement: '' // 自定义提示词
+  })
 
 const polishForm = ref({
   emotion: '',
@@ -1166,6 +1213,43 @@ const saveModels = () => {
 }
 
 
+
+// 默认设置加载函数：从本地存储获取配置
+  const loadDefaultSettings = () => {
+    try {
+      // 加载扩写默认字数
+      const savedExpand = localStorage.getItem('ai_default_expand_words')
+      if (savedExpand) {
+        defaultExpandWords.value = parseInt(savedExpand)
+        expandForm.value.targetWords = defaultExpandWords.value
+      }
+
+      // 加载续写默认字数
+      const savedContinue = localStorage.getItem('ai_default_continue_words')
+      if (savedContinue) {
+        defaultContinueWords.value = parseInt(savedContinue)
+        continueForm.value.targetWords = defaultContinueWords.value
+      }
+    } catch (error) {
+      console.error('加载默认字数失败:', error)
+    }
+  }
+  
+  // 默认设置保存函数：保存配置到本地存储
+  const saveDefaultSettings = () => {
+    try {
+      // 将扩写默认字数存入 localStorage
+      localStorage.setItem('ai_default_expand_words', defaultExpandWords.value.toString())
+      // 将续写默认字数存入 localStorage
+      localStorage.setItem('ai_default_continue_words', defaultContinueWords.value.toString())
+      
+      // 改变配置后立即同步到对应的表单字数
+      expandForm.value.targetWords = defaultExpandWords.value
+      continueForm.value.targetWords = defaultContinueWords.value
+    } catch (error) {
+      console.error('保存默认字数失败:', error)
+    }
+  }
 
 // 监听模型选择变化
 watch(selectedModel, (newVal) => {
@@ -1354,6 +1438,8 @@ const handleSaveModel = () => {
 // 组件挂载时加载模型
 onMounted(() => {
   loadModels()
+  // 加载默认设置
+  loadDefaultSettings()
   // 默认选择第一个模型
   if (modelList.value.length > 0) {
     selectedModel.value = modelList.value[0].id
@@ -1581,7 +1667,7 @@ const handleExpand = () => {
     ElMessage.warning('请先选择模型')
     return
   }
-  expandForm.value.targetWords = 500
+  expandForm.value.targetWords = defaultExpandWords.value
   expandForm.value.emotion = ''
   expandForm.value.customRequirement = ''
   expandDialogVisible.value = true
@@ -1610,7 +1696,7 @@ const handleContinue = () => {
     ElMessage.warning('请先选择模型')
     return
   }
-  continueForm.value.targetWords = 500
+  continueForm.value.targetWords = defaultContinueWords.value
   continueForm.value.emotion = ''
   continueForm.value.customRequirement = ''
   continueDialogVisible.value = true
@@ -2954,6 +3040,26 @@ const exportableModels = computed(() => {
         transform: scale(1.05);
       }
     }
+  }
+
+  .setting-hints {
+    width: 100%;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .setting-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .setting-remark {
+    font-size: 12px;
+    color: var(--el-color-warning);
+    line-height: 1.4;
   }
 }
 

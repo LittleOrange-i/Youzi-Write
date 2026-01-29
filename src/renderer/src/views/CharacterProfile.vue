@@ -1,6 +1,10 @@
 <template>
   <LayoutTool title="人物谱管理">
     <template #headrAction>
+      <el-button type="primary" plain @click="handleImportCharacter">
+        <el-icon><Upload /></el-icon>
+        <span>导入人物</span>
+      </el-button>
       <el-button type="primary" @click="handleCreateCharacter">
         <el-icon><Plus /></el-icon>
         <span>创建人物</span>
@@ -490,8 +494,8 @@
     title="人物详情"
     width="700px"
     align-center
-    :close-on-click-modal="false" <!-- 禁用点击遮罩层关闭对话框 -->
-    :close-on-press-escape="false" <!-- 禁用通过按下 Esc 键关闭对话框 -->
+    :close-on-click-modal="true"
+    :close-on-press-escape="true" 
     class="preview-dialog"
   > <!-- 对话框：人物详情预览 -->
     <div v-if="previewCharacter" class="preview-content">
@@ -504,42 +508,42 @@
               alt="头像"
               class="preview-avatar-image"
               fit="cover"
-            />
+            /> <!-- 人物头像图片 -->
             <div v-else class="preview-avatar-placeholder">
               {{ previewCharacter.name.charAt(0) }}
-            </div>
-          </div>
+            </div> <!-- 无头像时的占位符，显示姓名首字母 -->
+          </div> <!-- 头像显示区域结束 -->
           <div class="preview-details">
             <div class="preview-name-row">
               <span
                 v-if="previewCharacter.markerColor"
                 class="preview-marker"
                 :style="{ backgroundColor: previewCharacter.markerColor }"
-              ></span>
-              <span class="preview-name">{{ previewCharacter.name }}</span>
-            </div>
+              ></span> <!-- 人物标记颜色点 -->
+              <span class="preview-name">{{ previewCharacter.name }}</span> <!-- 人物姓名 -->
+            </div> <!-- 姓名行结束 -->
             <div class="preview-info-row">
               <span class="preview-info-item">
-                <span class="preview-info-label">年龄:</span>
-                <span class="preview-info-value">{{ previewCharacter.age }}岁</span>
-              </span>
-              <span class="preview-divider">|</span>
+                <span class="preview-info-label">年龄:</span> <!-- 年龄标签 -->
+                <span class="preview-info-value">{{ previewCharacter.age }}岁</span> <!-- 年龄数值 -->
+              </span> <!-- 年龄项结束 -->
+              <span class="preview-divider">|</span> <!-- 分隔符 -->
               <span class="preview-info-item">
-                <span class="preview-info-label">身高:</span>
-                <span class="preview-info-value">{{ previewCharacter.height }}cm</span>
-              </span>
-              <span class="preview-divider">|</span>
+                <span class="preview-info-label">身高:</span> <!-- 身高标签 -->
+                <span class="preview-info-value">{{ previewCharacter.height }}cm</span> <!-- 身高数值 -->
+              </span> <!-- 身高项结束 -->
+              <span class="preview-divider">|</span> <!-- 分隔符 -->
               <span class="preview-info-item">
-                <span class="preview-info-label">性别:</span>
-                <span class="preview-info-value">{{ previewCharacter.gender }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
+                <span class="preview-info-label">性别:</span> <!-- 性别标签 -->
+                <span class="preview-info-value">{{ previewCharacter.gender }}</span> <!-- 性别数值 -->
+              </span> <!-- 性别项结束 -->
+            </div> <!-- 基础信息行结束 -->
+          </div> <!-- 详情信息区域结束 -->
+        </div> <!-- 预览头部结束 -->
         
         <!-- 别名显示区域 -->
         <div v-if="previewCharacter.aliases && previewCharacter.aliases.length > 0" class="preview-section">
-          <div class="preview-section-title">别名</div>
+          <div class="preview-section-title">别名</div> <!-- 别名栏目标题 -->
           <div class="preview-aliases">
             <el-tag
               v-for="(alias, index) in previewCharacter.aliases"
@@ -549,53 +553,113 @@
               class="preview-alias-tag"
             >
               {{ alias }}
-            </el-tag>
-          </div>
-        </div>
+            </el-tag> <!-- 循环显示每一个别名标签 -->
+          </div> <!-- 别名列表结束 -->
+        </div> <!-- 别名区域结束 -->
         
         <!-- 标签显示区域 -->
         <div v-if="previewCharacter.tags && previewCharacter.tags.length > 0" class="preview-section">
-          <div class="preview-section-title">标签</div>
+          <div class="preview-section-title">标签</div> <!-- 标签栏目标题 -->
           <div class="preview-tags">
             <el-tag v-for="tag in previewCharacter.tags" :key="tag" size="small" class="preview-tag">
               {{ tag }}
-            </el-tag>
-          </div>
-        </div>
+            </el-tag> <!-- 循环显示每一个人物标签 -->
+          </div> <!-- 标签列表结束 -->
+        </div> <!-- 标签区域结束 -->
         
         <!-- 形象介绍 -->
         <div v-if="previewCharacter.appearance" class="preview-section">
-          <div class="preview-section-title">形象介绍</div>
-          <p class="preview-text">{{ previewCharacter.appearance }}</p>
-        </div>
+          <div class="preview-section-title">形象介绍</div> <!-- 形象介绍标题 -->
+          <p class="preview-text">{{ previewCharacter.appearance }}</p> <!-- 形象介绍详细内容 -->
+        </div> <!-- 形象介绍区域结束 -->
         
         <!-- 生平介绍 -->
         <div v-if="previewCharacter.biography" class="preview-section">
-          <div class="preview-section-title">生平介绍</div>
-          <p class="preview-text">{{ previewCharacter.biography }}</p>
-        </div>
-      </div>
-    </div>
+          <div class="preview-section-title">生平介绍</div> <!-- 生平介绍标题 -->
+          <p class="preview-text">{{ previewCharacter.biography }}</p> <!-- 生平介绍详细内容 -->
+        </div> <!-- 生平介绍区域结束 -->
+      </div> <!-- 预览滚动容器结束 -->
+    </div> <!-- 预览内容主体结束 -->
 
 
     <template #footer>
       <el-button type="primary" @click="handleEditCharacter(previewCharacter)">
         <el-icon><Edit /></el-icon>
         编辑
-      </el-button>
-      <el-button @click="previewDialogVisible = false">关闭</el-button>
-    </template>
+      </el-button> <!-- 编辑按钮：点击跳转到该人物的编辑界面 -->
+      <el-button @click="previewDialogVisible = false">确定</el-button> <!-- 确定按钮：点击关闭预览弹窗 -->
+    </template> <!-- 弹窗页脚结束 -->
   </el-dialog>
-</template>
+
+  <!-- 导入人物弹窗 -->
+  <el-dialog
+    v-model="importDialogVisible" 
+    title="导入人物" 
+    width="500px" 
+    align-center 
+    :close-on-click-modal="false" 
+    class="import-dialog" 
+  > <!-- 对话框：导入人物 -->
+    <div class="import-content"> <!-- 导入内容容器 -->
+      <div class="template-download" style="margin-bottom: 20px; text-align: center;"> <!-- 模板下载区域 -->
+        <div style="margin-bottom: 10px;"> <!-- 文字提示间距 -->
+          <el-text class="mx-1">请先下载导入模板，按规则填写后上传</el-text> <!-- 提示文字 -->
+        </div> <!-- 文字提示结束 -->
+        <el-button type="primary" link @click="downloadTemplate"> <!-- 下载按钮 -->
+          <el-icon style="margin-right: 4px;"><Download /></el-icon> <!-- 下载图标 -->
+          下载导入模板.xlsx <!-- 按钮文本 -->
+        </el-button> <!-- 按钮结束 -->
+      </div> <!-- 模板下载区域结束 -->
+      
+      <el-upload
+        class="upload-area" 
+        drag 
+        action="#" 
+        :auto-upload="false" 
+        :on-change="handleFileChange" 
+        :show-file-list="false" 
+        accept=".xlsx" 
+      > <!-- 上传区域：拖拽或点击上传 -->
+        <el-icon class="el-icon--upload"><upload-filled /></el-icon> <!-- 上传图标 -->
+        <div class="el-upload__text"> <!-- 上传说明文字 -->
+          将文件拖到此处，或<em>点击上传</em> <!-- 说明内容 -->
+        </div> <!-- 文字结束 -->
+        <template #tip> <!-- 底部提示插槽 -->
+          <div class="el-upload__tip" style="text-align: center; margin-top: 10px;"> <!-- 提示容器 -->
+            仅支持 .xlsx 格式文件 <!-- 格式限制说明 -->
+          </div> <!-- 提示容器结束 -->
+        </template> <!-- 插槽结束 -->
+      </el-upload> <!-- 上传组件结束 -->
+
+      <!-- 校验结果提示 -->
+      <div v-if="importErrors.length > 0" class="import-errors" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;"> <!-- 错误提示容器 -->
+        <div class="error-title" style="margin-bottom: 10px; font-weight: bold; color: var(--el-color-danger);">数据校验失败 (共 {{ importErrors.length }} 条错误):</div> <!-- 错误汇总标题 -->
+        <el-scrollbar max-height="200px"> <!-- 错误列表滚动容器 -->
+          <div v-for="(error, index) in importErrors" :key="index" class="error-item" style="margin-bottom: 4px;"> <!-- 循环显示错误项 -->
+            <el-text type="danger">第 {{ error.row }} 行: {{ error.message }}</el-text> <!-- 错误行号与内容 -->
+          </div> <!-- 错误项结束 -->
+        </el-scrollbar> <!-- 滚动容器结束 -->
+      </div> <!-- 错误提示容器结束 -->
+    </div> <!-- 导入内容主体结束 -->
+    <template #footer> <!-- 弹窗页脚插槽 -->
+      <el-button @click="importDialogVisible = false">取消</el-button> <!-- 关闭弹窗按钮 -->
+      <el-button type="primary" :disabled="!canImport" @click="confirmImport"> <!-- 确认导入按钮 -->
+        开始导入 <!-- 按钮显示文本 -->
+      </el-button> <!-- 按钮结束 -->
+    </template> <!-- 页脚插槽结束 -->
+  </el-dialog> <!-- 导入弹窗结束 -->
+</template> <!-- 模板根节点结束 -->
+
 
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
 import { ref, reactive, onMounted, watch, toRaw, computed, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, Grid, List, Edit, Search, View } from '@element-plus/icons-vue'
+import { Plus, Delete, Grid, List, Edit, Search, View, Upload, Download, UploadFilled } from '@element-plus/icons-vue'
 import { genId } from '@renderer/utils/utils'
 import Sortable from 'sortablejs'
+import * as XLSX from 'xlsx'
 
 const route = useRoute()
 const dialogVisible = ref(false)
@@ -666,6 +730,262 @@ const characterForm = reactive({
 // 新别名输入框
 const newAliasInput = ref('')
 
+// 导入相关状态
+const importDialogVisible = ref(false) // 导入弹窗可见性
+const importErrors = ref([]) // 导入错误列表
+const importData = ref([]) // 待导入的数据
+const canImport = computed(() => importData.value.length > 0 && importErrors.value.length === 0) // 是否可以开始导入
+
+// 处理导入按钮点击
+function handleImportCharacter() {
+  importDialogVisible.value = true // 显示导入弹窗
+  importErrors.value = [] // 清空之前的错误信息
+  importData.value = [] // 清空之前解析的数据
+} // 函数结束
+
+// 下载导入模板
+function downloadTemplate() {
+  // 定义模板列名
+  const headers = ['头像', '姓名', '性别', '别名', '年龄', '身高', '形象介绍', '生平介绍', '标记色'] // 标题行数据
+  // 定义示例数据
+  const exampleData = [
+    {
+      '头像': 'https://example.com/avatar.jpg',
+      '姓名': '张三',
+      '性别': '男',
+      '别名': '法外狂徒 三哥',
+      '年龄': 25,
+      '身高': 180,
+      '形象介绍': '身穿黑色西装，眼神犀利。',
+      '生平介绍': '出生于平凡家庭，后因某种契机走上法外之路。',
+      '标记色': '#FF0000'
+    }
+  ] // 示例行数据
+
+  // 创建工作表
+  const worksheet = XLSX.utils.json_to_sheet(exampleData, { header: headers }) // 生成工作表
+  // 创建工作簿
+  const workbook = XLSX.utils.book_new() // 创建新工作簿
+  XLSX.utils.book_append_sheet(workbook, worksheet, '人物导入模板') // 将工作表添加到工作簿
+
+  // 生成二进制数据并触发下载
+  XLSX.writeFile(workbook, '人物导入模板.xlsx') // 导出并下载文件
+  
+  // 弹出规则说明，优化排版
+  const templateInfo = `
+    <div style="line-height: 1.8;">
+      <p><b>导入规则说明：</b></p>
+      <ul style="padding-left: 20px; margin: 0;">
+        <li><b>头像</b> (可选): 图片链接或本地图片绝对路径</li>
+        <li><b>姓名</b> (<span style="color: red;">必填</span>): 最大20字</li>
+        <li><b>性别</b> (<span style="color: red;">必填</span>): 只能填 <b>男</b>、<b>女</b> 或 <b>无</b></li>
+        <li><b>别名</b> (可选): 多个别名用<b>空格</b>分隔，最多20个，每个最多15字</li>
+        <li><b>年龄</b> (<span style="color: red;">必填</span>): 必须为<b>纯数字</b></li>
+        <li><b>身高</b> (<span style="color: red;">必填</span>): 必须为<b>纯数字</b></li>
+        <li><b>形象介绍</b> (<span style="color: red;">必填</span>): 最大500字</li>
+        <li><b>生平介绍</b> (<span style="color: red;">必填</span>): 最大1000字</li>
+        <li><b>标记色</b> (可选): 十六进制颜色码，如 <b>#FF0000</b></li>
+      </ul>
+    </div>
+  ` // 使用 HTML 字符串优化排版内容
+
+  ElMessageBox.alert(templateInfo, '导入模板说明', { // 弹出说明对话框
+    confirmButtonText: '知道了', // 按钮文本
+    dangerouslyUseHTMLString: true, // 允许使用 HTML 字符串渲染
+    type: 'info', // 消息类型
+    customStyle: { maxWidth: '500px' } // 自定义样式，限制最大宽度
+  }) // 对话框调用结束
+} // 函数结束
+
+// 处理文件选择
+async function handleFileChange(file) {
+  importErrors.value = [] // 重置错误列表
+  importData.value = [] // 重置导入数据
+  
+  const rawFile = file.raw // 获取原始文件对象
+  if (!rawFile) return // 如果文件不存在则返回
+
+  // 校验文件格式
+  const isXlsx = rawFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                 rawFile.name.endsWith('.xlsx') // 判断是否为 xlsx 格式
+  
+  if (!isXlsx) { // 如果不是 xlsx 格式
+    ElMessage.error('只能上传 .xlsx 格式的文件') // 弹出错误提示
+    return // 返回
+  } // 格式校验结束
+
+  // 使用 XLSX 库读取文件内容
+  const reader = new FileReader() // 创建文件读取器
+  reader.onload = async (e) => { // 读取完成后的回调，改为异步函数以支持内部 await
+    try {
+      const data = new Uint8Array(e.target.result) // 将结果转换为 8 位无符号整数数组
+      const workbook = XLSX.read(data, { type: 'array' }) // 解析 Excel 数据
+      const firstSheetName = workbook.SheetNames[0] // 获取第一个工作表的名称
+      const worksheet = workbook.Sheets[firstSheetName] // 获取工作表对象
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) // 将工作表转换为 JSON 数组
+
+      if (jsonData.length === 0) { // 如果数据为空
+        ElMessage.warning('上传的文件中没有数据') // 弹出警告
+        return // 返回
+      } // 空数据校验结束
+
+      const { errors, validatedData } = await validateImportData(jsonData) // 执行数据校验（异步）
+      importErrors.value = errors // 记录错误列表
+      importData.value = validatedData // 记录通过校验的数据
+
+      if (errors.length > 0) { // 如果存在校验错误
+        ElMessage.error(`发现 ${errors.length} 处数据格式错误，请修正后重新上传`) // 弹出错误提示
+      } else { // 如果校验全部通过
+        ElMessage.success(`文件解析成功，准备导入 ${validatedData.length} 条数据`) // 弹出成功提示
+      } // 校验结果处理结束
+    } catch (err) { // 捕获解析过程中的错误
+      console.error('解析 Excel 失败:', err) // 打印错误日志
+      ElMessage.error('解析文件失败，请检查文件是否损坏') // 弹出错误提示
+    } // 异常处理结束
+  } // 回调定义结束
+  reader.readAsArrayBuffer(rawFile) // 以 ArrayBuffer 方式读取文件内容
+} // 函数结束
+
+// 校验导入数据
+async function validateImportData(dataList) {
+  const errors = [] // 存储所有错误
+  const validatedData = [] // 存储验证通过的数据
+  const existingNames = characters.value.map(c => c.name) // 获取当前已存在的所有人物姓名
+  const importedNamesInThisFile = new Set() // 用于记录本次导入文件中已处理的姓名，防止文件内部重复
+
+  // 格式化并转换本地路径为 DataURL 的工具函数
+  const processAvatarPath = async (path) => {
+    if (!path) return ''
+    const pathStr = path.toString().trim()
+    
+    // 1. 如果是 http/https 开头的链接，直接返回
+    if (/^https?:\/\//i.test(pathStr)) {
+      return pathStr
+    }
+    
+    // 2. 如果已经是 DataURL (base64)，直接返回
+    if (pathStr.startsWith('data:image/')) {
+      return pathStr
+    }
+
+    // 3. 处理本地路径
+    let localPath = pathStr
+    if (pathStr.startsWith('file:///')) {
+      // file:///C:/Users/... -> C:/Users/...
+      localPath = pathStr.replace(/^file:\/\/\//, '')
+    }
+
+    try {
+      // 调用 Electron 接口将本地路径转换为 DataURL
+      const dataUrl = await window.electron.readLocalImage(localPath)
+      return dataUrl || pathStr // 如果转换失败，保留原路径（虽然可能无法显示）
+    } catch (err) {
+      console.error('转换头像路径失败:', err)
+      return pathStr
+    }
+  } // 转换函数结束
+
+  // 使用 for...of 循环处理异步操作
+  for (const [index, item] of dataList.entries()) {
+    const rowNum = index + 2 // 计算当前行号（加上标题行）
+    const rowErrors = [] // 存储当前行的错误
+
+    // 2. 姓名（必填）
+    const name = item.姓名 ? item.姓名.toString().trim() : ''
+    if (!name) { // 校验姓名是否为空
+      rowErrors.push('姓名是必填项') // 添加错误信息
+    } else if (name.length > 20) { // 校验姓名长度
+      rowErrors.push('姓名长度不能超过20个字符') // 添加错误信息
+    } else if (existingNames.includes(name)) { // 校验是否与库中现有姓名冲突
+      rowErrors.push(`人物"${name}"已存在，请勿重复导入`) // 添加错误信息
+    } else if (importedNamesInThisFile.has(name)) { // 校验文件内部是否存在重复姓名
+      rowErrors.push(`文件内存在重复的人物姓名"${name}"`) // 添加错误信息
+    } else {
+      importedNamesInThisFile.add(name) // 记录已处理的姓名
+    } // 姓名校验结束
+
+    // 3. 性别（必填）：只能填 男 女 无
+    const validGenders = ['男', '女', '无'] // 定义合法的性别选项
+    if (!item.性别 || !validGenders.includes(item.性别.toString().trim())) { // 校验性别
+      rowErrors.push('性别只能填写“男”、“女”或“无”') // 添加错误信息
+    } // 性别校验结束
+
+    // 4. 别名（可选）：空格分隔，最多20个，每个长度15
+    let aliases = [] // 存储解析后的别名列表
+    if (item.别名) { // 如果填写了别名
+      aliases = item.别名.toString().split(/\s+/).filter(a => a.trim()) // 使用空格分割并过滤空项
+      if (aliases.length > 20) { // 校验别名数量
+        rowErrors.push('别名最多只能有20个') // 添加错误信息
+      } // 数量校验结束
+      if (aliases.some(a => a.length > 15)) { // 校验每个别名的长度
+        rowErrors.push('每个别名长度不能超过15个字符') // 添加错误信息
+      } // 长度校验结束
+    } // 别名校验结束
+
+    // 5. 年龄（必填）：纯数字
+    const age = parseInt(item.年龄) // 尝试转换为整数
+    if (isNaN(age)) { // 校验是否为数字
+      rowErrors.push('年龄必须是纯数字') // 添加错误信息
+    } // 年龄校验结束
+
+    // 6. 身高（必填）：纯数字
+    const height = parseInt(item.身高) // 尝试转换为整数
+    if (isNaN(height)) { // 校验是否为数字
+      rowErrors.push('身高必须是纯数字') // 添加错误信息
+    } // 身高校验结束
+
+    // 7. 形象介绍（必填）：最大500字
+    if (!item.形象介绍 || !item.形象介绍.toString().trim()) { // 校验形象介绍是否为空
+      rowErrors.push('形象介绍是必填项') // 添加错误信息
+    } else if (item.形象介绍.toString().length > 500) { // 校验字数
+      rowErrors.push('形象介绍长度不能超过500个字符') // 添加错误信息
+    } // 形象介绍校验结束
+
+    // 8. 生平介绍（必填）：最大1000字
+    if (!item.生平介绍 || !item.生平介绍.toString().trim()) { // 校验生平介绍是否为空
+      rowErrors.push('生平介绍是必填项') // 添加错误信息
+    } else if (item.生平介绍.toString().length > 1000) { // 校验字数
+      rowErrors.push('生平介绍长度不能超过1000个字符') // 添加错误信息
+    } // 生平介绍校验结束
+
+    // 9. 标记色（可选）：十六进制
+    if (item.标记色 && !/^#[0-9A-Fa-f]{6}$/.test(item.标记色.toString().trim())) { // 校验色值格式
+      rowErrors.push('标记色必须是有效的十六进制表示（如 #FFFFFF）') // 添加错误信息
+    } // 标记色校验结束
+
+    if (rowErrors.length > 0) { // 如果当前行有错误
+      rowErrors.forEach(msg => { // 遍历当前行错误
+        errors.push({ row: rowNum, message: msg }) // 添加到全局错误列表
+      }) // 遍历结束
+    } else { // 如果没有错误
+      validatedData.push({ // 添加到验证通过的列表
+        id: genId(), // 生成唯一ID
+        name: item.姓名.toString().trim(), // 姓名
+        gender: item.性别.toString().trim(), // 性别
+        aliases: aliases, // 别名列表
+        age: age, // 年龄
+        height: height, // 身高
+        appearance: item.形象介绍.toString().trim(), // 形象介绍
+        biography: item.生平介绍.toString().trim(), // 生平介绍
+        avatar: await processAvatarPath(item.头像), // 头像处理：异步转换为 DataURL
+        markerColor: item.标记色 ? item.标记色.toString().trim() : '#e198b8', // 标记色
+        tags: [] // 默认空标签
+      }) // 对象构建结束
+    } // 结果处理结束
+  } // 循环结束
+
+  return { errors, validatedData } // 返回校验结果
+} // 函数结束
+
+// 确认导入
+function confirmImport() {
+  if (importData.value.length > 0) { // 如果有待导入的数据
+    characters.value.push(...importData.value) // 合并到现有角色列表
+    ElMessage.success(`成功导入 ${importData.value.length} 个角色`) // 弹出成功提示
+    importDialogVisible.value = false // 关闭弹窗
+  } // 判断结束
+} // 函数结束
+
 // 表单验证规则
 const formRules = {
   name: [
@@ -722,38 +1042,41 @@ function handleSearch() {
 // 加载人物数据
 async function loadCharacters() {
   try {
-    const data = await window.electron.readCharacters(bookName)
-    let loadedData = Array.isArray(data) ? data : []
+    const data = await window.electron.readCharacters(bookName) // 调用 Electron 接口读取数据
+    let loadedData = Array.isArray(data) ? data : [] // 确保数据是数组
 
-    // 数据兼容：将旧的 introduction 字段迁移到 biography 字段
+    // 数据兼容处理与字段初始化
     loadedData = loadedData.map((character) => {
-      // 如果存在旧的 introduction 字段且没有 biography 字段，则迁移
+      // 兼容旧版本：将 introduction 迁移到 biography
       if (character.introduction && !character.biography) {
         return {
           ...character,
           biography: character.introduction,
           appearance: character.appearance || '',
           avatar: character.avatar || '',
+          aliases: Array.isArray(character.aliases) ? character.aliases : [], // 确保别名是数组
+          tags: Array.isArray(character.tags) ? character.tags : [], // 确保标签是数组
           introduction: undefined // 移除旧字段
         }
       }
-      // 确保新字段存在
+      // 确保所有必要字段都已初始化，防止预览或编辑时显示异常
       return {
         ...character,
         biography: character.biography || '',
         appearance: character.appearance || '',
         avatar: character.avatar || '',
-        markerColor: character.markerColor || ''
+        markerColor: character.markerColor || '',
+        aliases: Array.isArray(character.aliases) ? character.aliases : [], // 确保别名是数组
+        tags: Array.isArray(character.tags) ? character.tags : [] // 确保标签是数组
       }
-    })
+    }) // map 结束
 
-    // 直接使用数组顺序，不需要 sort 字段
-    characters.value = loadedData
-  } catch (error) {
-    console.error('加载人物数据失败:', error)
-    characters.value = []
-  }
-}
+    characters.value = loadedData // 更新响应式角色列表
+  } catch (error) { // 捕获错误
+    console.error('加载人物数据失败:', error) // 打印错误日志
+    characters.value = [] // 加载失败则设置为空数组
+  } // 异常处理结束
+} // 函数结束
 
 // 加载字典数据
 async function loadDictionary() {
@@ -815,15 +1138,17 @@ function handleEditCharacter(character) {
 
 // 预览人物详情
 function handlePreviewCharacter(character) {
-  previewCharacter.value = { ...character }
-  previewDialogVisible.value = true
+  if (!character) return // 如果没有数据则返回
+  // 使用 toRaw 获取原始对象并深拷贝，确保所有字段（包括数组）都被正确复制且响应式正常
+  previewCharacter.value = JSON.parse(JSON.stringify(toRaw(character))) // 深拷贝人物数据
+  previewDialogVisible.value = true // 显示预览弹窗
   // 使用 nextTick 确保 DOM 更新后再重置滚动位置
   nextTick(() => {
-    if (previewScrollContainer.value) {
-      previewScrollContainer.value.scrollTop = 0
-    }
-  })
-}
+    if (previewScrollContainer.value) { // 如果滚动容器存在
+      previewScrollContainer.value.scrollTop = 0 // 重置滚动位置到顶部
+    } // 判断结束
+  }) // nextTick 结束
+} // 函数结束
 
 // 删除人物
 async function handleDeleteCharacter(character) {
@@ -850,31 +1175,41 @@ async function handleDeleteCharacter(character) {
 
 // 确认保存
 async function confirmSave() {
-  if (!formRef.value) return
+  if (!formRef.value) return // 如果表单引用不存在则返回
 
   try {
-    await formRef.value.validate()
+    await formRef.value.validate() // 执行表单验证
 
-    if (isEdit.value) {
+    // 校验姓名唯一性（仅在创建新人物或修改了姓名时校验）
+    const nameExists = characters.value.some(c => 
+      c.name === characterForm.name && c.id !== characterForm.id
+    ) // 检查是否存在同名人物（排除自身）
+    
+    if (nameExists) { // 如果姓名已存在
+      ElMessage.error(`人物"${characterForm.name}"已存在，请勿重复创建`) // 弹出错误提示
+      return // 返回，不保存
+    } // 唯一性校验结束
+
+    if (isEdit.value) { // 如果是编辑模式
       // 编辑模式：更新现有人物
-      const index = characters.value.findIndex((c) => c.id === characterForm.id)
-      if (index > -1) {
-        characters.value[index] = { ...characterForm }
-      }
-    } else {
+      const index = characters.value.findIndex((c) => c.id === characterForm.id) // 查找当前人物索引
+      if (index > -1) { // 如果找到了索引
+        characters.value[index] = { ...characterForm } // 更新人物数据
+      } // 更新结束
+    } else { // 如果是创建模式
       // 创建模式：添加新人物（直接添加到数组末尾）
-      characters.value.push({
-        ...characterForm,
-        id: genId()
-      })
-    }
+      characters.value.push({ // 将新人物推入数组
+        ...characterForm, // 展开表单数据
+        id: genId() // 生成新 ID
+      }) // 添加结束
+    } // 模式判断结束
 
-    dialogVisible.value = false
-    ElMessage.success(isEdit.value ? '编辑成功' : '创建成功')
-  } catch (error) {
-    console.error('表单验证失败:', error)
-  }
-}
+    dialogVisible.value = false // 关闭对话框
+    ElMessage.success(isEdit.value ? '编辑成功' : '创建成功') // 弹出成功提示
+  } catch (error) { // 捕获验证或其他错误
+    console.error('保存失败:', error) // 打印错误日志
+  } // 异常处理结束
+} // 函数结束
 
 // 添加别名
 function addAlias() {
@@ -1003,6 +1338,36 @@ async function reorderCharacters(oldIndex, newIndex) {
   // 手动触发保存
   await saveCharacters()
 }
+
+// 监听表单头像字段变化，如果是本地路径则自动转换
+watch(
+  () => characterForm.avatar,
+  async (newPath) => {
+    if (!newPath) return
+    const pathStr = newPath.toString().trim()
+    
+    // 只有在是本地绝对路径或 file:/// 路径，且不是 data: 或 http 时才处理
+    if (
+      (pathStr.startsWith('file:///') || /^[a-zA-Z]:[\\/]/.test(pathStr)) && 
+      !pathStr.startsWith('data:') && 
+      !pathStr.startsWith('http')
+    ) {
+      let localPath = pathStr
+      if (pathStr.startsWith('file:///')) {
+        localPath = pathStr.replace(/^file:\/\/\//, '')
+      }
+      
+      try {
+        const dataUrl = await window.electron.readLocalImage(localPath)
+        if (dataUrl) {
+          characterForm.avatar = dataUrl // 自动替换为 DataURL，以便预览显示
+        }
+      } catch (err) {
+        console.error('自动转换本地头像失败:', err)
+      }
+    }
+  }
+)
 
 // 监听数据变化，自动保存
 watch(characters, saveCharacters, { deep: true })
@@ -1992,4 +2357,34 @@ onBeforeUnmount(() => {
   }
 }
 
+// 导入弹窗样式
+.import-dialog {
+  .import-content {
+    padding: 10px 0; // 内容上下内边距
+  } // 内容结束
+  
+  .upload-area {
+    width: 100%; // 宽度撑满
+    
+    :deep(.el-upload-dragger) {
+      padding: 30px 20px; // 拖拽区域内边距
+    } // 拖拽区域结束
+  } // 上传区域结束
+  
+  .import-errors {
+    background-color: var(--el-color-danger-light-9); // 错误区域背景色
+    border-radius: 4px; // 圆角
+    padding: 12px; // 内边距
+    
+    .error-title {
+      font-size: 14px; // 标题字号
+      margin-bottom: 8px; // 下边距
+    } // 标题结束
+    
+    .error-item {
+      font-size: 13px; // 错误项字号
+      line-height: 1.6; // 行高
+    } // 错误项结束
+  } // 错误展示结束
+} // 导入弹窗样式结束
 </style>
