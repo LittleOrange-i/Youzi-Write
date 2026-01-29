@@ -191,39 +191,56 @@ watch(
 )
 
 // 执行搜索
-function performSearch() {
+function performSearch(preserveIndex = false) {
+  // 检查编辑器实例是否存在
   if (!props.editor) {
-    ElMessage.error('编辑器未初始化')
+    ElMessage.error('编辑器未初始化') // 如果不存在则报错提示
     return
   }
 
+  // 检查搜索文本是否为空
   if (!searchText.value || !searchText.value.trim()) {
-    clearSearch()
+    clearSearch() // 如果为空则清空搜索结果
     return
   }
 
-  // 先清除之前的高亮
+  // 先清除之前的高亮标记
   clearVisualHighlights()
 
+  // 查找文档中所有匹配的项
   const foundMatches = findTextMatches()
 
+  // 记录之前的索引位置，用于保持搜索进度
+  const oldIndex = currentMatchIndex.value
+  
+  // 更新匹配项列表和总数
   matches.value = foundMatches
   totalMatches.value = foundMatches.length
-  currentMatchIndex.value = foundMatches.length > 0 ? 0 : -1
-
-  // 高亮第一个匹配项
-  if (foundMatches.length > 0) {
-    highlightMatch(foundMatches[0], true)
-    highlightAllMatches() // 高亮所有匹配项
-    addVisualHighlights() // 添加视觉高亮
+  
+  // 如果需要保留索引（如替换后重新搜索）
+  if (preserveIndex) {
+    // 确保新索引不会超出当前总数范围
+    currentMatchIndex.value = foundMatches.length > 0 ? Math.min(oldIndex, foundMatches.length - 1) : -1
   } else {
-    // 确保无结果时也清空状态
+    // 默认跳转到第一个匹配项
+    currentMatchIndex.value = foundMatches.length > 0 ? 0 : -1
+  }
+
+  // 高亮当前选中的匹配项
+  if (foundMatches.length > 0 && currentMatchIndex.value !== -1) {
+    // 获取当前匹配项并应用高亮
+    const matchToHighlight = foundMatches[currentMatchIndex.value]
+    highlightMatch(matchToHighlight, true)
+    // 视觉上标记出文档中所有的匹配项
+    addVisualHighlights() 
+  } else {
+    // 如果没有结果，确保清空相关状态
     matches.value = []
     totalMatches.value = 0
     currentMatchIndex.value = -1
   }
 
-  // 搜索完成后，确保搜索框保持焦点
+  // 搜索操作完成后，确保焦点返回到搜索输入框
   nextTick(() => {
     searchInputRef.value?.focus()
   })
@@ -362,17 +379,13 @@ function highlightMatch(match, keepSearchFocus = true) {
 
 // 暴露给父组件的方法：打开替换模式
 function openReplaceMode() {
+  // 显示替换区域
   showReplace.value = true
+  // 在下一次 DOM 更新后聚焦到搜索输入框
   nextTick(() => {
-    // 聚焦替换框，如果没有替换框ref则聚焦搜索框
-    // 这里我们添加一个 replaceInputRef 或者通过类名查找
-    const replaceInput = document.querySelector('.replace-input input')
-    if (replaceInput) {
-      replaceInput.focus()
-      // 如果有替换文本，全选
-      if (replaceText.value) {
-        replaceInput.select()
-      }
+    // 根据用户要求，查找和替换模式下默认聚焦在搜索框而不是替换框
+    if (searchInputRef.value) {
+      searchInputRef.value.focus() // 聚焦搜索框
     }
   })
 }
@@ -467,40 +480,35 @@ function findPrevious() {
   addVisualHighlights()
 }
 
-// 替换当前
+// 替换当前选中的匹配项
 function replaceCurrent() {
+  // 如果没有匹配结果或当前索引无效，则返回
   if (totalMatches.value === 0 || currentMatchIndex.value === -1) return
 
+  // 获取当前正在操作的匹配项信息
   const currentMatch = matches.value[currentMatchIndex.value]
   if (!currentMatch) return
 
-  // 确保编辑器获得焦点
+  // 确保编辑器实例获得焦点，以便执行插入操作
   props.editor.commands.focus()
 
-  // 使用正确的文档位置设置选择范围
+  // 根据当前匹配项的位置设置编辑器的选择范围
   props.editor.commands.setTextSelection({
     from: currentMatch.from,
     to: currentMatch.to
   })
 
-  // 替换内容
+  // 执行内容替换操作，插入用户输入的替换文本
   props.editor.commands.insertContent(replaceText.value || '')
 
-  // 重新搜索（因为内容已改变）
+  // 内容发生变更后，需要重新执行搜索以刷新匹配项位置
   nextTick(() => {
-    performSearch()
-    // 如果还有匹配项，保持在当前索引或移动到下一个
-    if (matches.value.length > 0) {
-      const newIndex = Math.min(currentMatchIndex.value, matches.value.length - 1)
-      currentMatchIndex.value = newIndex
-      if (matches.value[newIndex]) {
-        highlightMatch(matches.value[newIndex])
-        // 重新应用所有高亮
-        addVisualHighlights()
-      }
-    }
+    // 调用 performSearch 并传入 true，指示其保留当前的匹配索引
+    // 这样在替换一处后，搜索焦点会自动落在原本的“下一处”上
+    performSearch(true)
   })
 
+  // 提示替换成功
   ElMessage.success('替换成功')
 }
 
