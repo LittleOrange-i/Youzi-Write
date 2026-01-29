@@ -1548,7 +1548,8 @@ async function initEditor() {
   const initialContent = editorStore.content || ''
 
   // 如果有初始内容，先开始编辑会话（设置初始化标志），再设置内容
-  if (initialContent) {
+  // 修改判断条件，确保空章节也能正确触发会话开始，从而清除初始化状态
+  if (initialContent !== undefined && initialContent !== null) {
     editorStore.startEditingSession(initialContent)
   }
 

@@ -60,6 +60,7 @@ export const useEditorStore = defineStore('editor', () => {
     // 无论是否计入书籍字数，都需要更新当前章节字数
     lastSyncedChapterWords.value = newLength
 
+    // 如果是初始加载（显式标记），直接更新状态并退出
     if (isInitialLoad) {
       if (isInitializing.value) {
         isInitializing.value = false
@@ -67,23 +68,30 @@ export const useEditorStore = defineStore('editor', () => {
       return
     }
 
-    if (delta !== 0) {
-      // 判断是否是加载已有内容（从空内容或较小内容加载到较大内容，且处于初始化状态）
-      const isLoadingExistingContent =
-        isInitializing.value &&
-        delta > 0 &&
-        ((oldLength === 0 && newLength > 0) || (oldLength > 0 && delta > oldLength * 0.5))
-
-      if (isInitializing.value && delta < 0) {
+    // 处理初始化状态的自动切换
+    if (isInitializing.value) {
+      // 如果字数没有变化（比如加载了一个空章节），我们仍然认为初始化已完成
+      if (delta === 0) {
         isInitializing.value = false
+        return
       }
 
-      if (isInitializing.value && delta > 0 && !isLoadingExistingContent) {
+      // 判断是否是加载已有内容（从空内容或较小内容加载到较大内容，且处于初始化状态）
+      // 这里的逻辑改为：如果增量大于 2 个字符，且不是用户正常输入的节奏，则视为加载已有内容
+      const isLoadingExistingContent = delta > 2
+      
+      if (isLoadingExistingContent) {
+        // 保持 isInitializing 为 true，直到加载完成（即 delta 不再大幅波动）
+        // 但为了防止卡死，如果是单次大增量，本次处理完后就应该关闭初始化
+        isInitializing.value = false
+        return // 初始加载不计入书籍总字数变动
+      } else {
+        // 如果增量很小（<=2），说明可能是用户在初始化完成后立即开始输入
         isInitializing.value = false
       }
     }
 
-    // 更新书籍总字数：仅在章节类型、已加载书籍统计且不是章节初始加载场景时同步
+    // 更新书籍总字数：仅在章节类型、已加载书籍统计且不是初始化状态时同步
     if (
       file.value?.type === 'chapter' &&
       !isInitializing.value &&
