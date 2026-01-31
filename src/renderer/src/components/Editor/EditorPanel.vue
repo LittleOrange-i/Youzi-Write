@@ -1134,8 +1134,8 @@ function updateCursorPosition() {
     // 获取光标位置（from 表示选区开始位置）
     const pos = selection.from
     // 计算从文档开头到光标位置的纯文本字符数
-    const textBeforeCursor = state.doc.textBetween(0, pos, '')
-    cursorPosition.value = textBeforeCursor.length
+    const textBeforeCursor = state.doc.textBetween(0, pos, '') // 获取从文档开头到当前光标位置的所有文本内容
+    cursorPosition.value = textBeforeCursor.replace(/[\s\n\r\t]/g, '').length // 过滤掉所有空白字符（如空格、换行、制表符等）后计算长度，确保光标字数统计不包含空白占位
   } catch (error) {
     console.error('更新光标位置失败:', error)
   }
