@@ -1,26 +1,42 @@
 // 书籍类型常量
 const BOOK_TYPES = [
-  { label: '玄幻', value: 'xuanhua' },
-  { label: '仙侠', value: 'xianxia' },
-  { label: '奇幻', value: 'qihuan' },
-  { label: '都市', value: 'dushi' },
-  { label: '科幻', value: 'kehuan' },
-  { label: '武侠', value: 'wuxia' },
-  { label: '言情', value: 'yanqing' },
-  { label: '历史', value: 'lishi' },
-  { label: '悬疑', value: 'xuanyi' },
-  { label: '军事', value: 'junshi' },
-  { label: '游戏', value: 'youxi' },
-  { label: '体育', value: 'tiyu' },
-  { label: '现实', value: 'xianshi' },
-  { label: '同人', value: 'tongren' },
-  { label: '青春', value: 'qingchun' },
-  { label: '职场', value: 'zhichang' },
-  { label: '校园', value: 'xiaoyuan' },
-  { label: '二次元', value: 'erciyuan' },
-  { label: '轻小说', value: 'qingxiaoshuo' },
-  { label: '短篇', value: 'duanpian' },
-  { label: '其他', value: 'other' }
+  // —————— 男频类型 ——————
+  { "label": "男频/玄幻", "value": "nan/xuanhuan" },
+  { "label": "男频/仙侠", "value": "nan/xianxia" },
+  { "label": "男频/都市异能", "value": "nan/dushi_yineng" },
+  { "label": "男频/历史架空", "value": "nan/lishi_jiakong" },
+  { "label": "男频/科幻硬核", "value": "nan/kehuan_yinghe" },
+  { "label": "男频/军事争霸", "value": "nan/junshi_zhengba" },
+  { "label": "男频/游戏电竞", "value": "nan/youxi_dianjing" },
+  { "label": "男频/高武世界", "value": "nan/gaowu" },
+  { "label": "男频/修真升级流", "value": "nan/xiuzhen_shengji" },
+  { "label": "男频/系统爽文", "value": "nan/xitong_shuangwen" },
+
+  // —————— 女频类型 ——————
+  { "label": "女频/言情", "value": "nv/yanqing" },
+  { "label": "女频/古代言情", "value": "nv/gudai_yanqing" },
+  { "label": "女频/现代言情", "value": "nv/xiandai_yanqing" },
+  { "label": "女频/宫斗宅斗", "value": "nv/gongdou_zhaidou" },
+  { "label": "女频/穿书快穿", "value": "nv/chuanshu_kuaichuan" },
+  { "label": "女频/耽美BL", "value": "nv/danmei" },
+  { "label": "女频/无CP成长", "value": "nv/wucp_chengzhang" },
+  { "label": "女频/职场现实", "value": "nv/zhichang_xianshi" },
+  { "label": "女频/悬疑探案", "value": "nv/xuanyi_tanan" },
+  { "label": "女频/仙侠言情", "value": "nv/xianxia_yanqing" },
+
+  // —————— 通用/中性类型（不分男女频） ——————
+  { "label": "奇幻", "value": "qihuan" },
+  { "label": "武侠", "value": "wuxia" },
+  { "label": "悬疑", "value": "xuanyi" },
+  { "label": "青春", "value": "qingchun" },
+  { "label": "校园", "value": "xiaoyuan" },
+  { "label": "同人", "value": "tongren" },
+  { "label": "二次元", "value": "erciyuan" },
+  { "label": "轻小说", "value": "qingxiaoshuo" },
+  { "label": "短篇", "value": "duanpian" },
+  { "label": "现实", "value": "xianshi" },
+  { "label": "体育", "value": "tiyu" },
+  { "label": "其他", "value": "other" }
 ]
 
 // 百家姓（单姓，部分示例，建议全量）

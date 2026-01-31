@@ -8,81 +8,140 @@
     <div class="absolute -inset-[2px] bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 rounded-2xl opacity-0 group-hover:opacity-60 blur-sm transition-all duration-500 animate-pulse-glow"></div>
     
     <!-- 书籍主体 - 9:16 比例 -->
-    <div class="book-body relative rounded-xl shadow-xl overflow-hidden">
-      <!-- 背景图片或默认淡紫色背景 -->
-      <div 
-        class="absolute inset-0 bg-[#c4b5d8] bg-cover bg-center bg-no-repeat"
-        :style="coverStyle"
-      ></div>
-      
-      <!-- 渐变光效 -->
-      <div class="absolute inset-0 bg-gradient-to-br   from-blue-900/20 via-white/0 to-purple-900/30 group-hover:opacity-100 transition-opacity duration-500"></div>
-      
-      <!-- 主要内容区 - 左右分栏布局 -->
-      <div class="relative h-full flex">
-        <!-- 左侧信息栏 (约75%宽度) - 不使用整体磨砂 -->
-        <div class="w-[75%] flex flex-col justify-between p-3">
-          <!-- 顶部：类型标签和备份标识 -->
-          <div class="flex items-start justify-start gap-1.5">
-            <div class="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-amber-500/90 to-orange-500/90 rounded-md shadow-lg">
-              <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
-              </svg>
-              <span class="text-xs font-bold text-white whitespace-nowrap">{{ typeName }}</span>
-            </div>
-          </div>
+    <el-popover
+      placement="right-start"
+      :width="320"
+      trigger="hover"
+      popper-class="book-info-popover"
+      :show-after="300"
+    >
+      <template #reference>
+        <div class="book-body relative rounded-xl shadow-xl overflow-hidden">
+          <!-- 背景图片或默认淡紫色背景 -->
+          <div 
+            class="absolute inset-0 bg-[#c4b5d8] bg-cover bg-center bg-no-repeat"
+            :style="coverStyle"
+          ></div>
+          
+          <!-- 渐变光效 -->
+          <div class="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-white/0 to-purple-900/30 group-hover:opacity-100 transition-opacity duration-500"></div>
+          
+          <!-- 主要内容区 - 左右分栏布局 -->
+          <div class="relative h-full flex">
+            <!-- 左侧信息栏 (约75%宽度) - 不使用整体磨砂 -->
+            <div class="w-[75%] flex flex-col justify-between p-3">
+              <!-- 顶部：类型标签和备份标识 -->
+              <div class="flex items-start justify-start gap-1.5">
+                <div class="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-amber-500/90 to-orange-500/90 rounded-md shadow-lg">
+                  <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+                  </svg>
+                  <span class="text-xs font-bold text-white whitespace-nowrap">{{ typeName }}</span>
+                </div>
+              </div>
 
-          <!-- 底部信息区 - 添加磨砂效果 -->
-          <div class="flex flex-col gap-2 -ml-1  p-0.5 rounded-lg bg-black/30 backdrop-blur-sm border border-white/20">
-            <!-- 作者信息 -->
-            <div class="flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 flex-shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
-              </svg>
-              <span class="text-xs font-semibold text-white break-all drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ author || '佚名' }}</span>
+              <!-- 底部信息区 - 添加磨砂效果 -->
+              <div class="flex flex-col gap-2 -ml-1  p-0.5 rounded-lg bg-black/30 backdrop-blur-sm border border-white/20">
+                <!-- 作者信息 -->
+                <div class="flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                  </svg>
+                  <span class="text-xs font-semibold text-white break-all drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ author || '佚名' }}</span>
+                </div>
+
+                <!-- 字数统计 -->
+                <div class="flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+                  </svg>
+                  <span class="text-sm font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ formatWords(totalWords) }}</span>
+                </div>
+                
+                <!-- 更新时间 - 显示到秒 -->
+                <div class="flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 flex-shrink-0 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                  </svg>
+                  <span class="text-[11px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ fullDateTime }}</span>
+                </div>
+              </div>
             </div>
 
-            <!-- 字数统计 -->
-            <div class="flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 flex-shrink-0 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
-              </svg>
-              <span class="text-sm font-bold text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ formatWords(totalWords) }}</span>
-            </div>
-            
-            <!-- 更新时间 - 显示到秒 -->
-            <div class="flex items-center gap-1">
-              <svg class="w-3.5 h-3.5 flex-shrink-0 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-              </svg>
-              <span class="text-[11px] font-semibold text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{{ fullDateTime }}</span>
+            <!-- 右侧书名栏 (约25%宽度) - 纵向显示，紧贴右边，顶部对齐 -->
+            <div class="flex-1 flex items-start justify-end pr-4 pt-1 pb-6">
+              <!-- 第二列（右侧）- 显示第9-15个字符 -->
+              <div v-if="name && name.length > 8" class="vertical-title-container">
+                <h3 
+                  class="vertical-title text-white font-black tracking-widest"
+                  :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
+                >
+                  <span style="visibility: hidden;">空</span>{{ name.slice(8) }}
+                </h3>
+              </div>
+              <!-- 第一列（右侧）- 显示前8个字符 -->
+              <div class="vertical-title-container">
+                <h3 
+                  class="vertical-title text-white font-black tracking-widest"
+                  :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
+                >
+                  {{ name ? name.slice(0, 8) : '' }}
+                </h3>
+              </div>
             </div>
           </div>
         </div>
+      </template>
 
-        <!-- 右侧书名栏 (约25%宽度) - 纵向显示，紧贴右边，顶部对齐 -->
-        <div class="flex-1 flex items-start justify-end pr-4 pt-1 pb-6">
-          <!-- 第二列（右侧）- 显示第9-15个字符 -->
-          <div v-if="name && name.length > 8" class="vertical-title-container">
-            <h3 
-              class="vertical-title text-white font-black tracking-widest"
-              :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
-            >
-              <span style="visibility: hidden;">空</span>{{ name.slice(8) }}
-            </h3>
+      <!-- 悬浮详情面板 -->
+      <div class="book-detail-panel p-4 flex flex-col gap-4">
+        <!-- 头部：标题与主类型 -->
+        <div class="flex flex-col gap-1">
+          <h2 class="text-lg font-bold text-gray-800 dark:text-white line-clamp-2 leading-tight">{{ name }}</h2>
+          <div class="flex items-center gap-2">
+            <el-tag size="small" type="warning" effect="dark" class="rounded">{{ typeName }}</el-tag>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ author }}</span>
           </div>
-          <!-- 第一列（右侧）- 显示前8个字符 -->
-          <div class="vertical-title-container">
-            <h3 
-              class="vertical-title text-white font-black tracking-widest"
-              :style="{ fontSize: getVerticalTitleSize() + 'px', writingMode: 'vertical-rl', textOrientation: 'upright' }"
-            >
-              {{ name ? name.slice(0, 8) : '' }}
-            </h3>
+        </div>
+
+        <!-- 标签展示区 -->
+        <div v-if="tags && tags.length > 0" class="flex flex-wrap gap-1.5">
+          <el-tag 
+            v-for="tag in tags" 
+            :key="tag" 
+            size="small" 
+            type="primary" 
+            plain 
+            class="rounded-full px-2"
+          >
+            {{ tag }}
+          </el-tag>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="grid grid-cols-2 gap-3 py-2 border-y border-gray-100 dark:border-gray-700">
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[10px] text-gray-400 uppercase tracking-wider">当前字数</span>
+            <span class="text-sm font-bold text-primary-600">{{ formatWords(totalWords) }}</span>
           </div>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[10px] text-gray-400 uppercase tracking-wider">更新时间</span>
+            <span class="text-xs font-medium text-gray-600 dark:text-gray-300">{{ shortDateWithTime }}</span>
+          </div>
+        </div>
+
+        <!-- 简介预览 -->
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-gray-500">内容简介</span>
+            <el-button type="primary" link size="small" @click.stop="emit('onShowDetail', props)">查看详情</el-button> <!-- 触发详情事件，将书籍数据传给父组件 -->
+          </div>
+          <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-3 italic">
+            {{ intro || '暂无简介' }}
+          </p>
         </div>
       </div>
-    </div>
+    </el-popover>
 
     <!-- 右键菜单 -->
     <Teleport to="body">
@@ -141,7 +200,7 @@ import { ref, computed, onBeforeUnmount, nextTick } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
-const emit = defineEmits(['onOpen', 'onEdit', 'onDelete'])
+const emit = defineEmits(['onOpen', 'onEdit', 'onDelete', 'onShowDetail'])
 const props = defineProps({
   id: String,
   name: String,
@@ -159,7 +218,26 @@ const props = defineProps({
     type: String,
     default: '暂无更新'
   },
-  coverUrl: String
+  coverUrl: String,
+  tags: {
+    type: Array,
+    default: () => []
+  },
+  intro: {
+    type: String,
+    default: ''
+  }
+})
+
+const showFullIntro = ref(false) // 是否显示完整简介弹窗
+
+// 格式化更新时间 - 包含时间
+const shortDateWithTime = computed(() => {
+  if (!props.updatedAt || props.updatedAt === '暂无更新') {
+    return '暂无'
+  }
+  const date = dayjs(props.updatedAt)
+  return date.isValid() ? date.format('YYYY-MM-DD HH:mm') : '暂无'
 })
 
 // 右键菜单状态
@@ -417,6 +495,76 @@ onBeforeUnmount(() => {
     font-family: 'KaiTi', 'STKaiti', '楷体', 'KaiTi_GB2312', serif;
   }
 }
+
+/* 详情面板样式 */
+.book-detail-panel {
+  h2, span, p, div {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  }
+}
+
+/* 弹出框全局样式 */
+:global(.book-info-popover) {
+  padding: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 弹窗样式优化 - 使用全局样式确保 Teleport 后依然生效 */
+:global(.custom-book-dialog) { // 弹窗容器全局选择器
+  border-radius: 12px !important; // 强制圆角
+  overflow: hidden !important; // 强制隐藏溢出
+  display: flex !important; // 强制弹性布局
+  flex-direction: column !important; // 强制纵向排列
+  max-height: 70vh !important; // 限制最大高度
+  margin-left: auto !important; // 水平居中
+  margin-right: auto !important; // 水平居中
+  
+  /* 针对详情弹窗的宽度修正 */
+  &.book-detail-width-fix {
+    width: 500px !important; // 显式设置详情弹窗宽度
+  }
+
+  .el-dialog__body { // 弹窗主体样式
+    padding: 0 !important; // 去除内边距
+    flex: 1 !important; // 占据剩余空间
+    overflow: hidden !important; // 隐藏溢出
+    display: flex !important; // 开启弹性布局
+    flex-direction: column !important; // 纵向排列
+    width: 100% !important; // 宽度 100%
+  } // 主体样式结束
+  
+  .el-dialog__header { // 头部样式优化
+    margin-right: 0 !important; // 移除右侧间距
+    padding: 20px 24px 10px !important; // 统一内边距
+  } // 头部样式结束
+  
+  .el-dialog__footer { // 页脚样式优化
+    padding: 10px 24px 20px !important; // 统一内边距
+    border-top: 1px solid rgba(0, 0, 0, 0.05) !important; // 顶部细分割线
+  } // 页脚样式结束
+} // 弹窗样式结束
+
+/* 弹窗内部滚动容器 */
+:global(.dialog-scroll-content) { // 滚动容器全局选择器
+  overflow-y: auto !important; // 开启垂直滚动
+  padding: 24px !important; // 内容内边距
+  width: 100% !important; // 确保宽度占满
+  max-height: calc(70vh - 120px) !important; // 关键：限制内容最大高度以触发滚动条
+  
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar { // 滚动条宽度
+    width: 6px; // 宽度 6px
+  } // 滚动条结束
+  &::-webkit-scrollbar-thumb { // 滚动条滑块
+    background: #e5e7eb; // 滑块颜色
+    border-radius: 3px; // 滑块圆角
+  } // 滑块结束
+  &::-webkit-scrollbar-track { // 滚动条轨道
+    background: transparent; // 轨道透明
+  } // 轨道结束
+} // 滚动容器样式结束
 </style>
 
 
