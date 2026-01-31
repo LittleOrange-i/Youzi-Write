@@ -424,6 +424,7 @@
           check-strictly
           :render-after-expand="false"
           clearable
+          @change="handleTagChange"
         />
       </el-form-item>
       <el-form-item label="标记色">
@@ -452,6 +453,58 @@
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" @click="confirmSave">确认</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 创建新标签/词条弹框 -->
+  <el-dialog
+    v-model="tagDialogVisible"
+    title="创建新词条"
+    width="600px"
+    align-center
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+    @close="resetTagForm"
+    class="tag-dialog"
+  > <!-- 对话框：从人物管理界面直接创建新词条 -->
+    <el-form ref="tagFormRef" :model="tagForm" :rules="tagFormRules" label-width="80px">
+      <!-- 词条名称输入项 -->
+      <el-form-item label="名称" prop="name">
+        <el-input v-model="tagForm.name" placeholder="请输入词条名称" clearable />
+      </el-form-item>
+      <!-- 父级词条选择项 -->
+      <el-form-item label="父级" prop="parentId">
+        <el-tree-select
+          v-model="tagForm.parentId"
+          :data="treeSelectData"
+          placeholder="请选择父级词条"
+          clearable
+          style="width: 100%"
+          :props="{
+            children: 'children',
+            label: 'name',
+            value: 'id'
+          }"
+          node-key="id"
+          check-strictly
+          :render-after-expand="false"
+        />
+      </el-form-item>
+      <!-- 词条介绍输入项 -->
+      <el-form-item label="介绍" prop="introduction">
+        <el-input
+          v-model="tagForm.introduction"
+          placeholder="请输入词条介绍"
+          type="textarea"
+          :rows="6"
+          clearable
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <!-- 底部操作按钮 -->
+      <el-button @click="tagDialogVisible = false">取消</el-button>
+      <el-button type="primary" @click="confirmSaveTag">确认</el-button>
     </template>
   </el-dialog>
 
@@ -672,8 +725,30 @@ const formRef = ref(null)
 const tableRef = ref(null)
 const searchQuery = ref('') // 搜索关键词
 const previewDialogVisible = ref(false) // 预览弹框可见性
+const tagDialogVisible = ref(false) // 新标签弹框可见性
 const previewCharacter = ref(null) // 预览的人物数据
+const tagFormRef = ref(null) // 标签表单引用
 let sortableInstance = null // 存储 SortableJS 实例
+
+// 标签表单数据
+const tagForm = reactive({
+  id: '',
+  name: '',
+  parentId: 0,
+  introduction: ''
+})
+
+// 标签表单验证规则
+const tagFormRules = {
+  name: [
+    { required: true, message: '请输入词条名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '名称长度在 1 到 50 个字符', trigger: 'blur' }
+  ],
+  introduction: [
+    { required: true, message: '请输入词条介绍', trigger: 'blur' },
+    { min: 1, max: 1000, message: '介绍长度在 1 到 1000 个字符', trigger: 'blur' }
+  ]
+}
 
 const presetMarkerColors = [
   '', // 无颜色
@@ -1020,8 +1095,158 @@ const tagOptions = computed(() => {
       .filter((node) => node.name && node.name.trim()) // 过滤掉没有名称的节点
   }
 
-  return processTreeData(cloneDictionary)
+  const processedData = processTreeData(cloneDictionary)
+  // 在列表首项添加“添加新词条”选项
+  return [
+    { name: '+ 添加新词条', isAction: true },
+    ...processedData
+  ]
 })
+
+// 将树结构转换为扁平数组（用于构建父级选择列表）
+function treeToArray(treeData) {
+  const result = []
+  function traverse(nodes, parentId = 0) {
+    if (!Array.isArray(nodes)) return
+    nodes.forEach((node) => {
+      if (!node) return
+      const { children, ...item } = node
+      result.push({ ...item, parentId })
+      if (children && Array.isArray(children) && children.length > 0) {
+        traverse(children, item.id)
+      }
+    })
+  }
+  traverse(treeData)
+  return result
+}
+
+// 计算词条父级选项数据
+const treeSelectData = computed(() => {
+  const flatData = treeToArray(dictionary.value) // 将树结构转换为扁平数组
+  const map = {} // 节点映射表
+  const result = [] // 树形结果数组
+
+  // 第一步：创建所有节点的映射，初始化 children 数组
+  flatData.forEach((item) => {
+    map[item.id] = { ...item, children: [] }
+  })
+
+  // 第二步：根据 parentId 将节点挂载到对应的父节点下
+  flatData.forEach((item) => {
+    const node = map[item.id] // 获取当前节点
+    if (item.parentId === 0) {
+      result.push(node) // 根节点直接存入结果数组
+    } else {
+      const parent = map[item.parentId] // 查找父节点
+      if (parent) {
+        parent.children.push(node) // 挂载到父节点的 children 中
+      }
+    }
+  })
+
+  // 在最前面添加一个“无父级”的可选项，方便创建一级词条
+  return [
+    {
+      id: 0,
+      name: '无父级',
+      parentId: 0,
+      introduction: '',
+      children: []
+    },
+    ...result
+  ]
+})
+
+// 在树结构中添加新词条节点的递归函数
+function addNodeToTree(treeData, newNode) {
+  if (newNode.parentId === 0 || !newNode.parentId) {
+    // 如果没有父级，说明是顶级词条，直接推入顶层数组
+    treeData.push(newNode)
+  } else {
+    // 否则需要递归查找对应的父节点并插入到其子节点列表中
+    function addToParent(nodes, parentId) {
+      for (let node of nodes) {
+        if (String(node.id) === String(parentId)) {
+          if (!node.children) node.children = [] // 确保 children 数组存在
+          node.children.push(newNode) // 插入新节点
+          return true // 插入成功，结束查找
+        }
+        if (node.children && node.children.length > 0) {
+          if (addToParent(node.children, parentId)) return true // 继续在子树中查找
+        }
+      }
+      return false // 当前分支未找到
+    }
+    addToParent(treeData, newNode.parentId)
+  }
+}
+
+// 处理标签选择器的变化事件
+function handleTagChange(val) {
+  // 检查当前选择的标签列表中是否包含“添加新词条”这个特殊操作项
+  if (val && val.includes('+ 添加新词条')) {
+    // 如果包含，先从已选列表中剔除这个伪标签
+    characterForm.tags = val.filter(t => t !== '+ 添加新词条')
+    // 然后唤起创建词条的对话框
+    tagDialogVisible.value = true
+  }
+}
+
+// 确认并保存新创建的词条
+async function confirmSaveTag() {
+  if (!tagFormRef.value) return // 确保表单实例存在
+  
+  try {
+    await tagFormRef.value.validate() // 触发 Element Plus 表单校验
+    
+    // 构造符合字典数据结构的新节点对象
+    const newNode = {
+      id: genId(), // 调用工具函数生成唯一 ID
+      name: tagForm.name, // 词条名称
+      introduction: tagForm.introduction, // 词条详细介绍
+      parentId: tagForm.parentId, // 所属父级 ID
+      children: [] // 初始化空子节点列表
+    }
+    
+    // 首先更新当前页面内存中的 dictionary 状态，以便立即反映在 UI 上
+    addNodeToTree(dictionary.value, newNode)
+    
+    // 调用主进程接口，将最新的完整字典数据保存到本地 JSON 文件中
+    const result = await window.electron.writeDictionary(bookName, JSON.parse(JSON.stringify(toRaw(dictionary.value))))
+    
+    if (result.success) {
+      // 保存成功提示
+      ElMessage.success('词条创建并同步成功')
+      // 关键逻辑：创建成功后，自动将该词条名称勾选到当前正在编辑的人物标签列表中
+      if (!characterForm.tags.includes(newNode.name)) {
+        characterForm.tags.push(newNode.name)
+      }
+      tagDialogVisible.value = false // 操作完成，关闭弹窗
+    } else {
+      // 接口返回保存失败的处理
+      throw new Error(result.message || '同步失败')
+    }
+  } catch (error) {
+    // 捕获校验失败或保存过程中的任何异常
+    console.error('保存词条失败:', error)
+    ElMessage.error(error.message || '保存词条失败')
+  }
+}
+
+// 重置词条创建表单的所有字段及状态
+function resetTagForm() {
+  if (tagFormRef.value) {
+    tagFormRef.value.resetFields() // 清除表单校验信息
+  }
+  // 恢复表单数据的初始默认值
+  Object.assign(tagForm, {
+    id: '',
+    name: '',
+    parentId: 0,
+    introduction: ''
+  })
+}
 
 // 计算过滤后的人物列表（根据搜索关键词）
 const filteredCharacters = computed(() => {
@@ -2111,23 +2336,43 @@ onBeforeUnmount(() => {
 
 // 预览弹框样式
 .preview-dialog {
+  :deep(.el-dialog) {
+    display: flex; // 开启弹性布局以支持内部自适应
+    flex-direction: column; // 设置主轴方向为纵向
+    max-height: 80vh !important; // 限制弹窗最大高度为视口高度的 80%
+    margin-bottom: 0; // 移除底部外边距
+  }
   :deep(.el-dialog__body) {
-    padding: 0; // 移除padding，由内部容器控制
+    padding: 0; // 移除内边距，由内部容器控制
+    flex: 1; // 占据剩余空间
+    overflow: hidden; // 隐藏主体区域的溢出内容
+    display: flex; // 开启弹性布局
+    flex-direction: column; // 设置主轴方向为纵向
   }
 }
 
 // 编辑弹框样式
 .edit-dialog {
+  :deep(.el-dialog) {
+    display: flex; // 开启弹性布局以支持内部自适应
+    flex-direction: column; // 设置主轴方向为纵向
+    max-height: 80vh !important; // 限制弹窗最大高度为视口高度的 80%
+    margin-bottom: 0; // 移除底部外边距
+  }
   :deep(.el-dialog__body) {
-    padding: 0; // 移除padding，由内部容器控制
+    padding: 0; // 移除内边距，由内部容器控制
+    flex: 1; // 占据剩余空间
+    overflow: hidden; // 隐藏主体区域的溢出内容
+    display: flex; // 开启弹性布局
+    flex-direction: column; // 设置主轴方向为纵向
   }
 }
 
 .edit-scroll-container {
-  max-height: 500px; // 固定最大高度500px，与预览弹窗一致
-  overflow-y: auto; // 添加垂直滚动条
-  padding: 20px; // 在滚动容器内添加padding
-  scrollbar-width: none; // 隐藏滚动条
+  max-height: calc(80vh - 120px); // 动态计算最大高度，适配 80vh 的弹窗
+  overflow-y: auto; // 开启垂直滚动
+  padding: 20px; // 在滚动容器内添加内边距
+  scrollbar-width: none; // 在 Firefox 中隐藏滚动条
 }
 
 // 文本编辑器弹窗样式
@@ -2196,11 +2441,16 @@ onBeforeUnmount(() => {
 }
 
 .preview-content {
+  flex: 1; // 占据剩余空间
+  display: flex; // 开启弹性布局
+  flex-direction: column; // 设置主轴方向为纵向
+  overflow: hidden; // 隐藏溢出内容
+  
   .preview-scroll-container {
-    max-height: 500px; // 固定最大高度500px
-    overflow-y: auto; // 添加垂直滚动条
-    padding: 20px; // 在滚动容器内添加padding
-    scrollbar-width: none;   //隐藏滚动条
+    max-height: calc(80vh - 120px); // 动态计算最大高度，适配 80vh 的弹窗
+    overflow-y: auto; // 开启垂直滚动
+    padding: 20px; // 在滚动容器内添加内边距
+    scrollbar-width: none; // 在 Firefox 中隐藏滚动条
   }
 
   .preview-header {
