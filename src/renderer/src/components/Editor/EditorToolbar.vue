@@ -121,11 +121,11 @@
       </el-dialog>
     </div>
     
-    <!-- 主题切换按钮 -->
+    <!-- 右侧功能组 -->
     <div class="toolbar-right">
-      <ThemeSelector />
-    </div>
-  </div>
+      <ThemeSelector /> <!-- 主题选择组件 -->
+    </div> <!-- 右侧功能组结束 -->
+  </div> <!-- 工具栏结束 -->
 </template>
 
 <script setup>
@@ -146,6 +146,39 @@ const randomNameRef = ref(null) // 定义随机起名组件引用
 const bannedWordsRef = ref(null) // 定义禁词管理组件引用
 const router = useRouter() // 获取路由实例
 const route = useRoute() // 获取当前路由信息
+const independentWindowMode = ref(false) // 定义独立窗口模式响应式变量
+
+// 加载独立窗口模式配置
+const loadWindowMode = async () => { // 异步加载函数
+  try { // 异步加载配置
+    const savedMode = await window.electronStore.get('independent-window-mode') // 从本地存储获取配置
+    independentWindowMode.value = !!savedMode // 应用保存的配置，默认为 false
+  } catch (error) { // 捕获异常
+    console.error('加载窗口模式失败:', error) // 打印错误日志
+  } // 处理结束
+} // 加载配置函数结束
+
+// 监听独立窗口模式配置变化（用于在独立模式下实时同步）
+watch( // 监听器定义
+  () => independentWindowMode.value, // 监听当前模式变量
+  async (val) => { // 当模式发生变化时
+    // 保持独立模式状态与存储同步，此处主要用于 openTool 的判断
+  } // 监听逻辑结束
+) // 监听器结束
+
+// 通用工具打开逻辑处理
+const openTool = (routePath) => { // 定义通用工具打开函数
+  const bookName = route.query.name // 获取当前书名
+  if (independentWindowMode.value) { // 如果开启了独立窗口模式
+    window.electron.openToolWindow(routePath, { name: bookName }) // 通过主进程打开独立窗口
+  } else { // 否则（常规模式）
+    if (route.path === routePath) { // 如果当前路由已在该页面
+      router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器首页
+    } else { // 否则
+      router.push({ path: routePath, query: { name: bookName } }) // 跳转到目标工具页面
+    } // 路由判断结束
+  } // 模式判断结束
+} // 函数定义结束
 
 // 默认快捷键配置定义
 const DEFAULT_SHORTCUTS = [ // 快捷键列表定义
@@ -242,73 +275,31 @@ const saveParagraphMaxLength = async () => { // 保存段落字数设置
 } // 函数结束
 
 const handleWorldMap = () => { // 设计地图处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在地图列表页面，返回编辑器；否则跳转到地图列表
-  if (route.path === '/map-list') { // 如果当前在地图列表
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/map-list', query: { name: bookName } }) // 跳转到地图列表
-  } // 判断结束
+  openTool('/map-list') // 调用通用逻辑打开地图列表
 } // 函数结束
 
 const handleTimeline = () => { // 时间线处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在时间线页面，返回编辑器；否则跳转到时间线
-  if (route.path === '/timeline') { // 如果当前在时间线
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/timeline', query: { name: bookName } }) // 跳转到时间线
-  } // 判断结束
+  openTool('/timeline') // 调用通用逻辑打开时间线
 } // 函数结束
 
 const handleEntryDictionary = () => { // 词条字典处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在词条字典页面，返回编辑器；否则跳转到词条字典
-  if (route.path === '/dictionary') { // 如果当前在字典
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/dictionary', query: { name: bookName } }) // 跳转到字典
-  } // 判断结束
+  openTool('/dictionary') // 调用通用逻辑打开词条字典
 } // 函数结束
 
 const handleCharacterProfile = () => { // 人物谱处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在人物谱页面，返回编辑器；否则跳转到人物谱
-  if (route.path === '/character-profile') { // 如果当前在人物谱
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/character-profile', query: { name: bookName } }) // 跳转到人物谱
-  } // 判断结束
+  openTool('/character-profile') // 调用通用逻辑打开人物谱
 } // 函数结束
 
 const handleRelationshipMap = () => { // 关系图处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在关系图列表页面，返回编辑器；否则跳转到关系图列表
-  if (route.path === '/relationship-list') { // 如果当前在关系图列表
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/relationship-list', query: { name: bookName } }) // 跳转到关系图列表
-  } // 判断结束
+  openTool('/relationship-list') // 调用通用逻辑打开关系图列表
 } // 函数结束
 
 const handleEventsSequence = () => { // 事序图处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在事序图页面，返回编辑器；否则跳转到事序图
-  if (route.path === '/events-sequence') { // 如果当前在事序图
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/events-sequence', query: { name: bookName } }) // 跳转到事序图
-  } // 判断结束
+  openTool('/events-sequence') // 调用通用逻辑打开事序图
 } // 函数结束
 
 const handleOrganization = () => { // 组织架构处理函数
-  const bookName = route.query.name // 获取当前书名
-  // 如果已经在组织架构列表页面，返回编辑器；否则跳转到组织架构列表
-  if (route.path === '/organization-list') { // 如果当前在组织架构列表
-    router.push({ path: '/editor', query: { name: bookName } }) // 返回编辑器
-  } else { // 否则
-    router.push({ path: '/organization-list', query: { name: bookName } }) // 跳转到组织架构列表
-  } // 判断结束
+  openTool('/organization-list') // 调用通用逻辑打开组织架构列表
 } // 函数结束
 
 const handleBannedWords = () => { // 禁词管理处理函数
@@ -345,35 +336,45 @@ const shortcutRouteMap = { // 映射对象定义
 } // 映射结束
 
 // 监听主进程发来的快捷键触发事件
-const handleShortcutTriggered = (actionId) => { // 定义触发回调函数
+const handleShortcutTriggered = (actionId) => { // 定义快捷键触发回调函数
   console.log(`[快捷键] 收到快捷键: ${actionId}, 当前路由: ${route.path}`) // 打印触发日志
   
+  // 获取当前快捷键对应的处理器和预期路由
+  const handler = shortcutHandlers[actionId] // 获取对应的处理器
+  const expectedRoute = shortcutRouteMap[actionId] // 获取预期路由
+
+  // 如果开启了独立窗口模式且是这七个功能之一
+  if (independentWindowMode.value && expectedRoute) { // 独立模式且功能匹配
+    console.log(`[快捷键] 独立窗口模式开启，直接打开独立窗口: ${actionId}`) // 打印逻辑执行日志
+    const bookName = route.query.name // 获取当前书籍名称
+    window.electron.openToolWindow(expectedRoute, { name: bookName }) // 通过 IPC 打开独立工具窗口
+    return // 直接返回，不再执行后续主窗口切换逻辑
+  } // 独立模式处理结束
+
   // 如果在编辑器页面，允许所有快捷键
-  if (route.path === '/editor') { // 判断是否在编辑器
-    console.log(`[快捷键] 在编辑器页面，允许执行快捷键: ${actionId}`) // 打印允许日志
-    const handler = shortcutHandlers[actionId] // 获取对应的处理器
+  if (route.path === '/editor') { // 判断是否在编辑器主页
+    console.log(`[快捷键] 在编辑器页面，执行切换逻辑: ${actionId}`) // 打印主页处理日志
     if (handler) { // 如果处理器存在
-      handler() // 执行处理器
+      handler() // 执行处理器进行主窗口内的路由跳转
     } // 处理器执行结束
     return // 返回
-  } // 编辑器判断结束
+  } // 编辑器页面处理结束
   
   // 如果不在编辑器页面，检查当前路由是否对应该快捷键
   // 只有当前路由对应的快捷键才能触发（用于返回编辑器）
-  const expectedRoute = shortcutRouteMap[actionId] // 获取预期路由
-  if (expectedRoute && route.path === expectedRoute) { // 如果当前路由匹配预期
-    console.log(`[快捷键] 当前在 ${route.path}，允许快捷键 ${actionId} 返回编辑器`) // 打印允许日志
-    const handler = shortcutHandlers[actionId] // 获取对应的处理器
+  if (expectedRoute && route.path === expectedRoute) { // 如果当前正在该工具页面
+    console.log(`[快捷键] 当前在 ${route.path}，执行处理器返回编辑器: ${actionId}`) // 打印返回日志
     if (handler) { // 如果处理器存在
-      handler() // 执行处理器
+      handler() // 执行处理器跳转回编辑器
     } // 处理器执行结束
-  } else { // 路由不匹配时
-    console.log(`[快捷键] 当前在 ${route.path}，只能使用对应的快捷键返回，快捷键 ${actionId} 被忽略`) // 打印忽略日志
-  } // 路由匹配判断结束
-} // 函数定义结束
+  } else { // 路由不匹配且非编辑器页
+    console.log(`[快捷键] 当前在 ${route.path}，快捷键 ${actionId} 被忽略`) // 打印忽略日志
+  } // 路由判断结束
+} // 快捷键处理函数结束
 
 onMounted(async () => { // 组件挂载后的异步钩子
   await loadShortcuts() // 每次进入编辑器获取一遍最新的组合
+  await loadWindowMode() // 加载独立窗口模式设置
 
   // 监听全局快捷键事件
   if (window.electron?.onShortcutTriggered) { // 检查 electron API 是否可用
@@ -458,6 +459,14 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     margin-left: 16px;
+    gap: 16px; // 增加间距
+
+    .window-mode-switch { // 独立窗口模式开关样式
+      :deep(.el-switch__label) { // 深度选择标签样式
+        font-size: 12px; // 设置字体大小
+        color: var(--text-lighter); // 设置较浅颜色
+      } // 标签样式结束
+    } // 开关样式结束
   }
 }
 </style>

@@ -5,8 +5,14 @@ import { onMounted, onUnmounted } from 'vue'
 const route = useRoute()
 const router = useRouter()
 
+// 是否为独立窗口模式
+const isIndependent = window.api?.isIndependentWindow || false
+
 // 全局快捷键处理
 const handleGlobalKeydown = (e) => {
+  // 如果是独立窗口模式，禁用这些导航快捷键
+  if (isIndependent) return
+
   // Alt key (Option on Mac)
   if (e.altKey) {
     const key = e.key.toLowerCase()

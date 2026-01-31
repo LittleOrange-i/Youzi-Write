@@ -73,8 +73,104 @@ ipcMain.handle('store:get', async (_, key) => {
 
 ipcMain.handle('store:set', async (_, key, value) => {
   store.set(key, value)
-  return true
-})
+  return true // 返回成功
+}) // 处理器结束
+
+// 工具窗口标题映射
+const toolTitles = { // 映射对象定义
+  '/map-list': '设计地图', // 设计地图路由对应的标题
+  '/timeline': '时间线', // 时间线路由对应的标题
+  '/dictionary': '词条字典', // 词条字典路由对应的标题
+  '/character-profile': '人物谱', // 人物谱路由对应的标题
+  '/relationship-list': '关系图', // 关系图路由对应的标题
+  '/events-sequence': '事序图', // 事序图路由对应的标题
+  '/organization-list': '组织架构' // 组织架构路由对应的标题
+} // 映射结束
+
+// 打开独立工具窗口的处理程序
+ipcMain.handle('window:open-tool', async (event, { route, query }) => { // 异步处理函数定义
+  const toolKey = `${route}?name=${query.name}` // 生成窗口唯一键名
+  
+  if (toolWindows.has(toolKey)) { // 如果窗口已经存在
+    const win = toolWindows.get(toolKey) // 获取已有的窗口实例
+    if (win && !win.isDestroyed()) { // 检查窗口是否未被销毁
+      win.focus() // 聚焦该窗口
+      return true // 返回成功
+    } // 检查结束
+  } // 存在性判断结束
+
+  const macIcon = getMacIcon() // 获取 macOS 平台图标
+  const title = toolTitles[route] || '工具窗口' // 获取工具对应的标题
+
+  // 获取保存的窗口尺寸
+  const savedBounds = store.get(`window-bounds:${route}`) || { // 从存储中获取对应工具的窗口尺寸
+    width: 900, // 默认宽度
+    height: 625 // 默认高度
+  } // 尺寸获取结束
+
+  const toolWindow = new BrowserWindow({ // 创建新的浏览器窗口实例
+    title: `${title} - ${query.name}`, // 设置窗口标题，仅显示功能名称和书名
+    width: savedBounds.width, // 设置保存的宽度
+    height: savedBounds.height, // 设置保存的高度
+    minWidth: 750, // 设置最小宽度
+    minHeight: 520, // 设置最小高度
+    show: false, // 初始不显示，等待加载完成
+    autoHideMenuBar: true, // 自动隐藏菜单栏
+    ...(process.platform === 'linux' ? { icon } : {}), // Linux 图标配置
+    ...(process.platform === 'darwin' && macIcon ? { icon: macIcon } : {}), // macOS 图标配置
+    webPreferences: { // 网页偏好设置
+      preload: join(__dirname, '../preload/index.mjs'), // 设置预加载脚本路径
+      sandbox: false, // 禁用沙箱模式
+      additionalArguments: ['isToolWindow=true'] // 标识为独立工具窗口
+    } // 偏好设置结束
+  }) // 窗口创建结束
+
+  toolWindows.set(toolKey, toolWindow) // 将新窗口存入映射中
+
+  toolWindow.on('ready-to-show', () => { // 监听窗口准备好显示的事件
+    toolWindow.show() // 显示窗口
+    windowShortcutStates.set(toolWindow.id, true) // 在该窗口中启用快捷键
+  }) // 监听结束
+
+  // 页面加载完成后，再次强制设置一次标题，防止被前端页面标题覆盖
+  toolWindow.webContents.on('did-finish-load', () => { // 监听加载完成事件
+    toolWindow.setTitle(`${title} - ${query.name}`) // 强制设置标题为：功能名称 - 书名
+  }) // 监听结束
+
+  // 监听窗口尺寸变化并保存
+  toolWindow.on('resize', () => { // 监听尺寸改变事件
+    const { width, height } = toolWindow.getBounds() // 获取当前窗口尺寸
+    store.set(`window-bounds:${route}`, { width, height }) // 将新尺寸保存到存储中
+  }) // 监听结束
+
+  toolWindow.on('closed', () => { // 监听窗口关闭事件
+    toolWindows.delete(toolKey) // 从映射中移除该窗口
+    windowShortcutStates.delete(toolWindow.id) // 清理该窗口的快捷键状态
+  }) // 监听结束
+
+  // 阻止 Alt 键激活菜单栏（仅 Windows）
+  if (process.platform === 'win32') { // 如果是 Windows 系统
+    toolWindow.webContents.on('before-input-event', (event, input) => { // 监听输入事件
+      if (input.key === 'Alt' && !input.control && !input.meta && !input.shift) { // 检查是否单独按下 Alt
+        event.preventDefault() // 阻止默认行为（激活菜单）
+      } // 检查结束
+    }) // 监听结束
+  } // 系统判断结束
+
+  const queryString = Object.entries(query) // 将查询参数转换为数组
+    .map(([key, val]) => `${key}=${encodeURIComponent(val)}`) // 编码参数
+    .join('&') // 连接成查询字符串
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) { // 如果是开发环境且有渲染器 URL
+    toolWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${route}?${queryString}`) // 加载开发环境 URL
+  } else { // 生产环境
+    toolWindow.loadFile(join(__dirname, '../renderer/index.html'), { // 加载打包后的 HTML 文件
+      hash: `${route}?${queryString}` // 设置路由 Hash
+    }) // 加载结束
+  } // 环境判断结束
+
+  return true // 返回成功
+}) // 处理器结束
 
 ipcMain.handle('store:delete', async (_, key) => {
   store.delete(key)
@@ -806,7 +902,8 @@ ipcMain.handle('call-ai', async (_, { endpoint, apiKey, modelId, providerId, sys
 })
 
 // 维护已打开书籍编辑窗口的映射
-const bookEditorWindows = new Map()
+const bookEditorWindows = new Map() // 用于存储书籍编辑窗口的 Map
+const toolWindows = new Map() // 用于存储独立工具窗口的 Map（地图、时间线等）
 
 function createWindow() {
   // 获取 macOS 图标

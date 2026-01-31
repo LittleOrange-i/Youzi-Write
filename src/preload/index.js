@@ -1,8 +1,34 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+// --------- 独立窗口识别与返回操作控制 ---------
+const isIndependent = process.argv.includes('isToolWindow=true')
+
+if (isIndependent) {
+  // 禁用返回操作
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      // 屏蔽 Backspace (不在输入框时)
+      if (e.key === 'Backspace') {
+        const target = e.target
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && !target.isContentEditable) {
+          e.preventDefault()
+        }
+      }
+      // 屏蔽 Alt + Left (浏览器返回快捷键)
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+      }
+    },
+    true
+  )
+}
+
 // Custom APIs for renderer
-const api = {}
+const api = {
+  isIndependentWindow: isIndependent
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
@@ -295,6 +321,9 @@ if (process.contextIsolated) {
       setFullScreen: (flag) => ipcRenderer.invoke('window:set-fullscreen', flag),
       // 获取全屏状态
       isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen'),
+
+      // 打开独立工具窗口
+      openToolWindow: (route, query) => ipcRenderer.invoke('window:open-tool', { route, query }),
 
       // 退出应用程序
       quitApp: () => ipcRenderer.invoke('quit-app')

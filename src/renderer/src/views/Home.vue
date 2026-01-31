@@ -102,22 +102,22 @@
     </el-dialog>
 
     <!-- 帮助中心弹框 -->
-    <el-dialog v-model="showHelpDialog" title="帮助中心" width="420px" align-center>
-      <div class="flex flex-col items-center gap-4 text-center">
-        <img :src="qqGroupQrcode" alt="QQ 群二维码" class="w-64 max-w-full rounded-xl shadow-lg" />
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          问题反馈
-          <a class="text-primary-600 hover:text-primary-700 font-medium" :href="`mailto:${contactEmail}`">{{ contactEmail }}</a>
-        </p>
-      </div>
-    </el-dialog>
+    <el-dialog v-model="showHelpDialog" title="帮助中心" width="420px" align-center> <!-- 帮助中心对话框 -->
+      <div class="flex flex-col items-center gap-4 text-center"> <!-- 内容居中布局容器 -->
+        <img :src="qqGroupQrcode" alt="QQ 群二维码" class="w-64 max-w-full rounded-xl shadow-lg" /> <!-- QQ群二维码图片 -->
+        <p class="text-sm" :style="{ color: 'var(--text-gray)' }"> <!-- 底部提示文本 -->
+          问题反馈 <!-- 文本内容 -->
+          <a class="font-medium" :style="{ color: 'var(--accent-color)' }" :href="`mailto:${contactEmail}`">{{ contactEmail }}</a> <!-- 邮箱链接 -->
+        </p> <!-- 文本结束 -->
+      </div> <!-- 容器结束 -->
+    </el-dialog> <!-- 对话框结束 -->
 
     <!-- 赞助作者弹框 -->
-    <el-dialog v-model="showSponsorDialog" title="赞助作者" width="520px" align-center>
-      <div class="flex flex-col items-center">
-        <img :src="rewardQrcode" alt="赞助二维码" class="w-128 max-w-full rounded-xl shadow-lg" />
-      </div>
-    </el-dialog>
+    <el-dialog v-model="showSponsorDialog" title="赞助作者" width="520px" align-center> <!-- 赞助作者对话框 -->
+      <div class="flex flex-col items-center"> <!-- 内容居中布局容器 -->
+        <img :src="rewardQrcode" alt="赞助二维码" class="w-128 max-w-full rounded-xl shadow-lg" /> <!-- 赞助二维码图片 -->
+      </div> <!-- 容器结束 -->
+    </el-dialog> <!-- 对话框结束 -->
 
     <!-- 书架密码设置弹框 -->
     <el-dialog v-model="showShelfPasswordDialog" title="书架密码" width="500px" align-center>
@@ -190,81 +190,95 @@
     </el-dialog>
 
     <!-- 系统设置弹框 -->
-    <el-dialog v-model="showSettingsDialog" title="系统设置" width="600px" align-center :style="{ maxHeight: '80vh' }">
-      <div class="space-y-6 settings-dialog-content">
+    <el-dialog v-model="showSettingsDialog" title="系统设置" width="600px" align-center :style="{ maxHeight: '80vh' }"> <!-- 系统设置对话框 -->
+      <div class="space-y-6 settings-dialog-content"> <!-- 设置内容容器 -->
         <!-- 书籍目录设置 -->
-        <div class="setting-section">
-          <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">书籍存储目录</h4>
-          <el-form label-width="0">
-            <el-form-item>
-              <el-row :gutter="10" style="width: 100%">
-                <el-col :span="18">
-                  <el-input v-model="bookDir" readonly placeholder="请选择目录" />
-                </el-col>
-                <el-col :span="6">
-                  <el-button type="primary" style="width: 100%" @click="handleChooseDir">
-                    选择目录
-                  </el-button>
-                </el-col>
-              </el-row>
-            </el-form-item>
-          </el-form>
-        </div>
+        <div class="setting-section"> <!-- 书籍存储目录设置区块 -->
+          <h4 class="text-sm font-semibold text-[var(--text-base)] mb-3">书籍存储目录</h4> <!-- 区块标题 -->
+          <el-form label-width="0"> <!-- 表单容器 -->
+            <el-form-item> <!-- 表单项 -->
+              <el-row :gutter="10" style="width: 100%"> <!-- 栅格行 -->
+                <el-col :span="18"> <!-- 输入框列 -->
+                  <el-input v-model="bookDir" readonly placeholder="请选择目录" /> <!-- 目录显示输入框 -->
+                </el-col> <!-- 列结束 -->
+                <el-col :span="6"> <!-- 按钮列 -->
+                  <el-button type="primary" style="width: 100%" @click="handleChooseDir"> <!-- 选择按钮 -->
+                    选择目录 <!-- 按钮文字 -->
+                  </el-button> <!-- 按钮结束 -->
+                </el-col> <!-- 列结束 -->
+              </el-row> <!-- 行结束 -->
+            </el-form-item> <!-- 项结束 -->
+          </el-form> <!-- 表单结束 -->
+        </div> <!-- 区块结束 -->
 
+        <!-- 独立窗口设置 -->
+        <div class="setting-section"> <!-- 窗口管理设置区块 -->
+          <h4 class="text-sm font-semibold text-[var(--text-base)] mb-3">窗口管理</h4> <!-- 区块标题 -->
+          <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-mute)] border border-[var(--border-color)]"> <!-- 设置项容器 -->
+            <div class="flex flex-col"> <!-- 文本说明容器 -->
+              <span class="text-sm font-medium text-[var(--text-base)]">独立窗口模式</span> <!-- 功能名称 -->
+              <p class="text-xs text-[var(--text-gray)] mt-1">开启后，点击地图、时间线等工具将以独立窗口打开</p> <!-- 功能描述 -->
+            </div> <!-- 文本说明结束 -->
+            <el-switch v-model="independentWindowMode" @change="handleWindowModeChange" /> <!-- 切换开关 -->
+          </div> <!-- 容器结束 -->
+        </div> <!-- 区块结束 -->
+
+       
         <!-- 主题设置 -->
-        <div class="setting-section">
-          <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">主题外观</h4>
-          <div class="grid grid-cols-2 gap-3">
+        <div class="setting-section"> <!-- 主题外观设置区块 -->
+          <h4 class="text-sm font-semibold text-[var(--text-base)] mb-3">主题外观</h4> <!-- 区块标题 -->
+          <div class="grid grid-cols-2 gap-3"> <!-- 主题网格布局 -->
             <button
               v-for="(config, themeKey) in THEME_CONFIGS"
               :key="themeKey"
               @click="handleThemeChange(themeKey)"
               class="theme-card p-3 rounded-lg border-2 transition-all duration-200 hover:shadow-md"
-              :class="{
-                'border-primary-600 bg-primary-50 dark:bg-primary-900/20': themeStore.currentTheme === themeKey,
-                'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600': themeStore.currentTheme !== themeKey
+              :style="{
+                borderColor: themeStore.currentTheme === themeKey ? 'var(--accent-color)' : 'var(--border-color)',
+                backgroundColor: themeStore.currentTheme === themeKey ? 'var(--bg-mute)' : 'var(--bg-soft)'
               }"
-            >
+            > <!-- 主题卡片按钮 -->
               <!-- 主题颜色预览 -->
-              <div class="flex gap-1 mb-2">
+              <div class="flex gap-1 mb-2"> <!-- 颜色预览容器 -->
                 <div
                   v-for="(color, index) in getThemeColors(themeKey)"
                   :key="index"
                   class="flex-1 h-8 rounded"
                   :style="{ backgroundColor: color }"
-                ></div>
-              </div>
+                ></div> <!-- 颜色块 -->
+              </div> <!-- 预览结束 -->
               
               <!-- 主题名称 -->
-              <div class="text-left">
-                <div class="flex items-center justify-between">
+              <div class="text-left"> <!-- 文字对齐容器 -->
+                <div class="flex items-center justify-between"> <!-- 名称和勾选图标容器 -->
                   <span
                     class="text-sm font-medium"
-                    :class="{
-                      'text-primary-600 dark:text-primary-400': themeStore.currentTheme === themeKey,
-                      'text-gray-900 dark:text-gray-100': themeStore.currentTheme !== themeKey
+                    :style="{
+                      color: themeStore.currentTheme === themeKey ? 'var(--accent-color)' : 'var(--text-base)'
                     }"
-                  >
-                    {{ config.name }}
-                  </span>
+                  > <!-- 主题名称 -->
+                    {{ config.name }} <!-- 名称内容 -->
+                  </span> <!-- 名称结束 -->
                   <svg
                     v-if="themeStore.currentTheme === themeKey"
-                    class="w-4 h-4 text-primary-600 dark:text-primary-400"
+                    class="w-4 h-4"
+                    :style="{ color: 'var(--accent-color)' }"
                     fill="currentColor"
                     viewBox="0 0 20 20"
-                  >
+                  > <!-- 选中图标 -->
                     <path
                       fill-rule="evenodd"
                       d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                       clip-rule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {{ config.description }}
-                </p>
-              </div>
-            </button>
+                    /> <!-- 图标路径 -->
+                  </svg> <!-- 图标结束 -->
+                </div> <!-- 容器结束 -->
+                <p class="text-xs text-[var(--text-gray)] mt-1"> <!-- 主题描述 -->
+                  {{ config.description }} <!-- 描述内容 -->
+                </p> <!-- 描述结束 -->
+              </div> <!-- 文字结束 -->
+            </button> <!-- 按钮结束 -->
+
           </div>
         </div>
       </div>
@@ -278,57 +292,57 @@
       align-center 
       :style="{ maxHeight: '80vh' }"
       @close="handleShortcutDialogClose"
-    >
-      <div class="space-y-4 shortcut-dialog-content">
+    > <!-- 快捷键设置对话框 -->
+      <div class="space-y-4 shortcut-dialog-content"> <!-- 对话框内容容器 -->
         <!-- 被占用快捷键警告 -->
         <el-alert
           v-if="hasOccupiedShortcuts"
           title="检测到部分快捷键被系统或其他应用占用，无法正常使用。请重新设置这些快捷键。"
           type="warning"
           :closable="false"
-        >
-          <template #default>
+        > <!-- 占用警告提示 -->
+          <template #default> <!-- 警告内容模板 -->
             <!-- 只在自动打开时显示"不再提示"选项 -->
-            <div v-if="isAutoOpenShortcut" class="mt-2">
-              <el-checkbox v-model="ignoreOccupiedWarning">
-                不再提示（下次启动不会自动打开此设置）
-              </el-checkbox>
-            </div>
-          </template>
-        </el-alert>
+            <div v-if="isAutoOpenShortcut" class="mt-2"> <!-- 自动打开时的选项容器 -->
+              <el-checkbox v-model="ignoreOccupiedWarning"> <!-- 忽略警告复选框 -->
+                不再提示（下次启动不会自动打开此设置） <!-- 复选框文字 -->
+              </el-checkbox> <!-- 复选框结束 -->
+            </div> <!-- 容器结束 -->
+          </template> <!-- 模板结束 -->
+        </el-alert> <!-- 警告结束 -->
 
         <!-- 提示信息 -->
         <el-alert
           title="提示：点击快捷键输入框，按下键盘组合键即可设置。系统会自动检测冲突。"
           type="info"
           :closable="false"
-        />
+        /> <!-- 操作提示 -->
 
         <!-- 快捷键列表 -->
-        <div class="shortcut-list space-y-3">
+        <div class="shortcut-list space-y-3"> <!-- 快捷键列表容器 -->
           <div
             v-for="(shortcut, index) in shortcuts"
             :key="shortcut.id"
             class="shortcut-item p-4 rounded-lg border transition-all"
-            :class="{
-              'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-700': shortcut.conflict || shortcut.occupied,
-              'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800': !shortcut.conflict && !shortcut.occupied
+            :style="{
+              borderColor: (shortcut.conflict || shortcut.occupied) ? '#fca5a5' : 'var(--border-color)',
+              backgroundColor: (shortcut.conflict || shortcut.occupied) ? 'rgba(254, 226, 226, 0.2)' : 'var(--bg-soft)'
             }"
-          >
-            <div class="flex items-center justify-between gap-4">
+          > <!-- 快捷键项 -->
+            <div class="flex items-center justify-between gap-4"> <!-- 项内布局容器 -->
               <!-- 功能名称和描述 -->
-              <div class="flex-1">
-                <div class="font-medium text-gray-900 dark:text-white">
-                  {{ shortcut.name }}
-                  <span v-if="shortcut.occupied" class="text-orange-500 text-sm ml-2">（被占用）</span>
-                </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {{ shortcut.description }}
-                </div>
-              </div>
+              <div class="flex-1"> <!-- 左侧信息列 -->
+                <div class="font-medium" :style="{ color: 'var(--text-base)' }"> <!-- 功能名称 -->
+                  {{ shortcut.name }} <!-- 名称内容 -->
+                  <span v-if="shortcut.occupied" class="text-orange-500 text-sm ml-2">（被占用）</span> <!-- 占用标记 -->
+                </div> <!-- 名称结束 -->
+                <div class="text-xs mt-1" :style="{ color: 'var(--text-gray)' }"> <!-- 功能描述 -->
+                  {{ shortcut.description }} <!-- 描述内容 -->
+                </div> <!-- 描述结束 -->
+              </div> <!-- 信息列结束 -->
 
               <!-- 快捷键输入 -->
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2"> <!-- 右侧输入列 -->
                 <input
                   :value="shortcut.key"
                   @keydown.prevent="handleKeyDown($event, index)"
@@ -336,33 +350,34 @@
                   placeholder="按下快捷键"
                   readonly
                   class="shortcut-input px-3 py-2 rounded border text-center cursor-pointer min-w-[180px] transition-all"
-                  :class="{
-                    'border-red-400 bg-red-50 dark:bg-red-900/30 dark:border-red-600 text-red-600 dark:text-red-400': shortcut.conflict || shortcut.occupied,
-                    'border-gray-300 dark:border-gray-600 focus:border-primary-500 dark:focus:border-primary-400': !shortcut.conflict && !shortcut.occupied
+                  :style="{
+                    borderColor: (shortcut.conflict || shortcut.occupied) ? '#f87171' : 'var(--border-color)',
+                    backgroundColor: (shortcut.conflict || shortcut.occupied) ? 'rgba(254, 226, 226, 0.3)' : 'var(--bg-primary)',
+                    color: (shortcut.conflict || shortcut.occupied) ? '#ef4444' : 'var(--text-base)'
                   }"
-                />
+                /> <!-- 快捷键输入框 -->
                 <el-button
                   size="small"
                   type="danger"
                   text
                   @click="handleClearShortcut(index)"
-                >
-                  清除
-                </el-button>
-              </div>
-            </div>
+                > <!-- 清除按钮 -->
+                  清除 <!-- 按钮文字 -->
+                </el-button> <!-- 按钮结束 -->
+              </div> <!-- 输入列结束 -->
+            </div> <!-- 布局容器结束 -->
 
             <!-- 冲突提示 -->
-            <div v-if="shortcut.conflict" class="mt-2 text-sm text-red-600 dark:text-red-400">
-              ⚠️ 该快捷键与"{{ shortcut.conflictWith }}"冲突，请更换其他组合
-            </div>
+            <div v-if="shortcut.conflict" class="mt-2 text-sm text-red-600 dark:text-red-400"> <!-- 冲突警告文字 -->
+              ⚠️ 该快捷键与"{{ shortcut.conflictWith }}"冲突，请更换其他组合 <!-- 警告内容 -->
+            </div> <!-- 警告结束 -->
             <!-- 被占用提示 -->
-            <div v-if="shortcut.occupied" class="mt-2 text-sm text-orange-600 dark:text-orange-400">
-              ⚠️ 该快捷键已被系统或其他应用占用，请更换其他组合
-            </div>
-          </div>
-        </div>
-      </div>
+            <div v-if="shortcut.occupied" class="mt-2 text-sm text-orange-600 dark:text-orange-400"> <!-- 占用警告文字 -->
+              ⚠️ 该快捷键已被系统或其他应用占用，请更换其他组合 <!-- 警告内容 -->
+            </div> <!-- 警告结束 -->
+          </div> <!-- 项结束 -->
+        </div> <!-- 列表结束 -->
+      </div> <!-- 内容容器结束 -->
 
       <template #footer>
         <div class="flex justify-between items-center">
@@ -393,6 +408,7 @@ const bookDir = ref('')
 const showHelpDialog = ref(false)
 const showSponsorDialog = ref(false)
 const themeStore = useThemeStore()
+const independentWindowMode = ref(false) // 独立窗口模式状态
 const qqGroupQrcode = new URL('../../../../static/qq_chart.jpg', import.meta.url).href
 const rewardQrcode = new URL('../../../../static/wx_reward_qrcode.jpg', import.meta.url).href
 const contactEmail = '3026408975@qq.com'
@@ -622,6 +638,9 @@ onMounted(async () => {
   await loadShelfPasswordHint()
   // 加载快捷键设置
   await loadShortcuts()
+  // 加载独立窗口模式设置
+  const savedMode = await window.electronStore?.get('independent-window-mode') // 从本地存储获取配置
+  independentWindowMode.value = !!savedMode // 应用保存的配置
   // 检查被占用的快捷键
   await checkOccupiedShortcuts()
 })
@@ -672,6 +691,16 @@ function handleThemeChange(themeKey) {
   themeStore.setTheme(themeKey)
   // ElMessage.success(`已切换到 ${THEME_CONFIGS[themeKey]?.name} 主题`)
 }
+
+// 处理独立窗口模式切换
+const handleWindowModeChange = async (val) => { // 切换处理函数
+  try { // 异常处理
+    await window.electronStore.set('independent-window-mode', val) // 保存新配置到本地存储
+    ElMessage.success(val ? '已开启独立窗口模式' : '已关闭独立窗口模式') // 成功提示
+  } catch (error) { // 捕获错误
+    console.error('保存窗口模式失败:', error) // 打印错误日志
+  } // 处理结束
+} // 函数定义结束
 
 // 加载保存的快捷键设置
 async function loadShortcuts() {

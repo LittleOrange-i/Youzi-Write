@@ -1,7 +1,7 @@
 <template>
   <div class="layout-tool">
     <div :class="{ 'layout-tool-header-fixed': headerFixed }" class="layout-tool-header">
-      <el-button class="back-btn" :icon="ArrowLeftBold" text @click="handleBack">
+      <el-button v-if="!isIndependent" class="back-btn" :icon="ArrowLeftBold" text @click="handleBack">
         <span>返回</span>
       </el-button>
       <h2 class="header-title">{{ title }}</h2>
@@ -36,6 +36,9 @@ const props = defineProps({
     default: false
   }
 })
+
+// 是否为独立窗口模式
+const isIndependent = window.api?.isIndependentWindow || false
 
 // 返回上一页
 function handleBack() {

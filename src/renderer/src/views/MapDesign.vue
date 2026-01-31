@@ -1,7 +1,7 @@
 <template>
   <div class="map-design">
     <!-- 返回按钮 -->
-    <div class="back-button-container">
+    <div v-if="!isIndependent" class="back-button-container">
       <el-button text class="back-button" :icon="ArrowLeftBold" @click="handleBack">
         返回
       </el-button>
@@ -166,6 +166,9 @@ import { useBackgroundTool } from '@renderer/composables/map/tools/useBackground
 const router = useRouter()
 const route = useRoute()
 const bookName = route.query.name
+
+// 是否为独立窗口模式
+const isIndependent = window.api?.isIndependentWindow || false
 
 // ==================== 基础数据 ====================
 const mapName = ref(route.query.id || '')
