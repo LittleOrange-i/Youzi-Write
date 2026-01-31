@@ -331,60 +331,78 @@ export function useRender(canvasRef) {
   }
 
   /**
+   * 资源图片缓存，避免重复创建和加载导致的闪烁
+   */
+  const resourceImageCache = new Map() // 创建资源图片缓存对象
+
+  /**
    * 渲染资源（支持图标和图片两种类型，支持调整大小）
    */
-  function renderResource(ctx, element) {
-    ctx.save()
+  function renderResource(ctx, element) { // 渲染资源函数
+    ctx.save() // 保存当前上下文状态
     // 应用旋转（参考 excalidraw）
-    const angle = element.angle || 0
-    if (angle !== 0) {
-      const centerX = element.x
-      const centerY = element.y
-      ctx.translate(centerX, centerY)
-      ctx.rotate(angle)
-      ctx.translate(-centerX, -centerY)
-    }
+    const angle = element.angle || 0 // 获取旋转角度
+    if (angle !== 0) { // 如果有旋转角度
+      const centerX = element.x // 获取中心点 x 坐标
+      const centerY = element.y // 获取中心点 y 坐标
+      ctx.translate(centerX, centerY) // 移动到中心点
+      ctx.rotate(angle) // 旋转上下文
+      ctx.translate(-centerX, -centerY) // 移回原位
+    } // 旋转处理结束
 
     // 获取资源元素的宽度和高度（支持调整大小）
-    const width = element.width || 40
-    const height = element.height || 40
-    const halfWidth = width / 2
-    const halfHeight = height / 2
+    const width = element.width || 40 // 获取宽度，默认为 40
+    const height = element.height || 40 // 获取高度，默认为 40
+    const halfWidth = width / 2 // 计算宽度的一半
+    const halfHeight = height / 2 // 计算高度的一半
 
     // 优先使用图标，如果没有图标则使用 URL（兼容旧数据）
-    if (element.icon) {
+    if (element.icon) { // 如果是图标资源
       // 使用实际大小来生成图标图片
-      const iconSize = Math.max(width, height)
-      const img = svgIconToImage(element.icon, iconSize)
-      if (img) {
-        if (img.complete && img.naturalWidth > 0) {
-          // 图片已加载
-          ctx.drawImage(img, element.x - halfWidth, element.y - halfHeight, width, height)
-        } else {
-          // 等待图片加载
-          img.onload = () => {
-            ctx.drawImage(img, element.x - halfWidth, element.y - halfHeight, width, height)
+      const iconSize = Math.max(width, height) // 获取图标尺寸
+      const img = svgIconToImage(element.icon, iconSize) // 转换为图片对象
+      if (img) { // 如果转换成功
+        if (img.complete && img.naturalWidth > 0) { // 如果图片已加载
+          // 图片已加载，直接绘制
+          ctx.drawImage(img, element.x - halfWidth, element.y - halfHeight, width, height) // 绘制图标
+        } else { // 如果图片未加载完成
+          // 等待图片加载完成
+          img.onload = () => { // 图片加载完成回调
             // 触发重新渲染
-            if (canvasRef.value) {
-              const renderCanvas = canvasRef.value.__renderCanvas
-              if (renderCanvas) {
-                renderCanvas()
-              }
-            }
-          }
-        }
-      }
-    } else if (element.url) {
-      // 兼容旧的图片资源
-      const img = new window.Image()
-      img.src = element.url
-      img.onload = () => {
-        ctx.drawImage(img, element.x - halfWidth, element.y - halfHeight, width, height)
-      }
-    }
+            if (canvasRef.value) { // 如果画布存在
+              const renderCanvas = canvasRef.value.__renderCanvas // 获取重绘函数
+              if (renderCanvas) { // 如果重绘函数存在
+                renderCanvas() // 触发重绘
+              } // 重绘执行结束
+            } // 画布判断结束
+          } // 加载回调结束
+        } // 加载状态判断结束
+      } // 图片对象判断结束
+    } else if (element.url) { // 如果是图片 URL 资源
+      // 兼容图片资源和本地导入资源
+      let img = resourceImageCache.get(element.url) // 从缓存中获取图片
+      if (!img) { // 如果缓存中不存在
+        img = new window.Image() // 创建新图片对象
+        img.src = element.url // 设置图片来源
+        img.onload = () => { // 图片加载完成回调
+          // 触发重新渲染
+          if (canvasRef.value) { // 如果画布存在
+            const renderCanvas = canvasRef.value.__renderCanvas // 获取重绘函数
+            if (renderCanvas) { // 如果重绘函数存在
+              renderCanvas() // 触发重绘
+            } // 重绘执行结束
+          } // 画布判断结束
+        } // 加载回调结束
+        resourceImageCache.set(element.url, img) // 存入缓存
+      } // 缓存判断结束
 
-    ctx.restore()
-  }
+      if (img.complete && img.naturalWidth > 0) { // 如果图片已加载
+        ctx.drawImage(img, element.x - halfWidth, element.y - halfHeight, width, height) // 绘制图片
+      } // 绘制执行结束
+    } // 资源类型判断结束
+
+    ctx.restore() // 恢复上下文状态
+  } // renderResource 结束
 
   /**
    * 渲染填充区域

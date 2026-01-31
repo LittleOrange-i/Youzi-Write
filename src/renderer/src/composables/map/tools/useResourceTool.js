@@ -130,35 +130,54 @@ export function useResourceTool({ canvasRef, elements, history, renderCanvas, ge
    * 在画布上绘制资源
    */
   function drawResourceOnCanvas(resource, x, y) {
-    if (!canvasRef.value || !history.value) return
+    if (!canvasRef.value || !history.value) return // 基础检查
 
     // 在创建元素前保存状态
-    history.value.saveState()
+    history.value.saveState() // 保存历史记录
+
+    // 计算初始尺寸
+    let initialWidth = 40 // 默认宽度
+    let height = 40 // 默认高度
+
+    if (resource.isLocal && resource.width && resource.height) {
+      // 如果是本地导入的图片，根据原始尺寸计算初始大小，但不超过 200px
+      const maxSize = 200 // 最大尺寸限制
+      if (resource.width > resource.height) {
+        initialWidth = Math.min(resource.width, maxSize) // 宽度受限
+        height = initialWidth / resource.aspectRatio // 根据比例计算高度
+      } else {
+        height = Math.min(resource.height, maxSize) // 高度受限
+        initialWidth = height * resource.aspectRatio // 根据比例计算宽度
+      }
+    }
 
     // 保存资源元素（支持图标和图片两种类型）
     const resourceElement = {
-      type: 'resource',
-      name: resource.name,
-      x: x,
-      y: y,
-      width: 40,
-      height: 40,
-      id: Date.now().toString()
+      type: 'resource', // 元素类型
+      name: resource.name, // 资源名称
+      x: x, // x 坐标
+      y: y, // y 坐标
+      width: initialWidth, // 初始宽度
+      height: height, // 初始高度
+      id: Date.now().toString() // 生成唯一 ID
+    }
+
+    // 存储纵横比，以便后续等比例缩放
+    if (resource.aspectRatio) {
+      resourceElement.aspectRatio = resource.aspectRatio // 保存纵横比
     }
 
     // 优先使用图标，如果没有图标则使用 URL（兼容旧数据）
     if (resource.icon) {
-      resourceElement.icon = resource.icon
+      resourceElement.icon = resource.icon // 图标名称
     } else if (resource.url) {
-      resourceElement.url = resource.url
+      resourceElement.url = resource.url // 图片 URL 或 base64
     }
 
-    elements.resourceElements.value.push(resourceElement)
+    elements.resourceElements.value.push(resourceElement) // 添加到元素列表
 
     // 重新渲染画布
-    renderCanvas(true)
-    // 注意：这里不再保存状态，因为已经在创建前保存了
-    // 如果用户想撤销，可以撤销到创建前的状态
+    renderCanvas(true) // 触发重绘
   }
 
   return {

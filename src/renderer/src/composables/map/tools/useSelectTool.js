@@ -392,7 +392,7 @@ export function useSelectTool({
   /**
    * 鼠标移动
    */
-  function onMouseMove(pos) {
+  function onMouseMove(pos, shiftKey = false) {
     if (isDragging.value) {
       if (!pointerDownState.value) return
 
@@ -699,11 +699,39 @@ export function useSelectTool({
           newHeight = originalHeight - deltaY
         }
 
-        if (newWidth < 10) newWidth = 10
-        if (newHeight < 10) newHeight = 10
+        if (newWidth < 10) newWidth = 10 // 限制最小宽度
+        if (newHeight < 10) newHeight = 10 // 限制最小高度
 
-        const scaleX = newWidth / originalWidth
-        const scaleY = newHeight / originalHeight
+        // 等比例缩放逻辑
+        // 如果按下 Shift 键，则进行等比例缩放
+        const shouldKeepAspectRatio = shiftKey // 判断是否需要锁定纵横比
+
+        if (shouldKeepAspectRatio) { // 如果需要锁定纵横比
+          // 优先使用资源自带的纵横比，如果没有（如形状）则使用原始尺寸的纵横比
+          const aspectRatio = // 计算纵横比
+            selectedElements.length === 1 && selectedElements[0].aspectRatio // 如果是单个资源且有纵横比
+              ? selectedElements[0].aspectRatio // 使用资源自带的纵横比
+              : originalWidth / originalHeight // 否则使用当前尺寸的纵横比
+
+          // 根据拖拽方向决定以哪个维度为准
+          if (handle === 'e' || handle === 'w') { // 左右拉伸
+            newHeight = newWidth / aspectRatio // 根据宽度计算高度
+          } else if (handle === 's' || handle === 'n') { // 上下拉伸
+            newWidth = newHeight * aspectRatio // 根据高度计算宽度
+          } else { // 角部拖拽
+            // 取变化较大的那个维度作为基准
+            const scaleX = Math.abs(newWidth / originalWidth) // x轴缩放比例
+            const scaleY = Math.abs(newHeight / originalHeight) // y轴缩放比例
+            if (scaleX > scaleY) { // 如果宽度变化更大
+              newHeight = newWidth / aspectRatio // 以宽度为准计算高度
+            } else { // 如果高度变化更大
+              newWidth = newHeight * aspectRatio // 以高度为准计算宽度
+            } // 比例判断结束
+          } // 拖拽方向判断结束
+        } // 纵横比锁定处理结束
+
+        const scaleX = newWidth / originalWidth // 计算最终 x 轴缩放比例
+        const scaleY = newHeight / originalHeight // 计算最终 y 轴缩放比例
 
         selectedElements.forEach((element) => {
           const originalElement = pointerDownState.value.originalElements.get(element.id)

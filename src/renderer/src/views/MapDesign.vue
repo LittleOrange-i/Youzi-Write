@@ -181,6 +181,7 @@ const size = ref(5)
 const opacity = ref(100)
 const canvasCursor = ref('default')
 const spaceKeyPressed = ref(false)
+const shiftKeyPressed = ref(false) // Shift 键按下状态，用于等比例缩放
 
 // ==================== 使用 Composables ====================
 // 画布状态
@@ -556,7 +557,7 @@ function handleCanvasMouseMove(e) {
   } else if (tool.value === 'shape' && shapeTool.drawingActive.value) {
     shapeTool.onMouseMove(pos)
   } else if (tool.value === 'select') {
-    selectTool.onMouseMove(pos)
+    selectTool.onMouseMove(pos, shiftKeyPressed.value)
     if (
       !selectTool.isDragging.value &&
       !selectTool.isTransforming.value &&
@@ -1118,21 +1119,31 @@ function handleKeyDown(e) {
   }
 
   // 空格键：临时切换到移动模式
-  if (e.key === ' ' && tool.value !== 'move') {
-    e.preventDefault()
-    spaceKeyPressed.value = true
-    canvasCursor.value = 'grab'
-  }
-}
+  if (e.key === ' ' && tool.value !== 'move') { // 空格键处理
+    e.preventDefault() // 阻止默认行为
+    spaceKeyPressed.value = true // 设置空格键按下状态
+    canvasCursor.value = 'grab' // 改变光标为抓取
+  } // 空格判断结束
 
-function handleKeyUp(e) {
-  if (e.key === ' ') {
-    spaceKeyPressed.value = false
-    if (tool.value !== 'move') {
-      canvasCursor.value = 'default'
-    }
-  }
-}
+  // Shift 键：用于等比例缩放
+  if (e.key === 'Shift') { // Shift 键处理
+    shiftKeyPressed.value = true // 设置 Shift 键按下状态
+  } // Shift 判断结束
+} // handleKeyDown 结束
+
+function handleKeyUp(e) { // 键盘抬起处理
+  if (e.key === ' ') { // 空格键抬起
+    spaceKeyPressed.value = false // 清除空格键状态
+    if (tool.value !== 'move') { // 如果不是移动工具
+      canvasCursor.value = 'default' // 恢复默认光标
+    } // 工具判断结束
+  } // 空格判断结束
+
+  // Shift 键释放
+  if (e.key === 'Shift') { // Shift 键抬起
+    shiftKeyPressed.value = false // 清除 Shift 键状态
+  } // Shift 判断结束
+} // handleKeyUp 结束
 
 // ==================== 加载地图数据 ====================
 /**
