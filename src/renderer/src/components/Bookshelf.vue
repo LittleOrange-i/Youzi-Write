@@ -84,7 +84,7 @@
                       <svg class="w-[0.42rem] h-[0.42rem] text-white flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
                       </svg>
-                      <span class="text-[8px] font-bold text-white whitespace-nowrap">{{ form.type ? BOOK_TYPES.find(t => t.value === form.type)?.label : '类型' }}</span>
+                      <span class="text-[8px] font-bold text-white whitespace-nowrap">{{ getBookTypeLabel(form.type) }}</span> <!-- 显示书籍类型标签 -->
                     </div>
                   </div>
                   
@@ -185,14 +185,13 @@
 
             
             <el-form-item prop="type" label="作品分类"> <!-- 作品分类表单项 -->
-              <el-select v-model="form.type" placeholder="请选择类型" class="w-full"> <!-- 分类选择框 -->
-                <el-option
-                  v-for="item in BOOK_TYPES"
-                  :key="item.value + item.label"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
+              <el-cascader
+                v-model="form.type"
+                :options="BOOK_TYPES"
+                :props="{ expandTrigger: 'hover', emitPath: false }"
+                placeholder="请选择类型"
+                class="w-full"
+              /> <!-- 作品分类级联选择器 -->
             </el-form-item>
 
             <el-form-item label="作品标签"> <!-- 作品标签表单项 -->
@@ -583,7 +582,22 @@ const rules = ref({
 })
 
 // 书籍列表数据
-const books = computed(() => mainStore.books)
+const books = computed(() => mainStore.books) // 获取书架书籍列表
+
+// 获取类型标签的辅助函数
+const getBookTypeLabel = (value) => { // 定义通过值获取类型标签的函数
+  if (!value) return '类型' // 如果没有值则返回默认文本
+  for (const group of BOOK_TYPES) { // 遍历顶层分类组
+    if (group.children) { // 如果存在子分类
+      const found = group.children.find((item) => item.value === value) // 在子分类中查找匹配的值
+      if (found) { // 如果找到匹配项
+        if (group.label === '通用') return found.label // 通用分类直接返回子标签，不加提示
+        return `${group.label}/${found.label}` // 男频和女频分类加上对应的组名前缀提示
+      }
+    }
+  }
+  return '类型' // 未找到匹配项则返回默认文本
+}
 
 // 封面预览样式计算
 const previewCoverStyle = computed(() => {
@@ -859,10 +873,10 @@ async function handleConfirm() {
         id: randomId, // 书籍 ID
         name: form.value.name, // 书名
         author: form.value.author || '佚名', // 作者名称
-        type: form.value.type, // 作品分类
-        tags: Array.isArray(form.value.tags) ? [...form.value.tags] : [], // 作品标签，浅拷贝避免 Proxy 问题
-        typeName: BOOK_TYPES.find((item) => item.value === form.value.type)?.label, // 分类名称
-        targetCount: form.value.targetCount, // 目标字数
+        type: form.value.type, // 作品分类标识符
+        tags: Array.isArray(form.value.tags) ? [...form.value.tags] : [], // 作品标签列表，使用浅拷贝
+        typeName: getBookTypeLabel(form.value.type), // 作品分类显示名称
+        targetCount: form.value.targetCount, // 目标写作字数
         intro: form.value.intro, // 简介
         password: form.value.password || null, // 密码
         coverUrl: form.value.coverUrl || null // 保存封面URL

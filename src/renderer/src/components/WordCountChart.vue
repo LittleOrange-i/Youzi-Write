@@ -155,7 +155,7 @@ async function updateChartData() {
   try {
     // 获取所有书籍的每日净增字数统计
     const result = await window.electron.getAllBooksDailyStats()
-    console.log('获取图表数据结果:', result) // 调试日志
+    // console.log('获取图表数据结果:', result) // 调试日志
     if (result.success) {
       const dates = getLast30Days()
       const netWordsData = dates.map((date) => {
@@ -169,7 +169,7 @@ async function updateChartData() {
         return totalNetWords
       })
 
-      console.log('图表数据:', netWordsData) // 调试日志
+      // console.log('图表数据:', netWordsData) // 调试日志
 
       chart.setOption({
         series: [
@@ -196,7 +196,7 @@ defineExpose({
 })
 
 onMounted(() => {
-  console.log('WordCountChart 组件已挂载') // 调试日志
+  // console.log('WordCountChart 组件已挂载') // 调试日志
   // 延迟初始化，确保 DOM 已完全渲染
   setTimeout(() => {
     initChart()

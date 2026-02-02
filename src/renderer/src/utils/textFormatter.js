@@ -167,7 +167,7 @@ const indentParagraphs = (lines) => {
 // 规则注册表
 export const formattingRules = [
   // 空白字符处理
-  { id: 'removeTrailingSpaces', label: '去掉行尾空白字符', handler: removeTrailingSpaces, default: false },
+  { id: 'removeTrailingSpaces', label: '去掉行尾空白字符', handler: removeTrailingSpaces, default: true },
   { id: 'trimLines', label: '去掉行首及行尾空白字符', handler: trimLines, default: false },
   { id: 'ensureEmptyLineBetweenParagraphs', label: '确保段落之间至少有一个空行', handler: ensureEmptyLineBetweenParagraphs, default: false },
   { id: 'mergeMultipleEmptyLines', label: '合并多个连续空行', handler: mergeMultipleEmptyLines, default: true }, // 默认常用
@@ -183,10 +183,10 @@ export const formattingRules = [
   { id: 'removeAllSpaces', label: '移除所有空格', handler: removeAllSpaces, default: false },
 
   // 标点符号处理
-  { id: 'replaceHalfWidthComma', label: '将半角逗号替换为全角逗号（, → ，）', handler: replaceHalfWidthComma, default: false },
-  { id: 'replaceHalfWidthPeriod', label: '将半角句号替换为全角句号（. → 。）', handler: replaceHalfWidthPeriod, default: false },
-  { id: 'replaceHalfWidthQuotes', label: '将半角引号替换为全角引号（"" → “”）', handler: replaceHalfWidthQuotes, default: false },
-  { id: 'fixQuotes', label: '引号修正（"aaa" → “aaa”）', handler: fixQuotes, default: false },
+  { id: 'replaceHalfWidthComma', label: '将半角逗号替换为全角逗号（, → ，）', handler: replaceHalfWidthComma, default: true },
+  { id: 'replaceHalfWidthPeriod', label: '将半角句号替换为全角句号（. → 。）', handler: replaceHalfWidthPeriod, default: true },
+  { id: 'replaceHalfWidthQuotes', label: '将半角引号替换为全角引号（"" → “”）', handler: replaceHalfWidthQuotes, default: true },
+  { id: 'fixQuotes', label: '引号修正（"aaa" → “aaa”）', handler: fixQuotes, default: true },
 
   // 段落格式
   // { id: 'indentParagraphs', label: '段首缩进 2 个空白字符', handler: indentParagraphs, default: false }

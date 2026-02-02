@@ -108,9 +108,9 @@ const showThemeMenu = ref(false)
 
 // 组件挂载时输出日志
 onMounted(() => {
-  console.log('[ThemeSelector] 组件已挂载')
-  console.log('[ThemeSelector] 当前主题:', themeStore.currentTheme)
-  console.log('[ThemeSelector] 主题配置:', THEME_CONFIGS)
+  // console.log('[ThemeSelector] 组件已挂载')
+  // console.log('[ThemeSelector] 当前主题:', themeStore.currentTheme)
+  // console.log('[ThemeSelector] 主题配置:', THEME_CONFIGS)
 })
 
 // 所有主题列表
@@ -147,10 +147,10 @@ function getThemeColors(themeKey) {
 
 // 切换主题
 async function handleThemeChange(themeKey) {
-  console.log('[ThemeSelector] 开始切换主题:', themeKey)
+  // console.log('[ThemeSelector] 开始切换主题:', themeKey)
   try {
     await themeStore.setTheme(themeKey)
-    console.log('[ThemeSelector] 主题切换成功')
+    // console.log('[ThemeSelector] 主题切换成功')
     showThemeMenu.value = false
   } catch (error) {
     console.error('[ThemeSelector] 主题切换失败:', error)

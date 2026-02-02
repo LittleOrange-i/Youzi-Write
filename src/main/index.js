@@ -1,5 +1,8 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, globalShortcut } from 'electron'
-import { setupUpdater } from './updater.js'
+import { app, shell, BrowserWindow, ipcMain, dialog, nativeImage, protocol, globalShortcut } from 'electron' // 导入电子模块相关功能
+// 修复 DevTools 中的 Autofill 报错：'Autofill.enable' wasn't found
+// 这是因为某些版本的 Electron/Chromium 在开启开发者工具时会尝试调用此接口，但该接口未被支持
+app.commandLine.appendSwitch('disable-features', 'Autofill') // 禁用自动填充功能以修复调试工具报错
+import { setupUpdater } from './updater.js' // 导入更新程序设置函数
 import { join } from 'path'
 import path from 'path'
 import fs from 'fs'

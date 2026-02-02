@@ -427,11 +427,58 @@ function createEditor() {
         style: () => {
           const fullFontFamily = props.getFontFamily(props.menubarState.fontFamily)
           const fontFamilyStyle = `font-family: ${fullFontFamily} !important;`
-          return `white-space: pre-wrap; ${fontFamilyStyle} font-size: ${props.menubarState.fontSize} !important; line-height: ${props.menubarState.lineHeight} !important;`
+          
+          const fontSize = parseInt(props.menubarState.fontSize) // 获取字号数值
+          const lineHeight = parseFloat(props.menubarState.lineHeight) // 获取行高倍数
+          const actualLineHeight = fontSize * lineHeight // 计算实际行高像素值
+          
+          let gridStyles = '' // 初始化网格样式字符串
+          const gridSettings = props.editorStore.editorSettings.gridLines || {} // 从 store 获取网格配置
+          
+          if (gridSettings.enabled) { // 如果启用了网格
+            const color = gridSettings.lineColor || '#e0e0e0' // 获取线条颜色
+            const thickness = gridSettings.boldSize ? '2px' : '1px' // 获取线条粗细
+            // 计算底部贴合偏移量
+            const stickOffset = gridSettings.stickToBottom ? (actualLineHeight - fontSize) / 2 : 0
+            
+            let backgroundImage = '' // 初始化背景图
+            let backgroundSize = `100% ${actualLineHeight}px` // 初始化背景尺寸
+            let backgroundPosition = `0 ${-stickOffset}px` // 初始化背景位置
+            
+            const encodedColor = encodeURIComponent(color) // 编码颜色用于 SVG
+            const thicknessInt = parseInt(thickness) // 解析粗细数值
+            
+            if (gridSettings.lineType === 'single-solid') { // 单实线
+              // 生成单实线 SVG 背景
+              backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+              backgroundSize = `100% ${actualLineHeight}px` // 设置背景尺寸
+              backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 设置背景位置
+            } else if (gridSettings.lineType === 'double-solid') { // 双实线
+              // 生成双实线 SVG 背景
+              backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3Crect x='0' y='3' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+              backgroundSize = `100% ${actualLineHeight}px` // 设置背景尺寸
+              backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 设置背景位置
+            } else if (gridSettings.lineType === 'sparse-dashed' || gridSettings.lineType === 'dense-dashed') { // 虚线
+              const dashLen = gridSettings.lineType === 'sparse-dashed' ? 8 : 4 // 确定虚线长度
+              // 生成虚线 SVG 背景
+              backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${dashLen * 2}' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='${dashLen}' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+              backgroundSize = `${dashLen * 2}px ${actualLineHeight}px` // 设置背景尺寸
+              backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 设置背景位置
+            }
+            
+            if (backgroundImage) { // 如果生成了背景图
+              // 拼接网格样式字符串
+              gridStyles = `background-image: ${backgroundImage} !important; background-size: ${backgroundSize} !important; background-position: ${backgroundPosition} !important; background-repeat: repeat !important; background-attachment: local !important;`
+            }
+          }
+
+          // 将行高转换为像素值，确保与网格背景精确匹配，避免因浏览器舍入误差导致的累积偏移
+          const lineHeightPx = `${actualLineHeight}px`
+          return `white-space: pre-wrap; ${fontFamilyStyle} font-size: ${props.menubarState.fontSize} !important; line-height: ${lineHeightPx} !important; ${gridStyles}`
         }
       }
     },
-    onUpdate: ({ editor }) => {
+  onUpdate: ({ editor }) => {
       // 笔记模式：保存 HTML 格式
       const content = editor.getHTML()
 
@@ -540,6 +587,14 @@ defineExpose({
 </template>
 
 <style>
+/* 笔记编辑器中的段落基础样式，确保与网格对齐 */
+.tiptap.note-editor p {
+  margin: 0 !important; /* 必须消除段落外边距，否则会破坏网格对齐 */
+  padding-top: 0 !important; /* 消除内边距 */
+  padding-bottom: 0 !important; /* 消除内边距 */
+  min-height: 1em; /* 保证空行也有高度 */
+}
+
 /* 段落拖拽锚点样式（仅笔记模式生效） */
 /* 为笔记编辑区预留统一左侧功能栏宽度，便于放置多个功能图标 */
 .tiptap.note-editor {

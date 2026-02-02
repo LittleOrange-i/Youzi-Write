@@ -1,43 +1,56 @@
 // 书籍类型常量
-const BOOK_TYPES = [
-  // —————— 男频类型 ——————
-  { "label": "男频/玄幻", "value": "nan/xuanhuan" },
-  { "label": "男频/仙侠", "value": "nan/xianxia" },
-  { "label": "男频/都市异能", "value": "nan/dushi_yineng" },
-  { "label": "男频/历史架空", "value": "nan/lishi_jiakong" },
-  { "label": "男频/科幻硬核", "value": "nan/kehuan_yinghe" },
-  { "label": "男频/军事争霸", "value": "nan/junshi_zhengba" },
-  { "label": "男频/游戏电竞", "value": "nan/youxi_dianjing" },
-  { "label": "男频/高武世界", "value": "nan/gaowu" },
-  { "label": "男频/修真升级流", "value": "nan/xiuzhen_shengji" },
-  { "label": "男频/系统爽文", "value": "nan/xitong_shuangwen" },
-
-  // —————— 女频类型 ——————
-  { "label": "女频/言情", "value": "nv/yanqing" },
-  { "label": "女频/古代言情", "value": "nv/gudai_yanqing" },
-  { "label": "女频/现代言情", "value": "nv/xiandai_yanqing" },
-  { "label": "女频/宫斗宅斗", "value": "nv/gongdou_zhaidou" },
-  { "label": "女频/穿书快穿", "value": "nv/chuanshu_kuaichuan" },
-  { "label": "女频/耽美BL", "value": "nv/danmei" },
-  { "label": "女频/无CP成长", "value": "nv/wucp_chengzhang" },
-  { "label": "女频/职场现实", "value": "nv/zhichang_xianshi" },
-  { "label": "女频/悬疑探案", "value": "nv/xuanyi_tanan" },
-  { "label": "女频/仙侠言情", "value": "nv/xianxia_yanqing" },
-
-  // —————— 通用/中性类型（不分男女频） ——————
-  { "label": "奇幻", "value": "qihuan" },
-  { "label": "武侠", "value": "wuxia" },
-  { "label": "悬疑", "value": "xuanyi" },
-  { "label": "青春", "value": "qingchun" },
-  { "label": "校园", "value": "xiaoyuan" },
-  { "label": "同人", "value": "tongren" },
-  { "label": "二次元", "value": "erciyuan" },
-  { "label": "轻小说", "value": "qingxiaoshuo" },
-  { "label": "短篇", "value": "duanpian" },
-  { "label": "现实", "value": "xianshi" },
-  { "label": "体育", "value": "tiyu" },
-  { "label": "其他", "value": "other" }
-]
+const BOOK_TYPES = [ // 书籍类型常量数组
+  { // 男频分类组
+    label: '男频', // 分类显示名称
+    value: 'nan_group', // 分类组标识符
+    children: [ // 男频下的具体分类
+      { label: '玄幻', value: 'nan/xuanhuan' }, // 玄幻分类
+      { label: '仙侠', value: 'nan/xianxia' }, // 仙侠分类
+      { label: '都市异能', value: 'nan/dushi_yineng' }, // 都市异能分类
+      { label: '历史架空', value: 'nan/lishi_jiakong' }, // 历史架空分类
+      { label: '科幻硬核', value: 'nan/kehuan_yinghe' }, // 科幻硬核分类
+      { label: '军事争霸', value: 'nan/junshi_zhengba' }, // 军事争霸分类
+      { label: '游戏电竞', value: 'nan/youxi_dianjing' }, // 游戏电竞分类
+      { label: '高武世界', value: 'nan/gaowu' }, // 高武世界分类
+      { label: '修真升级流', value: 'nan/xiuzhen_shengji' }, // 修真升级流分类
+      { label: '系统爽文', value: 'nan/xitong_shuangwen' } // 系统爽文分类
+    ] // 结束男频分类列表
+  }, // 结束男频组
+  { // 女频分类组
+    label: '女频', // 分类显示名称
+    value: 'nv_group', // 分类组标识符
+    children: [ // 女频下的具体分类
+      { label: '言情', value: 'nv/yanqing' }, // 言情分类
+      { label: '古代言情', value: 'nv/gudai_yanqing' }, // 古代言情分类
+      { label: '现代言情', value: 'nv/xiandai_yanqing' }, // 现代言情分类
+      { label: '宫斗宅斗', value: 'nv/gongdou_zhaidou' }, // 宫斗宅斗分类
+      { label: '穿书快穿', value: 'nv/chuanshu_kuaichuan' }, // 穿书快穿分类
+      { label: '耽美BL', value: 'nv/danmei' }, // 耽美BL分类
+      { label: '无CP成长', value: 'nv/wucp_chengzhang' }, // 无CP成长分类
+      { label: '职场现实', value: 'nv/zhichang_xianshi' }, // 职场现实分类
+      { label: '悬疑探案', value: 'nv/xuanyi_tanan' }, // 悬疑探案分类
+      { label: '仙侠言情', value: 'nv/xianxia_yanqing' } // 仙侠言情分类
+    ] // 结束女频分类列表
+  }, // 结束女频组
+  { // 通用分类组
+    label: '通用', // 分类显示名称
+    value: 'common_group', // 分类组标识符
+    children: [ // 通用下的具体分类
+      { label: '奇幻', value: 'qihuan' }, // 奇幻分类
+      { label: '武侠', value: 'wuxia' }, // 武侠分类
+      { label: '悬疑', value: 'xuanyi' }, // 悬疑分类
+      { label: '青春', value: 'qingchun' }, // 青春分类
+      { label: '校园', value: 'xiaoyuan' }, // 校园分类
+      { label: '同人', value: 'tongren' }, // 同人分类
+      { label: '二次元', value: 'erciyuan' }, // 二次元分类
+      { label: '轻小说', value: 'qingxiaoshuo' }, // 轻小说分类
+      { label: '短篇', value: 'duanpian' }, // 短篇分类
+      { label: '现实', value: 'xianshi' }, // 现实分类
+      { label: '体育', value: 'tiyu' }, // 体育分类
+      { label: '其他', value: 'other' } // 其他分类
+    ] // 结束通用分类列表
+  } // 结束通用组
+] // 结束书籍类型常量数组
 
 // 百家姓（单姓，部分示例，建议全量）
 const CHINESE_SURNAMES = [

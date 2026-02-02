@@ -112,22 +112,22 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 应用主题
   const applyTheme = (theme) => {
-    console.log('[Theme Store] applyTheme 被调用, 参数:', theme)
+    // // console.log('[Theme Store] applyTheme 被调用, 参数:', theme)
     const root = document.documentElement
-    console.log('[Theme Store] root 元素:', root)
-    console.log('[Theme Store] 应用前 classList:', root.classList.toString())
+    // // console.log('[Theme Store] root 元素:', root)
+    // // console.log('[Theme Store] 应用前 classList:', root.classList.toString())
     
     // 为 Tailwind CSS 的 dark 模式添加/移除 dark 类
     const themeConfig = THEME_CONFIGS[theme]
     if (themeConfig?.isDark) {
-      console.log('[Theme Store] 添加 dark 类')
+      // // console.log('[Theme Store] 添加 dark 类')
       root.classList.add('dark')
     } else {
-      console.log('[Theme Store] 移除 dark 类')
+      // // console.log('[Theme Store] 移除 dark 类')
       root.classList.remove('dark')
     }
     
-    console.log('[Theme Store] 应用后 classList:', root.classList.toString())
+    // console.log('[Theme Store] 应用后 classList:', root.classList.toString())
     
     switch (theme) {
       case 'dark':
@@ -515,17 +515,17 @@ export const useThemeStore = defineStore('theme', () => {
 
   // 切换主题
   const setTheme = async (theme) => {
-    console.log('[Theme Store] setTheme 被调用, 参数:', theme)
-    console.log('[Theme Store] 切换前 currentTheme.value:', currentTheme.value)
+    // console.log('[Theme Store] setTheme 被调用, 参数:', theme)
+    // console.log('[Theme Store] 切换前 currentTheme.value:', currentTheme.value)
     
     currentTheme.value = theme
-    console.log('[Theme Store] 切换后 currentTheme.value:', currentTheme.value)
+    // console.log('[Theme Store] 切换后 currentTheme.value:', currentTheme.value)
     
     applyTheme(theme)
-    console.log('[Theme Store] applyTheme 执行完成')
+    // console.log('[Theme Store] applyTheme 执行完成')
     
     await window.electronStore.set('config.theme', theme)
-    console.log('[Theme Store] 已保存到 electronStore')
+    // console.log('[Theme Store] 已保存到 electronStore')
   }
 
   return {
