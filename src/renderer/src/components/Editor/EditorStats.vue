@@ -74,6 +74,9 @@ const typingStats = ref({
   isInitializingBaseline: true // 默认开启基准初始化，确保刚进入时的总字数作为基准而非打字数
 })
 
+// 记录已上报的时长，用于增量同步
+let lastReportedDuration = 0
+
 // 记录上次的书籍名和文件路径,用于判断是否真正切换
 const lastBookName = ref(null)
 const lastFilePath = ref(null)
@@ -202,6 +205,23 @@ function startStats(currentBookWords) {
     // 初始化状态机
     typingStats.value.isIdle = false // 设为活跃状态
     typingStats.value.statusStartTime = now // 记录活跃段开始时间
+    
+    // 重置上报基准
+    lastReportedDuration = 0
+  }
+}
+
+// 上报增量时长到后端
+async function reportDurationIncrement() {
+  if (!props.bookName || typingStats.value.activeDuration <= lastReportedDuration) return
+  
+  const increment = typingStats.value.activeDuration - lastReportedDuration
+  try {
+    await window.electron.updateTypingDuration(props.bookName, increment)
+    lastReportedDuration = typingStats.value.activeDuration
+    console.log(`[时长统计] 增量上报成功: ${increment}s, 当前总计: ${lastReportedDuration}s`)
+  } catch (error) {
+    console.error('[时长统计] 上报失败:', error)
   }
 }
 
@@ -367,9 +387,17 @@ function handleVisibilityChange() {
 onMounted(() => {
   // 启动实时时间更新 (每秒更新)
   updateCurrentTime()
+  let reportCounter = 0
   timeUpdateTimer = setInterval(() => {
     updateCurrentTime()
     updateStats() // 同时更新统计数据
+    
+    // 每 10 秒尝试上报一次增量时长
+    reportCounter++
+    if (reportCounter >= 10) {
+      reportDurationIncrement()
+      reportCounter = 0
+    }
   }, 1000)
 
   // 监听可见性变化
@@ -428,9 +456,12 @@ onMounted(() => {
   }
 })
 
-onBeforeUnmount(() => {
+onBeforeUnmount(async () => {
   // 移除可见性变化监听
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+  // 结算并上报最后的时长
+  await reportDurationIncrement()
 
   // 保存会话统计数据到 store
   // 记录保存时间，以便恢复时计算暂停时长

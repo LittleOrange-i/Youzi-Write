@@ -3247,6 +3247,33 @@ function updateChapterStats(bookName, volumeName, chapterName, oldContent, newCo
   return newLength
 }
 
+// 更新码字时长统计
+ipcMain.handle('update-typing-duration', async (event, { bookName, duration }) => {
+  const stats = readStats() // 读取统计数据
+  const today = new Date().toISOString().split('T')[0] // 获取今日日期
+  
+  if (!stats.bookDailyStats) stats.bookDailyStats = {} // 确保书籍每日统计对象存在
+  if (!stats.bookDailyStats[bookName]) stats.bookDailyStats[bookName] = {} // 确保书籍对象存在
+  if (!stats.bookDailyStats[bookName][today]) { // 如果今日没有记录
+    stats.bookDailyStats[bookName][today] = { // 初始化今日记录
+      netWords: 0, // 净增字数
+      addWords: 0, // 新增字数
+      deleteWords: 0, // 删除字数
+      totalWords: 0, // 总字数
+      duration: 0 // 码字时长（秒）
+    }
+  }
+  
+  if (typeof stats.bookDailyStats[bookName][today].duration !== 'number') { // 如果时长字段不是数字
+    stats.bookDailyStats[bookName][today].duration = 0 // 初始化为0
+  }
+  
+  stats.bookDailyStats[bookName][today].duration += duration // 累加码字时长
+  
+  saveStats(stats) // 保存统计数据
+  return { success: true } // 返回成功
+})
+
 // 修改保存章节内容的处理函数
 ipcMain.handle(
   'save-chapter',

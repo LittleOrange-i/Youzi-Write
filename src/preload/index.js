@@ -145,6 +145,9 @@ if (process.contextIsolated) {
       getBookDailyStats: (bookName) => ipcRenderer.invoke('get-book-daily-stats', bookName),
       // 新增：获取所有书籍的每日净增字数统计
       getAllBooksDailyStats: () => ipcRenderer.invoke('get-all-books-daily-stats'),
+      // 新增：更新码字时长统计
+      updateTypingDuration: (bookName, duration) =>
+        ipcRenderer.invoke('update-typing-duration', { bookName, duration }),
 
       // --------- 时间线相关 ---------
       // 读取时间线数据
