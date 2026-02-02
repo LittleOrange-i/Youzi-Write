@@ -3413,16 +3413,35 @@ defineExpose({
     height: 100%; // 高度填充
   }
 }
-.editor-content {
-  flex: 1;
-  min-height: 0;
-  padding: 16px;
-  overflow-y: auto;
-  // 隐藏滚动条
-  // scrollbar-width: none; 
-  background: var(--bg-primary);
+.editor-content { // 编辑器内容区域样式
+  flex: 1; // 占据剩余空间
+  min-height: 0; // 允许内容收缩
+  padding: 16px; // 内边距
+  overflow-y: auto; // 允许垂直滚动
+  background: var(--bg-primary); // 背景颜色
   white-space: pre-wrap; // 保证Tab缩进和换行显示
-  font-family: inherit, monospace;
+  font-family: inherit, monospace; // 字体设置
+
+  /* 自定义滚动条样式 */
+  scrollbar-width: thin; /* Firefox: 使用细滚动条 */
+  scrollbar-color: var(--border-color) transparent; /* Firefox: 滚动条颜色 */
+
+  &::-webkit-scrollbar { // Webkit内核滚动条整体
+    width: 6px; // 减小宽度
+  }
+
+  &::-webkit-scrollbar-thumb { // 滚动条滑块
+    background-color: var(--border-color); // 使用边框颜色
+    border-radius: 3px; // 圆角
+    
+    &:hover { // 鼠标悬停
+      background-color: var(--text-gray-light); // 悬停时加深颜色
+    }
+  }
+
+  &::-webkit-scrollbar-track { // 滚动条轨道
+    background-color: transparent; // 轨道透明
+  }
 }
 
 ::v-deep(.tiptap) {

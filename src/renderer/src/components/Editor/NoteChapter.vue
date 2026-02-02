@@ -1027,9 +1027,31 @@ async function handleSettingsChanged(newSettings) {
 }
 </script>
 <style lang="scss" scoped>
-.note-chapter {
-  height: 100%;
-  background-color: var(--bg-soft);
+.note-chapter { // 笔记章节面板容器
+  height: 100%; // 高度填充
+  background-color: var(--bg-soft); // 背景颜色
+  overflow-y: auto; // 允许垂直滚动
+
+  /* 自定义滚动条样式 */
+  scrollbar-width: thin; /* Firefox: 使用细滚动条 */
+  scrollbar-color: var(--border-color) transparent; /* Firefox: 滚动条颜色 */
+
+  &::-webkit-scrollbar { // Webkit内核滚动条整体
+    width: 6px; // 减小宽度
+  }
+
+  &::-webkit-scrollbar-thumb { // 滚动条滑块
+    background-color: var(--border-color); // 使用边框颜色
+    border-radius: 3px; // 圆角
+    
+    &:hover { // 鼠标悬停
+      background-color: var(--text-gray-light); // 悬停时加深颜色
+    }
+  }
+
+  &::-webkit-scrollbar-track { // 滚动条轨道
+    background-color: transparent; // 轨道透明
+  }
 }
 
 .panel-section {
