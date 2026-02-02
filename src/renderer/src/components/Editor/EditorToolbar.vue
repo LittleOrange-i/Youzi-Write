@@ -83,6 +83,7 @@
           <div class="shortcut-hint">{{ getShortcutLabel('banned-words') }}</div> <!-- 快捷键提示文本 -->
         </div> <!-- 包装层结束 -->
       </el-button> <!-- 按钮结束 -->
+      
       <BannedWordsDrawer ref="bannedWordsRef" :book-name="route.query.name" /> <!-- 禁词抽屉组件 -->
       
       <el-button class="tool-btn" @click="handleParagraphSettings" :title="`字数设置 (${getShortcutLabel('paragraph-settings')})`"> <!-- 字数设置按钮 -->
@@ -135,7 +136,7 @@ import BannedWordsDrawer from './BannedWordsDrawer.vue' // 导入禁词管理抽
 import ThemeSelector from '@renderer/components/ThemeSelector.vue' // 导入主题选择组件
 import { useRouter, useRoute } from 'vue-router' // 导入路由相关 API
 import SvgIcon from '@renderer/components/SvgIcon.vue' // 导入 SVG 图标组件
-import { Setting } from '@element-plus/icons-vue' // 导入 Element Plus 设置图标
+import { Setting } from '@element-plus/icons-vue' // 导入 Element Plus 设置图标和刷新图标
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器状态存储
 import { useJailStore } from '@renderer/stores/jail' // 导入专注模式状态存储
 import { ElMessage } from 'element-plus' // 导入消息提示组件
@@ -147,6 +148,8 @@ const bannedWordsRef = ref(null) // 定义禁词管理组件引用
 const router = useRouter() // 获取路由实例
 const route = useRoute() // 获取当前路由信息
 const independentWindowMode = ref(false) // 定义独立窗口模式响应式变量
+
+const emit = defineEmits([]) // 定义事件
 
 // 加载独立窗口模式配置
 const loadWindowMode = async () => { // 异步加载函数

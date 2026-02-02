@@ -37,6 +37,7 @@
     "@tiptap/starter-kit": "^3.7.0",
     "@tiptap/vue-3": "^3.7.0",
     "dayjs": "^1.11.19",
+    "diff": "^8.0.3",
     "echarts": "^6.0.0",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.6.2",

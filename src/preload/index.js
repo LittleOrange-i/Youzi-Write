@@ -130,6 +130,15 @@ if (process.contextIsolated) {
       // 保存章节内容
       saveChapter: (chapterInfo) => ipcRenderer.invoke('save-chapter', chapterInfo),
 
+      // --------- 回收站相关 ---------
+      // 保存回收站快照
+      saveRecycleBinSnapshot: (snapshotInfo) =>
+        ipcRenderer.invoke('save-recycle-bin-snapshot', snapshotInfo),
+      // 获取回收站快照列表
+      getRecycleBinSnapshots: (params) => ipcRenderer.invoke('get-recycle-bin-snapshots', params),
+      // 读取回收站快照内容
+      readRecycleBinSnapshot: (params) => ipcRenderer.invoke('read-recycle-bin-snapshot', params),
+
       // --------- 统计相关 ---------
       // 获取书籍字数统计
       getBookWordCount: (bookName) => ipcRenderer.invoke('get-book-word-count', bookName),

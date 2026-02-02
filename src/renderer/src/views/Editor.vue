@@ -1,7 +1,10 @@
 <template>
   <div class="editor-container" :class="{ 'fullscreen-mode': isFullscreenMode }">
     <!-- 顶部工具栏 - 全屏模式下隐藏 -->
-    <EditorToolbar v-if="!isFullscreenMode" class="top-toolbar" />
+    <EditorToolbar 
+      v-if="!isFullscreenMode" 
+      class="top-toolbar" 
+    />
     
     <div class="editor-content">
       <!-- 正常模式 -->
@@ -65,7 +68,7 @@
       :size="aiSidebarSize"
       class="editor-left-drawer"
     >
-      <EditorDrawerContent />
+      <EditorDrawerContent :book-name="bookName" @restore="handleRestoreFromDrawer" />
     </el-drawer>
   </div>
 </template>
@@ -274,6 +277,13 @@ function handleChapterWordCountUpdate({ path, wordCount }) {
   noteChapterRef.value &&
     noteChapterRef.value.updateChapterWordCount &&
     noteChapterRef.value.updateChapterWordCount(path, wordCount)
+}
+
+// 处理从抽屉发起的还原操作
+function handleRestoreFromDrawer(content) {
+  if (editorPanelRef.value?.handleRestore) {
+    editorPanelRef.value.handleRestore(content)
+  }
 }
 
 // 处理快捷键触发

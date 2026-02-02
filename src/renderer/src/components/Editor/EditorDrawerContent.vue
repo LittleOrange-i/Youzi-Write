@@ -4,12 +4,14 @@
       <el-tabs v-model="activeTab" class="menu-tabs"> <!-- 使用 Element Plus 标签页作为菜单 -->
 
         <el-tab-pane label="网格线条" name="grid" /> <!-- 网格线条标签页 -->
+        <el-tab-pane label="回收站" name="recycle" /> <!-- 回收站标签页 -->
       </el-tabs> <!-- 标签页结束 -->
     </div> <!-- 顶部菜单栏结束 -->
 
     <div class="drawer-body"> <!-- 抽屉功能区域 -->
       <!-- 网格线条功能区 -->
       <div v-if="activeTab === 'grid'" class="grid-settings"> <!-- 仅在选中网格线条时显示 -->
+        <!-- ... 原有内容 ... -->
         <!-- 线条设置部分 -->
         <div class="settings-section"> <!-- 设置区块 -->
           <div class="section-header"> <!-- 区块标题栏 -->
@@ -120,6 +122,78 @@
         </div> <!-- 颜色区块结束 -->
       </div> <!-- 网格功能区结束 -->
 
+      <!-- 回收站功能区 -->
+      <div v-else-if="activeTab === 'recycle'" class="recycle-settings"> <!-- 仅在选中回收站时显示 -->
+        <div v-loading="loading" class="recycle-bin-container"> <!-- 列表容器 -->
+          <div v-if="snapshots.length === 0" class="empty-state"> <!-- 无数据 -->
+            <el-empty description="暂无历史快照 (每30秒自动保存一次)" /> <!-- 空提示 -->
+          </div> <!-- 判断结束 -->
+          <div v-else class="snapshot-list"> <!-- 快照列表 -->
+            <div 
+              v-for="item in snapshots" 
+              :key="item.timestamp" 
+              class="snapshot-item"
+            > <!-- 循环快照项 -->
+              <div class="snapshot-info"> <!-- 信息 -->
+                <span class="time">{{ item.timeStr }}</span> <!-- 时间 -->
+              </div> <!-- 结束 -->
+              <div class="snapshot-actions"> <!-- 操作 -->
+                <el-button 
+                  type="primary" 
+                  link 
+                  @click="viewDiff(item)"
+                > <!-- 对比按钮 -->
+                  对比
+                </el-button> <!-- 结束 -->
+                <el-button 
+                  type="success" 
+                  link 
+                  @click="restoreSnapshot(item)"
+                > <!-- 还原按钮 -->
+                  还原
+                </el-button> <!-- 结束 -->
+              </div> <!-- 结束 -->
+            </div> <!-- 循环结束 -->
+          </div> <!-- 列表结束 -->
+        </div> <!-- 容器结束 -->
+
+        <!-- 差异对比弹窗容器 -->
+        <el-dialog
+          v-model="diffDialogVisible"
+          title="版本差异对比"
+          width="80%"
+          top="5vh"
+          append-to-body
+          class="diff-dialog"
+        > <!-- 差异对比对话框 -->
+          <div v-loading="diffLoading" class="diff-viewer"> <!-- 差异查看器主体 -->
+            <div class="diff-legend"> <!-- 图例颜色说明栏 -->
+              <span class="legend-item current">保持不变</span> <!-- 保持不变 -->
+              <span class="legend-item added">当前新增</span> <!-- 新增 -->
+              <span class="legend-item removed">当前缺失</span> <!-- 缺失 -->
+            </div> <!-- 结束 -->
+            <div class="diff-content"> <!-- 差异内容展示区 -->
+              <span 
+                v-for="(change, index) in diffChanges" 
+                :key="index"
+                :class="{ 
+                  'diff-added': change.added, 
+                  'diff-removed': change.removed 
+                }"
+              > <!-- 应用差异样式 -->
+                {{ change.value }} <!-- 内容 -->
+              </span> <!-- 循环结束 -->
+            </div> <!-- 内容区结束 -->
+          </div> <!-- 主体结束 -->
+          <template #footer> <!-- 底部操作 -->
+            <div class="dialog-footer"> <!-- 容器 -->
+              <el-button @click="diffDialogVisible = false">关闭</el-button> <!-- 关闭 -->
+              <el-button type="success" @click="restoreSnapshot(selectedSnapshot)">还原此版本</el-button> <!-- 还原 -->
+            </div> <!-- 容器结束 -->
+          </template> <!-- 底部结束 -->
+        </el-dialog> <!-- 对话框结束 -->
+      </div> <!-- 回收站功能区结束 -->
+
       <!-- 其他功能区占位 -->
       <div v-else class="placeholder-content"> <!-- 占位内容容器 -->
         <el-empty :description="`正在开发中...`" /> <!-- 暂未开放提示 -->
@@ -129,13 +203,137 @@
 </template> <!-- 模板结束 -->
 
 <script setup>
-import { ref, computed, onMounted } from 'vue' // 导入 Vue 核心 API
+import { ref, computed, onMounted, watch } from 'vue' // 导入 Vue 核心 API
 import { RefreshRight, ArrowDown, Check, Plus } from '@element-plus/icons-vue' // 导入图标
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 store
+import { useRoute } from 'vue-router' // 导入路由
+import { ElMessage, ElMessageBox } from 'element-plus' // 导入 Element Plus
+import * as diff from 'diff' // 导入差异对比库
 
 const editorStore = useEditorStore() // 获取 store 实例
+const route = useRoute() // 获取路由实例
+
+const props = defineProps({ // 定义组件属性
+  bookName: { // 书籍名称
+    type: String, // 类型
+    default: '' // 默认值
+  } // 结束
+}) // 结束
+
+const emit = defineEmits(['restore']) // 定义事件
 
 const activeTab = ref('grid') // 当前选中的标签页，默认选中网格线条
+
+// 回收站相关状态
+const snapshots = ref([]) // 快照列表
+const loading = ref(false) // 加载状态
+const diffLoading = ref(false) // 差异加载状态
+const diffDialogVisible = ref(false) // 差异对话框显示
+const diffChanges = ref([]) // 差异内容
+const selectedSnapshot = ref(null) // 选中的快照
+
+// 获取书名（优先从 props 获取，其次从路由获取）
+const currentBookName = computed(() => props.bookName || route.query.name)
+
+// 获取快照列表
+async function fetchSnapshots() {
+  if (!currentBookName.value || !editorStore.file) return
+  
+  loading.value = true
+  try {
+    const params = {
+      bookName: currentBookName.value,
+      type: editorStore.file.type
+    }
+
+    if (editorStore.file.type === 'chapter') {
+      params.volumeName = editorStore.file.volume
+      params.chapterName = editorStore.file.name
+    } else {
+      params.notebookName = editorStore.file.notebook
+      params.noteName = editorStore.file.name
+    }
+
+    const result = await window.electron.getRecycleBinSnapshots(params)
+    if (result.success) {
+      snapshots.value = result.snapshots || []
+    }
+  } catch (error) {
+    console.error('获取快照列表失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 查看差异
+async function viewDiff(snapshot) {
+  diffLoading.value = true
+  selectedSnapshot.value = snapshot
+  try {
+    const result = await window.electron.readRecycleBinSnapshot({
+      bookName: currentBookName.value,
+      fileName: snapshot.fileName
+    })
+
+    if (result.success) {
+      const oldContent = result.content
+      let currentContent = editorStore.content
+      diffChanges.value = diff.diffChars(oldContent, currentContent)
+      diffDialogVisible.value = true
+    } else {
+      ElMessage.error('读取快照内容失败')
+    }
+  } catch (error) {
+    console.error('查看差异失败:', error)
+  } finally {
+    diffLoading.value = false
+  }
+}
+
+// 还原快照
+async function restoreSnapshot(snapshot) {
+  try {
+    await ElMessageBox.confirm(
+      '确定要还原到该版本的快照吗？当前未保存的内容将会被覆盖。',
+      '还原快照',
+      {
+        confirmButtonText: '确定还原',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const result = await window.electron.readRecycleBinSnapshot({
+      bookName: currentBookName.value,
+      fileName: snapshot.fileName
+    })
+
+    if (result.success) {
+      emit('restore', result.content)
+      ElMessage.success('已成功还原到选定版本')
+    } else {
+      ElMessage.error('还原快照失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('还原快照失败:', error)
+    }
+  }
+}
+
+// 监听标签切换
+watch(activeTab, (val) => {
+  if (val === 'recycle') {
+    fetchSnapshots()
+  }
+})
+
+// 监听文件变化
+watch(() => editorStore.file, () => {
+  if (activeTab.value === 'recycle') {
+    fetchSnapshots()
+  }
+})
 
 // 线条设置折叠状态
 const isSettingsCollapsed = ref(false) // 设置区块折叠状态
@@ -422,4 +620,112 @@ onMounted(() => { // 挂载钩子
     } /* 结束 */
   } /* 结束 */
 } /* 结束 */
+
+.recycle-bin-container { // 回收站容器样式
+  height: 100%; // 高度填充
+  display: flex; // 弹性布局
+  flex-direction: column; // 垂直排列
+  gap: 16px; // 间距
+} // 结束
+
+.snapshot-list { // 快照列表样式
+  display: flex; // 弹性布局
+  flex-direction: column; // 垂直排列
+  gap: 12px; // 间距
+} // 结束
+
+.snapshot-item { // 快照项样式
+  display: flex; // 弹性布局
+  justify-content: space-between; // 两端对齐
+  align-items: center; // 垂直居中
+  padding: 12px; // 内边距
+  background-color: var(--bg-soft); // 次级背景色
+  border: 1px solid var(--border-color); // 边框
+  border-radius: 8px; // 圆角
+  transition: all 0.2s; // 过渡
+
+  &:hover { // 悬停
+    background-color: var(--bg-mute); // 悬停色
+    border-color: var(--el-color-primary); // 边框色
+  } // 结束
+
+  .snapshot-info { // 信息样式
+    .time { // 时间样式
+      font-size: 14px; // 字号
+      color: var(--text-base); // 主文字色
+    } // 结束
+  } // 结束
+
+  .snapshot-actions { // 操作样式
+    display: flex; // 弹性
+    gap: 8px; // 间距
+  } // 结束
+} // 结束
+
+.diff-viewer { // 差异查看器样式
+  max-height: 60vh; // 最大高度
+  overflow-y: auto; // 滚动
+  padding: 16px; // 内边距
+  background-color: var(--bg-primary); // 背景
+  border-radius: 4px; // 圆角
+  line-height: 1.8; // 行高
+  white-space: pre-wrap; // 预格式化
+  word-break: break-all; // 单词折行
+  color: var(--text-base); // 文字色
+} // 结束
+
+.diff-legend { // 图例样式
+  margin-bottom: 16px; // 下边距
+  padding-bottom: 12px; // 下内边距
+  border-bottom: 1px solid var(--border-color); // 下边框
+  display: flex; // 弹性
+  gap: 16px; // 间距
+  font-size: 12px; // 字号
+
+  .legend-item { // 图例项样式
+    display: flex; // 弹性
+    align-items: center; // 居中
+    gap: 4px; // 间距
+
+    &::before { // 前置色块
+      content: ''; // 内容
+      display: inline-block; // 块
+      width: 12px; // 宽
+      height: 12px; // 高
+      border-radius: 2px; // 圆角
+    } // 结束
+
+    &.current::before { border: 1px solid var(--border-color); } // 当前色块
+    &.added::before { background-color: #e6ffec; } // 新增色块
+    &.removed::before { background-color: #ffeef0; } // 移除色块
+  } // 结束
+} // 结束
+
+.diff-content { // 差异内容样式
+  font-size: 15px; // 字号
+  
+  .diff-added { // 新增文本样式
+    background-color: #e6ffec; // 绿底
+    color: #24292e; // 黑字
+  } // 结束
+
+  .diff-removed { // 移除文本样式
+    background-color: #ffeef0; // 红底
+    color: #d73a49; // 红字
+    text-decoration: line-through; // 删除线
+  } // 结束
+} // 结束
+
+.empty-state { // 空状态样式
+  padding-top: 40px; // 上边距
+} // 结束
 </style> <!-- 样式结束 -->
+
+<!-- 差异对话框样式（全局） -->
+<style lang="scss">
+.diff-dialog { // 差异对话框样式
+  .el-dialog__body { // 主体样式
+    padding: 0 20px 20px 20px !important; // 内边距
+  } // 结束
+} // 结束
+</style>

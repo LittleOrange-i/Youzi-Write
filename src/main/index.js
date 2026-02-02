@@ -3079,6 +3079,103 @@ ipcMain.handle(
   }
 )
 
+// --------- 回收站相关 ---------
+// 保存回收站快照
+ipcMain.handle(
+  'save-recycle-bin-snapshot', // 注册保存快照的 IPC 处理程序
+  async (event, { bookName, type, volumeName, chapterName, notebookName, noteName, content }) => { // 异步处理函数
+    const bookPath = findBookPath(bookName) // 获取书籍的物理路径
+    if (!bookPath) return { success: false, message: '书籍不存在' } // 如果路径不存在则返回错误
+
+    const recycleBinPath = join(bookPath, '.recycle_bin') // 构建回收站目录路径
+    if (!fs.existsSync(recycleBinPath)) { // 如果回收站目录不存在
+      fs.mkdirSync(recycleBinPath, { recursive: true }) // 递归创建回收站目录
+    } // 结束目录检查
+
+    const timestamp = Date.now() // 获取当前毫秒级时间戳
+    let targetName = '' // 初始化目标文件名标识
+    if (type === 'chapter') { // 如果当前是章节类型
+      targetName = `chapter_${volumeName}_${chapterName}` // 生成章节标识符
+    } else { // 否则（笔记类型）
+      targetName = `note_${notebookName}_${noteName}` // 生成笔记标识符
+    } // 结束类型判断
+
+    // 移除文件名中的非法字符，确保在 Windows 等系统上能够正常保存
+    targetName = targetName.replace(/[\\/:*?"<>|]/g, '_') // 替换非法字符为下划线
+
+    const snapshotFileName = `${targetName}_${timestamp}.txt` // 构建快照完整文件名
+    const snapshotPath = join(recycleBinPath, snapshotFileName) // 构建快照文件的完整物理路径
+
+    fs.writeFileSync(snapshotPath, content, 'utf-8') // 同步写入快照内容到文件
+
+    // 限制每个文件的快照数量（保留最近50个），避免磁盘空间占用过大
+    const files = fs // 获取文件系统对象
+      .readdirSync(recycleBinPath) // 读取回收站目录下的所有文件
+      .filter((f) => f.startsWith(targetName)) // 过滤出当前目标文件的所有历史快照
+      .sort((a, b) => { // 对快照文件进行排序
+        const timeA = parseInt(a.split('_').pop()) // 提取 A 文件的时间戳
+        const timeB = parseInt(b.split('_').pop()) // 提取 B 文件的时间戳
+        return timeB - timeA // 按照时间戳从新到旧排序
+      }) // 结束排序
+
+    if (files.length > 50) { // 如果快照数量超过 50 个
+      for (let i = 50; i < files.length; i++) { // 遍历超出的部分
+        fs.unlinkSync(join(recycleBinPath, files[i])) // 同步删除旧的快照文件
+      } // 结束删除循环
+    } // 结束数量限制逻辑
+
+    return { success: true } // 返回成功结果
+  } // 结束异步处理函数
+) // 结束 IPC 注册
+
+// 获取回收站快照列表
+ipcMain.handle(
+  'get-recycle-bin-snapshots', // 注册获取快照列表的 IPC 处理程序
+  async (event, { bookName, type, volumeName, chapterName, notebookName, noteName }) => { // 异步处理函数
+    const bookPath = findBookPath(bookName) // 获取书籍路径
+    if (!bookPath) return { success: false, message: '书籍不存在' } // 路径不存在则返回
+
+    const recycleBinPath = join(bookPath, '.recycle_bin') // 构建回收站路径
+    if (!fs.existsSync(recycleBinPath)) return { success: true, snapshots: [] } // 目录不存在则返回空列表
+
+    let targetPrefix = '' // 初始化目标前缀
+    if (type === 'chapter') { // 章节类型
+      targetPrefix = `chapter_${volumeName}_${chapterName}` // 生成章节前缀
+    } else { // 笔记类型
+      targetPrefix = `note_${notebookName}_${noteName}` // 生成笔记前缀
+    } // 结束判断
+    targetPrefix = targetPrefix.replace(/[\\/:*?"<>|]/g, '_') // 统一非法字符替换逻辑
+
+    const files = fs // 获取文件系统对象
+      .readdirSync(recycleBinPath) // 读取目录
+      .filter((f) => f.startsWith(targetPrefix)) // 匹配当前文件的快照
+      .map((f) => { // 映射为前端需要的格式
+        const parts = f.split('_') // 拆分文件名
+        const timestamp = parseInt(parts.pop().replace('.txt', '')) // 提取并转换时间戳
+        return { // 返回格式化后的快照对象
+          fileName: f, // 原始文件名
+          timestamp, // 原始时间戳
+          timeStr: dayjs(timestamp).format('YYYY-MM-DD HH:mm:ss') // 格式化后的时间字符串
+        } // 结束对象定义
+      }) // 结束映射
+      .sort((a, b) => b.timestamp - a.timestamp) // 按照时间从新到旧排序
+
+    return { success: true, snapshots: files } // 返回成功结果及列表
+  } // 结束处理函数
+) // 结束 IPC 注册
+
+// 读取回收站快照内容
+ipcMain.handle('read-recycle-bin-snapshot', async (event, { bookName, fileName }) => { // 注册读取内容的程序
+  const bookPath = findBookPath(bookName) // 获取书籍路径
+  if (!bookPath) return { success: false, message: '书籍不存在' } // 路径不存在
+
+  const snapshotPath = join(bookPath, '.recycle_bin', fileName) // 构建快照物理路径
+  if (!fs.existsSync(snapshotPath)) return { success: false, message: '快照不存在' } // 文件不存在
+
+  const content = fs.readFileSync(snapshotPath, 'utf-8') // 读取文件内容
+  return { success: true, content } // 返回成功结果和内容
+}) // 结束 IPC 注册
+
 // 读取章节内容
 ipcMain.handle('read-chapter', async (event, { bookName, volumeName, chapterName }) => {
   const bookPath = findBookPath(bookName)

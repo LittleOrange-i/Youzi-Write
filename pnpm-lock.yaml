@@ -44,6 +44,9 @@ importers:
       dayjs:
         specifier: ^1.11.19
         version: 1.11.19
+      diff:
+        specifier: ^8.0.3
+        version: 8.0.3
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -1491,6 +1494,10 @@ packages:
 
   didyoumean@1.2.2:
     resolution: {integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==}
+
+  diff@8.0.3:
+    resolution: {integrity: sha512-qejHi7bcSD4hQAZE0tNAawRK1ZtafHDmMTMkrrIGgSLl7hTnQHmKCeB45xAcbfTqK2zowkM3j3bHt/4b/ARbYQ==}
+    engines: {node: '>=0.3.1'}
 
   dir-compare@4.2.0:
     resolution: {integrity: sha512-2xMCmOoMrdQIPHdsTawECdNPwlVFB9zGcz3kuhmBO6U3oU+UQjsue0i8ayLKpgBcm+hcXPMVSGUN9d+pvJ6+VQ==}
@@ -4646,6 +4653,8 @@ snapshots:
     optional: true
 
   didyoumean@1.2.2: {}
+
+  diff@8.0.3: {}
 
   dir-compare@4.2.0:
     dependencies:

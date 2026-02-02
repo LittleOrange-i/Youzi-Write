@@ -324,6 +324,13 @@
     <!-- 搜索面板 -->
     <SearchPanel ref="searchPanelRef" :visible="searchPanelVisible" :editor="editor" @close="closeSearchPanel" />
     
+    <!-- 回收站抽屉 -->
+    <RecycleBinDrawer
+      v-model="recycleBinVisible"
+      :book-name="bookName"
+      @restore="handleRestore"
+    />
+
     <!-- 段落字数校验结果弹窗 -->
     <el-dialog
       v-model="paragraphCheckDialogVisible"
@@ -449,6 +456,7 @@ import EditorProgress from '@renderer/components/Editor/EditorProgress.vue' // �
 import ChapterEditorContent from '@renderer/components/Editor/ChapterEditorContent.vue' // 导入章节编辑器内容组件
 import NoteEditorContent from '@renderer/components/Editor/NoteEditorContent.vue' // 导入笔记编辑器内容组件
 import MoreSettingsDialog from '@renderer/components/Editor/MoreSettingsDialog.vue' // 导入更多设置弹窗组件
+import RecycleBinDrawer from '@renderer/components/Editor/RecycleBinDrawer.vue' // 导入回收站组件
 import { formatText } from '@renderer/utils/formatText' // 导入文本格式化工具函数
 
 // 全局菜单管理器 - 模块级单例，所有组件实例共享
@@ -1196,6 +1204,11 @@ let characterHighlightTimer = null // 人物高亮定时器
 const paragraphCheckDialogVisible = ref(false) // 校验结果弹窗显示状态
 const overLengthParagraphs = ref([]) // 超标段落列表
 
+// 回收站相关状态
+const recycleBinVisible = ref(false) // 回收站抽屉显示状态
+const lastSnapshotContent = ref('') // 上次快照的内容
+let snapshotTimer = null // 快照定时器
+
 // 禁词提示相关状态
 const bannedWordsHintEnabled = ref(false) // 禁词提示开关状态，默认关闭
 const bannedWords = computed(() => editorStore.bannedWords) // 使用 store 中的禁词列表
@@ -1358,6 +1371,10 @@ watch( // 开启监听
           await loadBannedWordsHintState(props.bookName) // 加载禁词提示
           await loadDialogueHighlightState(props.bookName) // 加载对白高亮
         } // 结束章节处理
+        
+        // 初始化后开启回收站快照定时器
+        startSnapshotTimer()
+        
         return // 初始化完成，直接返回
       } catch (error) { // 捕获错误
         console.error('初始化编辑器失败:', error) // 打印错误
@@ -1408,6 +1425,9 @@ watch( // 开启监听
 
     // 只有在文件路径变化且编辑器已存在时才设置内容
     if (editor.value && newFile?.path !== oldFile?.path) { // 如果路径变化
+      // 重置回收站记录
+      lastSnapshotContent.value = ''
+      
       // 文件变化时，先开始编辑会话（设置初始化标志），再设置内容
       let newContent = editorStore.content || '' // 默认从 store 获取内容
       const isNote = newFile?.type === 'note' // 判断是否为笔记
@@ -1854,6 +1874,9 @@ onMounted(async () => {
       await loadCharacterHighlightState(props.bookName)
       await loadBannedWordsHintState(props.bookName)
     }
+
+    // 初始化后开启回收站快照定时器
+    startSnapshotTimer()
   }
   // 如果 file 不存在，watch 会在文件加载后触发初始化
 
@@ -1902,6 +1925,9 @@ onBeforeUnmount(async () => {
 
   // 停止禁词提示定时器
   stopBannedWordsHintTimer()
+
+  // 停止回收站快照定时器
+  stopSnapshotTimer()
 
   if (saveTimer.value) clearTimeout(saveTimer.value)
   if (styleUpdateTimer) clearTimeout(styleUpdateTimer)
@@ -2025,6 +2051,76 @@ function toggleSearchPanel() {
 // 切换全屏模式
 function toggleFullscreen() {
   emit('toggle-fullscreen')
+}
+
+// --------- 回收站逻辑 ---------
+// 开始回收站自动快照定时器
+function startSnapshotTimer() {
+  stopSnapshotTimer() // 先停止旧的
+  snapshotTimer = setInterval(async () => {
+    const file = editorStore.file // 获取当前文件
+    if (!file || !editor.value) return // 校验
+
+    const editorContentComponent = getEditorContentComponent() // 获取组件
+    if (!editorContentComponent) return // 校验
+
+    const currentContent = editorContentComponent.getSaveContent(editor.value) // 获取最新内容
+    
+    // 如果内容没变，不保存快照
+    if (currentContent === lastSnapshotContent.value) return // 结束判断
+
+    const snapshotInfo = { // 准备快照信息
+      bookName: props.bookName, // 书籍名
+      type: file.type, // 文件类型
+      content: currentContent // 内容
+    }
+
+    if (file.type === 'chapter') { // 章节模式
+      snapshotInfo.volumeName = file.volume // 卷名
+      snapshotInfo.chapterName = file.name // 章节名
+    } else { // 笔记模式
+      snapshotInfo.notebookName = file.notebook // 笔记本名
+      snapshotInfo.noteName = file.name // 笔记名
+    }
+
+    try { // 尝试保存
+      const result = await window.electron.saveRecycleBinSnapshot(snapshotInfo) // 调用后端
+      if (result.success) { // 成功
+        lastSnapshotContent.value = currentContent // 更新记录
+      }
+    } catch (error) { // 捕获
+      console.error('保存回收站快照失败:', error) // 记录
+    }
+  }, 30000) // 30秒一次
+}
+
+// 停止回收站自动快照定时器
+function stopSnapshotTimer() {
+  if (snapshotTimer) { // 如果存在
+    clearInterval(snapshotTimer) // 清除
+    snapshotTimer = null // 设为 null
+  }
+}
+
+// 打开回收站
+function openRecycleBin() {
+  recycleBinVisible.value = true // 显示抽屉
+}
+
+// 处理快照还原
+function handleRestore(content) {
+  if (!editor.value) return // 校验编辑器
+  
+  const file = editorStore.file // 获取当前文件
+  if (file?.type === 'note') { // 笔记模式
+    noteEditorContentRef.value.setNoteContent(editor.value, content) // 设置笔记内容
+  } else { // 章节模式
+    chapterEditorContentRef.value.setChapterContent(editor.value, content) // 设置章节内容
+  }
+  
+  // 还原后更新 store 内容，确保同步
+  editorStore.setContent(content) // 更新 store
+  lastSnapshotContent.value = content // 同时更新最后快照内容，避免立即触发新的自动保存
 }
 
 function closeSearchPanel() {
@@ -3329,7 +3425,9 @@ watch(isJailModeActive, (newVal) => {
 
 defineExpose({
   saveContent,
-  autoSaveContent
+  autoSaveContent,
+  openRecycleBin,
+  handleRestore
 })
 
 </script>
