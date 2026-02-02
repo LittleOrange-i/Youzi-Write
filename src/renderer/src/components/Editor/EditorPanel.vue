@@ -11,6 +11,7 @@
       @save="saveContent"
       @export="handleExport"
       @update-style="handleStyleUpdate"
+      @toggle-drawer="() => $emit('toggle-drawer')"
     />
     <!-- 章节标题 - 全屏模式下隐藏 -->
     <div v-if="!isFullscreenMode" class="chapter-title">
@@ -490,7 +491,7 @@ const props = defineProps({
 
 const isMounted = ref(false)
 
-const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change', 'chapter-word-count-updated', 'toggle-fullscreen'])
+const emit = defineEmits(['refresh-notes', 'refresh-chapters', 'editor-ready', 'jail-mode-change', 'chapter-word-count-updated', 'toggle-fullscreen', 'toggle-drawer'])
 
 // 默认高亮颜色（当人物没有设置标记颜色时使用）
 const defaultHighlightColor = '#e198b8'
@@ -1239,21 +1240,74 @@ function getFontFamily(fontKey) {
 }
 
 // 更新编辑器样式
-function updateEditorStyle() {
-  const editors = [editor.value, editor2.value].filter(Boolean) // 获取所有已初始化的编辑器实例
-  editors.forEach((ed) => { // 遍历每个编辑器应用样式
-    const editorElement = ed.view.dom // 获取编辑器的 DOM 元素
-    if (editorElement) { // 如果元素存在
+function updateEditorStyle() { // 定义更新编辑器样式的主函数
+  const editors = [editor.value, editor2.value].filter(Boolean) // 获取当前页面所有有效的编辑器实例
+  const gridSettings = editorStore.editorSettings.gridLines || {} // 从 store 获取网格线条的相关配置
+  
+  editors.forEach((ed) => { // 遍历每个编辑器实例进行样式应用
+    const editorElement = ed.view.dom // 获取编辑器的 DOM 根节点
+    if (editorElement) { // 确保 DOM 元素存在
       // 使用 setProperty 并设置 important 优先级，确保样式生效
-      const fullFontFamily = getFontFamily(menubarState.value.fontFamily) // 获取完整的字体配置
-      editorElement.style.setProperty('font-family', fullFontFamily, 'important') // 设置字体
-      editorElement.style.setProperty('font-size', menubarState.value.fontSize, 'important') // 设置字号
-      editorElement.style.setProperty('line-height', menubarState.value.lineHeight, 'important') // 设置行高
-      const isChapter = editorStore.file?.type === 'chapter' // 判断是否为章节
-      editorElement.style.setProperty('text-indent', isChapter ? '2em' : '0', 'important') // 设置首行缩进
-    }
-  })
-}
+      const fullFontFamily = getFontFamily(menubarState.value.fontFamily) // 根据配置获取完整的字体名称
+      editorElement.style.setProperty('font-family', fullFontFamily, 'important') // 应用字体族样式
+      editorElement.style.setProperty('font-size', menubarState.value.fontSize, 'important') // 应用字体大小样式
+      editorElement.style.setProperty('line-height', menubarState.value.lineHeight, 'important') // 应用行高样式
+      const isChapter = editorStore.file?.type === 'chapter' // 判断当前是否为章节编辑模式
+      editorElement.style.setProperty('text-indent', isChapter ? '2em' : '0', 'important') // 章节模式设置首行缩进
+
+      // 应用网格线条样式
+      if (gridSettings.enabled) { // 如果用户启用了网格线条功能
+        const color = gridSettings.lineColor || '#e0e0e0' // 获取配置的线条颜色，默认为浅灰色
+        const thickness = gridSettings.boldSize ? '2px' : '1px' // 根据配置确定线条宽度
+        const lineHeight = menubarState.value.lineHeight // 获取当前设置的行高倍数
+        const fontSize = parseInt(menubarState.value.fontSize) // 获取当前设置的字号像素值
+        const actualLineHeight = fontSize * lineHeight // 计算单行文本占用的实际像素高度
+        
+        // 计算紧贴底部的偏移量：当行高大于1时，文字在行内居中，需要减去上下多出的空白
+        const stickOffset = gridSettings.stickToBottom ? (actualLineHeight - fontSize) / 2 : 0
+        
+        let backgroundImage = '' // 初始化背景图片字符串
+        let backgroundSize = `100% ${actualLineHeight}px` // 初始化背景尺寸为单行高度
+        let backgroundPosition = `0 ${-stickOffset}px` // 初始化背景起始位置，如果紧贴底部则向上偏移
+
+        // 使用 SVG 数据链接来实现更精确的网格线条渲染，解决虚线和双线在不同缩放下的显示问题
+        const encodedColor = encodeURIComponent(color) // 对颜色进行转义，确保在数据链接中可用
+        const thicknessInt = parseInt(thickness) // 获取线条宽度的整数值
+        
+        if (gridSettings.lineType === 'single-solid') { // 处理单实线类型
+          // 渲染单行实线：宽度为1（水平重复后成线），高度为行高，线条在 SVG 顶部
+          backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+          backgroundSize = `100% ${actualLineHeight}px` // 背景尺寸设为行高以实现垂直重复
+          backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 将线条位置对齐到文本底部
+        } else if (gridSettings.lineType === 'double-solid') { // 处理双实线类型
+          // 渲染双行实线：第一行作为基准线对齐底部，第二行在其下方 3px 处，确保第一行不超标
+          backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3Crect x='0' y='3' width='1' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+          backgroundSize = `100% ${actualLineHeight}px` // 背景尺寸设为行高
+          backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 以第一条线为基准对齐文本底部
+        } else if (gridSettings.lineType === 'sparse-dashed' || gridSettings.lineType === 'dense-dashed') { // 处理虚线类型
+          const dashLen = gridSettings.lineType === 'sparse-dashed' ? 8 : 4 // 根据类型确定虚线段的长度（稀疏8px，密集4px）
+          // 渲染水平虚线：宽度为周期长度（dashLen * 2），实线部分长为 dashLen
+          backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${dashLen * 2}' height='${actualLineHeight}'%3E%3Crect x='0' y='0' width='${dashLen}' height='${thicknessInt}' fill='${encodedColor}'/%3E%3C/svg%3E")`
+          backgroundSize = `${dashLen * 2}px ${actualLineHeight}px` // 背景宽度设为周期长度以实现水平虚线
+          backgroundPosition = `0 ${actualLineHeight - stickOffset - thicknessInt}px` // 将虚线对齐到文本底部
+        } // 结束线条类型判断
+
+        editorElement.style.setProperty('background-image', backgroundImage, 'important') // 应用生成的背景图样式
+        editorElement.style.setProperty('background-size', backgroundSize, 'important') // 应用背景尺寸样式
+        editorElement.style.setProperty('background-position', backgroundPosition, 'important') // 应用背景位置样式
+        editorElement.style.setProperty('background-repeat', 'repeat', 'important') // 设置背景在水平和垂直方向重复
+        editorElement.style.setProperty('background-attachment', 'local', 'important') // 设置背景随内容滚动
+      } else { // 如果用户禁用了网格线条功能
+        // 禁用时清除样式
+        editorElement.style.removeProperty('background-image') // 移除背景图属性
+        editorElement.style.removeProperty('background-size') // 移除背景尺寸属性
+        editorElement.style.removeProperty('background-position') // 移除背景位置属性
+        editorElement.style.removeProperty('background-repeat') // 移除背景重复属性
+        editorElement.style.removeProperty('background-attachment') // 移除背景附着属性
+      } // 结束启用状态处理
+    } // 结束 DOM 元素有效性判断
+  }) // 结束编辑器实例遍历
+} // 结束 updateEditorStyle 函数定义
 
 // 处理样式更新
 function handleStyleUpdate() {
@@ -1275,6 +1329,15 @@ function handleStyleUpdate() {
 function handleExport() {
   // 导出功能已在 EditorMenubar 组件中实现，这里只需要处理事件
 }
+
+// 监听网格线条设置变化
+watch( // 开启监听
+  () => editorStore.editorSettings.gridLines, // 监听 store 中的网格线条配置
+  () => { // 配置变化时的回调
+    updateEditorStyle() // 重新应用编辑器样式
+  }, // 结束回调
+  { deep: true } // 开启深度监听
+) // 结束监听定义
 
 // 监听 store 内容变化，回显到编辑器
 watch( // 开启监听

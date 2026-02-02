@@ -138,6 +138,9 @@ if (process.contextIsolated) {
       // 获取章节统计信息
       getChapterStats: (bookName, volumeName, chapterName) =>
         ipcRenderer.invoke('get-chapter-stats', { bookName, volumeName, chapterName }),
+      // 刷新书籍所有章节的字数统计
+      refreshAllChapterWordCounts: (bookName) =>
+        ipcRenderer.invoke('refresh-all-chapter-word-counts', bookName), // 调用主进程刷新字数统计
       // 新增：获取书籍每日净增字数统计
       getBookDailyStats: (bookName) => ipcRenderer.invoke('get-book-daily-stats', bookName),
       // 新增：获取所有书籍的每日净增字数统计

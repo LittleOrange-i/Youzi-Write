@@ -192,6 +192,14 @@ export const useEditorStore = defineStore('editor', () => {
         { id: 13, label: '""', start: '"', end: '"', enabled: true, color: '#e198b8', useCustomColor: false }, // 英文双引号
         { id: 14, label: "''", start: "'", end: "'", enabled: true, color: '#e198b8', useCustomColor: false } // 英文单引号
       ]
+    },
+    gridLines: { // 网格线条设置
+      enabled: false, // 是否启用
+      stickToBottom: false, // 线条紧贴文本底部
+      boldSize: false, // 线条尺寸加粗显示
+      lineType: 'single-solid', // 线条类型：single-solid (单行实线), double-solid (双行实线), sparse-dashed (稀疏虚线), dense-dashed (密集虚线)
+      lineColor: '#e0e0e0', // 线条颜色
+      customColors: [] // 自定义颜色列表
     }
   })
 
@@ -219,7 +227,8 @@ export const useEditorStore = defineStore('editor', () => {
         globalBoldMode: editorSettings.value.globalBoldMode,
         globalItalicMode: editorSettings.value.globalItalicMode,
         formattingRules: editorSettings.value.formattingRules,
-        dialogueHighlight: editorSettings.value.dialogueHighlight
+        dialogueHighlight: editorSettings.value.dialogueHighlight,
+        gridLines: editorSettings.value.gridLines
       }
       // 使用 JSON.parse(JSON.stringify()) 彻底移除 Vue 的 Proxy 代理
       // 解决 "An object could not be cloned" 错误

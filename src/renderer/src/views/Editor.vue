@@ -25,6 +25,7 @@
                 @jail-mode-change="handleJailModeChange"
                 @chapter-word-count-updated="handleChapterWordCountUpdate"
                 @toggle-fullscreen="toggleFullscreen"
+                @toggle-drawer="drawerVisible = !drawerVisible"
               />
             </el-splitter-panel>
             <el-splitter-panel :size="aiSidebarSize">
@@ -48,12 +49,24 @@
             @jail-mode-change="handleJailModeChange"  
             @chapter-word-count-updated="handleChapterWordCountUpdate"  
             @toggle-fullscreen="toggleFullscreen"   
+            @toggle-drawer="drawerVisible = !drawerVisible"
           /> <!-- 结束编辑器面板 -->
           <!-- 右下角时间显示 - 已移至编辑器容器内部 -->
           <div class="fullscreen-clock">{{ currentTime }}</div> <!-- 显示当前时间 -->
         </div> <!-- 结束全屏编辑器内容容器 -->
       </div> <!-- 结束全屏内容包装容器 -->
     </div>
+
+    <!-- 左侧抽屉 -->
+    <el-drawer
+      v-model="drawerVisible"
+      direction="ltr"
+      :with-header="false"
+      :size="aiSidebarSize"
+      class="editor-left-drawer"
+    >
+      <EditorDrawerContent />
+    </el-drawer>
   </div>
 </template>
 
@@ -66,10 +79,14 @@ import NoteChapter from '@renderer/components/Editor/NoteChapter.vue'
 import EditorPanel from '@renderer/components/Editor/EditorPanel.vue'
 import EditorToolbar from '@renderer/components/Editor/EditorToolbar.vue'
 import AISidebar from '@renderer/components/Editor/AISidebar.vue'
+import EditorDrawerContent from '@renderer/components/Editor/EditorDrawerContent.vue' // 导入抽屉内容组件
 
-const route = useRoute()
-const themeStore = useThemeStore()
-const jailStore = useJailStore()
+const route = useRoute() // 获取当前路由信息
+const themeStore = useThemeStore() // 获取主题 store 实例
+const jailStore = useJailStore() // 获取专注模式 store 实例
+
+// 抽屉显示状态
+const drawerVisible = ref(false) // 定义抽屉是否显示的响应式变量
 
 // 解析新窗口参数
 let bookName = null
@@ -292,6 +309,15 @@ const handleGlobalKeydown = (event) => {
 </script>
 
 <style lang="scss" scoped>
+
+// 抽屉部分样式
+::v-deep(.editor-left-drawer .el-drawer__body) {
+  flex: 1;
+  overflow: auto;
+  // padding: var(--el-drawer-padding-primary);
+  padding: 0 var(--el-drawer-padding-primary);
+}
+
 .editor-container {
   height: 100vh;
   background-color: var(--bg-primary);

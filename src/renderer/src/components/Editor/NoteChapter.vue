@@ -832,6 +832,15 @@ onMounted(async () => {
     const savedChapterSortOrder = await window.electron.getChapterSortOrder(props.bookName)
     chapterSortOrder.value = savedChapterSortOrder || 'desc'
     
+    // 首次打开书籍更新一次全部目录章节的字数
+    try { // 开始尝试执行字数刷新
+      // 调用接口刷新所有章节字数
+      await window.electron.refreshAllChapterWordCounts(props.bookName) // 执行主进程字数刷新逻辑
+    } catch (err) { // 捕获执行过程中的异常
+      // 捕获并打印错误
+      console.error('刷新字数失败:', err) // 在控制台输出错误信息
+    } // 结束异常处理
+    
     // 如果当前已经打开了文件（例如从全屏模式切回），则不需要自动选中最新章节
     const hasOpenFile = !!editorStore.file
     await loadChapters(!hasOpenFile) 

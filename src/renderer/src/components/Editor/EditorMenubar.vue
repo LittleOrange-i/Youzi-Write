@@ -1,6 +1,14 @@
 <template>
   <div class="editor-menubar">
     <div class="toolbar-left">
+      <el-button
+        class="toolbar-item drawer-trigger"
+        size="small"
+        title="更多设置"
+        @click="handleToggleDrawer"
+      >
+        <el-icon><Menu /></el-icon>
+      </el-button>
       <el-select
         v-model="fontFamily"
         class="toolbar-item"
@@ -197,37 +205,42 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { DocumentCopy, Search, Tickets, Edit, Delete, FullScreen } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import dayjs from 'dayjs'
-import { useEditorStore } from '@renderer/stores/editor'
-import { formatText } from '@renderer/utils/textFormatter'
+import { computed, ref } from 'vue' // 导入 Vue 核心 API
+import { DocumentCopy, Search, Tickets, Edit, Delete, FullScreen, Menu } from '@element-plus/icons-vue' // 导入图标组件
+import { ElMessage, ElMessageBox } from 'element-plus' // 导入 Element Plus 组件
+import dayjs from 'dayjs' // 导入时间处理库
+import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 store
+import { formatText } from '@renderer/utils/textFormatter' // 导入文本排版工具
 
-const props = defineProps({
-  editor: {
-    type: Object,
-    default: null
-  },
-  bookName: {
-    type: String,
-    default: ''
-  },
-  modelValue: {
-    type: Object,
-    default: () => ({
-      fontFamily: 'KaiTi',
-      fontSize: '18px',
-      lineHeight: '1.6',
-      isBold: false,
-      isItalic: false
-    })
-  }
-})
+const props = defineProps({ // 定义组件属性
+  editor: { // 编辑器实例
+    type: Object, // 类型为对象
+    default: null // 默认为空
+  }, // 结束编辑器属性
+  bookName: { // 书籍名称
+    type: String, // 类型为字符串
+    default: '' // 默认为空
+  }, // 结束书名属性
+  modelValue: { // 样式模型数据
+    type: Object, // 类型为对象
+    default: () => ({ // 默认值工厂函数
+      fontFamily: 'KaiTi', // 默认字体
+      fontSize: '18px', // 默认字号
+      lineHeight: '1.6', // 默认行高
+      isBold: false, // 默认不加粗
+      isItalic: false // 默认不倾斜
+    }) // 结束默认值
+  } // 结束模型数据属性
+}) // 结束属性定义
 
-const emit = defineEmits(['update:modelValue', 'toggle-search', 'save', 'export', 'update-style', 'toggle-fullscreen'])
+const emit = defineEmits(['update:modelValue', 'toggle-search', 'save', 'export', 'update-style', 'toggle-fullscreen', 'toggle-drawer']) // 定义组件事件
 
-const editorStore = useEditorStore()
+const editorStore = useEditorStore() // 获取编辑器 store 实例
+
+// 切换抽屉
+function handleToggleDrawer() { // 定义切换抽屉函数
+  emit('toggle-drawer') // 触发 toggle-drawer 事件
+} // 结束函数定义
 
 // 判断是否为笔记编辑器
 const isNoteEditor = computed(() => editorStore.file?.type === 'note')

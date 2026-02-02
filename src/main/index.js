@@ -3339,6 +3339,95 @@ ipcMain.handle('get-chapter-stats', async (event, { bookName, volumeName, chapte
   }
 })
 
+// 刷新书籍所有章节的字数统计
+ipcMain.handle('refresh-all-chapter-word-counts', async (event, bookName) => { // 注册刷新字数统计的IPC处理函数
+  try { // 开始尝试执行业务逻辑
+    // 获取书籍路径
+    const bookPath = findBookPath(bookName) // 调用辅助函数查找书籍路径
+    // 如果书籍目录不存在，返回失败
+    if (!bookPath) return { success: false, message: '书籍目录未找到' } // 校验书籍路径有效性
+
+    // 获取正文目录路径
+    const volumePath = join(bookPath, '正文') // 拼接正文目录路径
+    // 如果正文目录不存在，返回成功
+    if (!fs.existsSync(volumePath)) return { success: true } // 如果没有正文目录则直接返回
+
+    // 读取统计数据
+    const stats = readStats() // 从磁盘读取统计数据文件
+    // 获取当前日期
+    const today = new Date().toISOString().split('T')[0] // 获取当前日期字符串
+    // 标记是否发生变化
+    let hasChanged = false // 初始化变化标记为假
+
+    // 读取所有卷目录
+    const volumes = fs.readdirSync(volumePath, { withFileTypes: true }) // 读取正文目录下的所有子项
+    // 遍历所有卷
+    for (const volume of volumes) { // 循环处理每一个卷
+      // 确保是目录
+      if (volume.isDirectory()) { // 校验当前项是否为文件夹
+        // 获取卷名
+        const volumeName = volume.name // 获取卷文件夹名称
+        // 获取当前卷的完整路径
+        const currentVolumePath = join(bookPath, '正文', volumeName) // 拼接卷目录的完整路径
+        // 读取卷下的所有文件
+        const files = fs.readdirSync(currentVolumePath, { withFileTypes: true }) // 读取卷目录下的所有文件
+        // 遍历所有文件
+        for (const file of files) { // 循环处理每一个文件
+          // 确保是txt文件
+          if (file.isFile() && file.name.endsWith('.txt')) { // 校验是否为章节文本文件
+            // 获取章节名
+            const name = file.name.replace('.txt', '') // 移除文件扩展名获取章节标题
+            // 获取文件完整路径
+            const filePath = join(currentVolumePath, file.name) // 拼接章节文件的完整路径
+            // 读取文件内容
+            const content = fs.readFileSync(filePath, 'utf-8') // 同步读取章节文件文本内容
+            // 计算章节字数
+            const wordCount = countChapterWords(content) // 调用字数统计函数计算有效字数
+            // 生成章节统计键名
+            const chapterKey = `${bookName}/${volumeName}/${name}` // 生成唯一的章节标识键
+
+            // 如果统计不存在或字数与当前不符
+            if ( // 判断是否需要更新统计信息
+              !stats.chapterStats[chapterKey] || // 如果该章节尚无统计数据
+              stats.chapterStats[chapterKey].totalWords !== wordCount // 或者现有统计字数与实际不符
+            ) { // 进入更新逻辑
+              // 更新章节统计信息
+              stats.chapterStats[chapterKey] = { // 创建或覆盖章节统计对象
+                // 设置总字数
+                totalWords: wordCount, // 记录当前计算出的总字数
+                // 设置最后更新日期
+                lastUpdate: today, // 记录本次更新的日期
+                // 设置字数变化为0
+                wordChange: 0, // 刷新操作不记录增量变化
+                // 设置上次内容长度为当前字数
+                lastContentLength: wordCount // 同步上次内容长度记录
+              } // 结束章节统计对象赋值
+              // 标记已发生变化
+              hasChanged = true // 设置变化标记为真
+            } // 结束更新逻辑判断
+          } // 结束文件类型校验
+        } // 结束章节文件遍历
+      } // 结束卷目录校验
+    } // 结束卷遍历循环
+
+    // 如果发生了变化
+    if (hasChanged) { // 判断是否有数据变动需要持久化
+      // 保存统计数据到文件
+      saveStats(stats) // 将更新后的统计数据写回磁盘
+      // 同步更新书籍元数据总字数
+      await updateBookMetadata(bookName) // 调用函数更新书籍总字数元数据
+    } // 结束变化处理逻辑
+
+    // 返回成功
+    return { success: true } // 返回操作成功状态
+  } catch (error) { // 捕获执行过程中的异常
+    // 打印错误日志
+    console.error('刷新章节字数失败:', error) // 在控制台输出错误信息
+    // 返回失败信息
+    return { success: false, message: error.message } // 返回错误响应给渲染进程
+  } // 结束异常处理
+}) // 结束IPC处理器注册
+
 // 时间线数据读写
 ipcMain.handle('read-timeline', async (event, { bookName }) => {
   const booksDir = store.get('booksDir')
