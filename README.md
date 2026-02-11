@@ -7,6 +7,9 @@
 ## 声明
 > 本项目基于 [51mazi](https://github.com/xiaoshengxianjun/51mazi) 的基础二次开发
 
+## QQ 群
+> **柚子写作交流群**：[748844728](https://qm.qq.com/q/5XH9fNEAJq)
+
 ## 🎯 软件概述
 
 **柚子写作** 是一款基于 Electron + Vue 3 + Tailwind CSS  技术栈开发的桌面小说写作软件，专为小说创作者设计。
