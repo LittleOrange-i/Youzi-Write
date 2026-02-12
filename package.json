@@ -1,6 +1,6 @@
 {
   "name": "Youzi-Write",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "productName": "柚子写作",
   "description": "桌面小说写作软件，专为小说创作者设计",
   "main": "./out/main/index.js",
