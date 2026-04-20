@@ -497,6 +497,13 @@ const DEFAULT_SHORTCUTS = [
     defaultKey: 'Alt+D'
   },
   {
+    id: 'item-profile',
+    name: '道具档案',
+    description: '打开道具/法宝/装备物品档案',
+    key: 'Alt+I',
+    defaultKey: 'Alt+I'
+  },
+  {
     id: 'ai-result',
     name: 'AI生成结果',
     description: '打开AI生成结果浮窗',
@@ -725,7 +732,8 @@ async function loadShortcuts() {
   try {
     const savedShortcuts = await window.electronStore?.get('shortcuts')
     if (savedShortcuts) {
-      shortcuts.value = savedShortcuts.map(saved => {
+      // 将已保存的条目合并（保留用户自定义键值）
+      const merged = savedShortcuts.map(saved => {
         const defaultShortcut = DEFAULT_SHORTCUTS.find(d => d.id === saved.id)
         return {
           ...defaultShortcut,
@@ -735,6 +743,13 @@ async function loadShortcuts() {
           occupied: false // 初始化被占用状态,每次加载时都重置
         }
       })
+      // 补充 DEFAULT_SHORTCUTS 中新增但尚未保存的条目（版本升级时自动追加新快捷键）
+      DEFAULT_SHORTCUTS.forEach(def => {
+        if (!merged.find(m => m.id === def.id)) {
+          merged.push({ ...def, conflict: false, conflictWith: '', occupied: false })
+        }
+      })
+      shortcuts.value = merged
     } else {
       // 如果没有保存的快捷键,使用默认值
       shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))

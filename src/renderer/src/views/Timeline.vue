@@ -57,6 +57,18 @@
               >
                 <div class="timeline-node-content">
                   <p>{{ node.desc }}</p>
+                  <!-- 关联人物标签 -->
+                  <div v-if="node.characters && node.characters.length > 0" class="node-characters">
+                    <el-tag
+                      v-for="cid in node.characters"
+                      :key="cid"
+                      size="small"
+                      class="node-character-tag"
+                      :style="getCharacterTagStyle(cid)"
+                    >
+                      {{ getCharacterName(cid) }}
+                    </el-tag>
+                  </div>
                   <div class="timeline-node-actions">
                     <el-icon @click="addNode(timeline._idx, node._nidx)"><EditPen /></el-icon>
                     <el-icon @click="removeNode(timeline._idx, node._nidx)"><Delete /></el-icon>
@@ -101,6 +113,35 @@
           clearable
         />
       </el-form-item>
+      <!-- 关联人物 -->
+      <el-form-item label="关联人物">
+        <el-select
+          v-model="nodeInfo.characters"
+          multiple
+          filterable
+          placeholder="选择关联人物（可多选）"
+          style="width: 100%"
+          :no-data-text="characters.length === 0 ? '暂无人物，请先在人物谱中创建' : '无匹配'"
+        >
+          <el-option
+            v-for="c in characters"
+            :key="c.id"
+            :label="c.name"
+            :value="c.id"
+          >
+            <div class="character-option">
+              <!-- 颜色标记 -->
+              <span
+                v-if="c.markerColor"
+                class="character-option-marker"
+                :style="{ backgroundColor: c.markerColor }"
+              ></span>
+              <span>{{ c.name }}</span>
+              <span class="character-option-meta">{{ c.gender }} · {{ c.age }}岁</span>
+            </div>
+          </el-option>
+        </el-select>
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
@@ -134,6 +175,7 @@
   </el-dialog>
 </template>
 
+
 <script setup>
 import LayoutTool from '@renderer/components/LayoutTool.vue'
 import { ref, onMounted, watch, reactive, toRaw, computed } from 'vue'
@@ -148,7 +190,8 @@ const dialogVisible = ref(false)
 const nodeInfo = reactive({
   id: -1,
   title: '',
-  desc: ''
+  desc: '',
+  characters: [] // 关联人物 id 数组
 })
 // 时间线对话框
 const timelineDialogVisible = ref(false)
@@ -156,6 +199,9 @@ const timelineInfo = reactive({
   title: ''
 })
 const timelines = ref([])
+
+// 本书人物列表
+const characters = ref([])
 
 // 搜索关键词
 const searchQuery = ref('')
@@ -197,11 +243,16 @@ const filteredTimelines = computed(() => {
       return
     }
 
-    // 节点匹配：展示匹配到的节点
+    // 节点匹配：展示匹配到的节点（标题/描述/关联人物姓名）
     const filteredNodes = mappedNodes.filter((node) => {
       const nodeTitle = (node.title || '').toLowerCase()
       const nodeDesc = (node.desc || '').toLowerCase()
-      return nodeTitle.includes(query) || nodeDesc.includes(query)
+      // 支持按关联人物姓名搜索
+      const charMatched = (node.characters || []).some((cid) => {
+        const name = getCharacterName(cid).toLowerCase()
+        return name.includes(query)
+      })
+      return nodeTitle.includes(query) || nodeDesc.includes(query) || charMatched
     })
 
     if (filteredNodes.length > 0) {
@@ -223,6 +274,29 @@ const hoverTitleIdx = ref(-1)
 const editTitleIdx = ref(-1)
 const editTitleValue = ref('')
 
+/**
+ * 根据人物 id 获取姓名
+ */
+function getCharacterName(cid) {
+  const c = characters.value.find((ch) => ch.id === cid)
+  return c ? c.name : cid
+}
+
+/**
+ * 根据人物 id 获取标签样式（使用人物的 markerColor）
+ */
+function getCharacterTagStyle(cid) {
+  const c = characters.value.find((ch) => ch.id === cid)
+  if (c && c.markerColor) {
+    return {
+      backgroundColor: c.markerColor + '22',
+      borderColor: c.markerColor,
+      color: c.markerColor
+    }
+  }
+  return {}
+}
+
 async function loadTimelines() {
   try {
     const data = await window.electron.readTimeline(bookName)
@@ -231,6 +305,16 @@ async function loadTimelines() {
     timelines.value = []
   }
 }
+
+async function loadCharacters() {
+  try {
+    const data = await window.electron.readCharacters(bookName)
+    characters.value = Array.isArray(data) ? data : []
+  } catch {
+    characters.value = []
+  }
+}
+
 async function saveTimelines() {
   try {
     // 彻底去除响应式
@@ -270,6 +354,7 @@ function confirmAddTimeline() {
   timelineDialogVisible.value = false
   ElMessage.success('时间线创建成功')
 }
+
 async function removeTimeline(idx) {
   try {
     await ElMessageBox.confirm('确定要删除该时间线吗？此操作不可恢复！', '删除确认', {
@@ -283,41 +368,46 @@ async function removeTimeline(idx) {
     // 用户取消，无需处理
   }
 }
+
 /**
- * 新增节点
- * @param {*} idx 时间线索引
- * @param {*} nidx 节点索引，-1 表示新增节点
+ * 新增/编辑节点
+ * @param {number} idx 时间线索引
+ * @param {number} nidx 节点索引，undefined 表示新增
  */
 function addNode(idx, nidx) {
   currentTimelineIdx.value = idx
   currentNodeIdx.value = nidx
   if (nidx === undefined) {
+    // 新增模式：重置 id 为 -1
+    nodeInfo.id = -1
     nodeInfo.title = '新节点'
     nodeInfo.desc = ''
+    nodeInfo.characters = []
   } else {
-    nodeInfo.id = timelines.value[idx].nodes[nidx].id
-    nodeInfo.title = timelines.value[idx].nodes[nidx].title || '新节点'
-    nodeInfo.desc = timelines.value[idx].nodes[nidx].desc || ''
+    const node = timelines.value[idx].nodes[nidx]
+    nodeInfo.id = node.id
+    nodeInfo.title = node.title || '新节点'
+    nodeInfo.desc = node.desc || ''
+    nodeInfo.characters = Array.isArray(node.characters) ? [...node.characters] : []
   }
-  console.log(nodeInfo)
   dialogVisible.value = true
 }
+
 function confirmAddNode() {
+  const nodeData = {
+    id: nodeInfo.id === -1 ? genId() : nodeInfo.id,
+    title: nodeInfo.title,
+    desc: nodeInfo.desc,
+    characters: [...nodeInfo.characters] // 保存关联人物 id 列表
+  }
   if (nodeInfo.id === -1) {
-    timelines.value[currentTimelineIdx.value].nodes.push({
-      id: genId(),
-      title: nodeInfo.title,
-      desc: nodeInfo.desc
-    })
+    timelines.value[currentTimelineIdx.value].nodes.push(nodeData)
   } else {
-    timelines.value[currentTimelineIdx.value].nodes[currentNodeIdx.value] = {
-      id: nodeInfo.id,
-      title: nodeInfo.title,
-      desc: nodeInfo.desc
-    }
+    timelines.value[currentTimelineIdx.value].nodes[currentNodeIdx.value] = nodeData
   }
   dialogVisible.value = false
 }
+
 async function removeNode(tidx, nidx) {
   try {
     await ElMessageBox.confirm('确定要删除该节点吗？此操作不可恢复！', '删除确认', {
@@ -338,6 +428,7 @@ function confirmEditTitle(idx) {
   }
   editTitleIdx.value = -1
 }
+
 function cancelEditTitle() {
   editTitleIdx.value = -1
 }
@@ -345,6 +436,7 @@ function cancelEditTitle() {
 watch(timelines, saveTimelines, { deep: true })
 onMounted(() => {
   loadTimelines()
+  loadCharacters() // 加载本书人物数据
 })
 </script>
 
@@ -460,5 +552,41 @@ onMounted(() => {
   .el-button {
     width: 100%;
   }
+}
+
+/* 节点关联人物标签区域 */
+.node-characters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+.node-character-tag {
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 0 6px;
+  height: 20px;
+  line-height: 20px;
+}
+
+/* 关联人物下拉选项 */
+.character-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.character-option-marker {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.character-option-meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder, #aaa);
 }
 </style>
