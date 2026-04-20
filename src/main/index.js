@@ -430,69 +430,92 @@ async function loadAndRegisterShortcuts() {
     // 清空之前记录的被占用快捷键
     occupiedShortcuts = []
 
+    // 默认快捷键兜底配置（与渲染进程 DEFAULT_SHORTCUTS 保持同步）
+    const DEFAULT_SHORTCUT_MAP = {
+      'random-name': 'Alt+Q',
+      'world-map': 'Alt+A',
+      'timeline': 'Alt+Z',
+      'dictionary': 'Alt+W',
+      'character-profile': 'Alt+S',
+      'relationship-map': 'Alt+X',
+      'events-sequence': 'Alt+E',
+      'organization': 'Alt+D',
+      'item-profile': 'Alt+I',
+      'banned-words': 'Alt+C',
+      'paragraph-settings': 'Alt+V'
+    }
+
     const savedShortcuts = store.get('shortcuts')
+    const shortcutMap = { ...DEFAULT_SHORTCUT_MAP } // 先用默认值填充
+
     if (savedShortcuts && Array.isArray(savedShortcuts)) {
-      const shortcutMap = {}
+      // 用已保存的用户配置覆盖默认值（用户自定义优先）
       savedShortcuts.forEach((s) => {
-        if (s.key && s.id) {
-          shortcutMap[s.id] = s.key
+        if (s.id) {
+          // key 为空时不注册，保留 key 存在时才覆盖
+          if (s.key) {
+            shortcutMap[s.id] = s.key
+          } else {
+            delete shortcutMap[s.id]
+          }
         }
       })
+    }
 
-      // 注册快捷键
-      for (const [actionId, accelerator] of Object.entries(shortcutMap)) {
-        if (accelerator && accelerator.trim()) {
-          try {
-            const success = globalShortcut.register(accelerator, () => {
-              // 发送快捷键触发事件到渲染进程（只有启用状态的窗口才会响应）
-              const focusedWindow = BrowserWindow.getFocusedWindow()
-              if (focusedWindow) {
-                const windowId = focusedWindow.id
-                const isEnabled = windowShortcutStates.get(windowId)
+    // 注册快捷键
+    for (const [actionId, accelerator] of Object.entries(shortcutMap)) {
+      if (accelerator && accelerator.trim()) {
+        try {
+          const success = globalShortcut.register(accelerator, () => {
+            // 发送快捷键触发事件到渲染进程（只有启用状态的窗口才会响应）
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const windowId = focusedWindow.id
+              const isEnabled = windowShortcutStates.get(windowId)
 
-                if (is.dev) {
-                  console.log(
-                    `[主进程] 快捷键触发: ${actionId}, 窗口ID: ${windowId}, 启用状态: ${isEnabled}`
-                  )
-                }
-
-                // 只有当窗口的快捷键状态为启用时才发送事件
-                if (isEnabled) {
-                  focusedWindow.webContents.send('shortcut-triggered', actionId)
-                } else if (is.dev) {
-                  console.log(`[主进程] 窗口快捷键未启用，忽略快捷键: ${actionId}`)
-                }
+              if (is.dev) {
+                console.log(
+                  `[主进程] 快捷键触发: ${actionId}, 窗口ID: ${windowId}, 启用状态: ${isEnabled}`
+                )
               }
-            })
 
-            if (success) {
-              registeredShortcuts[actionId] = accelerator
-            } else {
-              // 记录注册失败的快捷键（被占用）
-              console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
-              const shortcutInfo = savedShortcuts.find((s) => s.id === actionId)
-              occupiedShortcuts.push({
-                id: actionId,
-                name: shortcutInfo?.name || actionId,
-                key: accelerator,
-                description: shortcutInfo?.description || ''
-              })
+              // 只有当窗口的快捷键状态为启用时才发送事件
+              if (isEnabled) {
+                focusedWindow.webContents.send('shortcut-triggered', actionId)
+              } else if (is.dev) {
+                console.log(`[主进程] 窗口快捷键未启用，忽略快捷键: ${actionId}`)
+              }
             }
-          } catch (error) {
-            // 记录注册出错的快捷键
-            console.error(`注册快捷键出错: ${actionId} - ${accelerator}`, error)
-            const shortcutInfo = savedShortcuts.find((s) => s.id === actionId)
+          })
+
+          if (success) {
+            registeredShortcuts[actionId] = accelerator
+          } else {
+            // 记录注册失败的快捷键（被占用）
+            console.warn(`快捷键注册失败: ${actionId} - ${accelerator}`)
+            const shortcutInfo = savedShortcuts?.find((s) => s.id === actionId)
             occupiedShortcuts.push({
               id: actionId,
               name: shortcutInfo?.name || actionId,
               key: accelerator,
-              description: shortcutInfo?.description || '',
-              error: error.message
+              description: shortcutInfo?.description || ''
             })
           }
+        } catch (error) {
+          // 记录注册出错的快捷键
+          console.error(`注册快捷键出错: ${actionId} - ${accelerator}`, error)
+          const shortcutInfo = savedShortcuts?.find((s) => s.id === actionId)
+          occupiedShortcuts.push({
+            id: actionId,
+            name: shortcutInfo?.name || actionId,
+            key: accelerator,
+            description: shortcutInfo?.description || '',
+            error: error.message
+          })
         }
       }
     }
+
   } catch (error) {
     console.error('加载快捷键设置失败:', error)
   }

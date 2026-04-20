@@ -74,6 +74,15 @@
           <div class="shortcut-hint">{{ getShortcutLabel('organization') }}</div> <!-- 快捷键提示文本 -->
         </div> <!-- 包装层结束 -->
       </el-button> <!-- 按钮结束 -->
+      <el-button class="tool-btn" @click="handleItemProfile" :title="`道具档案 (${getShortcutLabel('item-profile')})`"> <!-- 道具档案按钮 -->
+        <div class="btn-inner"> <!-- 按钮内部包装层 -->
+          <div class="btn-main"> <!-- 按钮主体部分 -->
+            <el-icon :size="16"><Box /></el-icon> <!-- 道具档案图标 -->
+            <span>道具档案</span> <!-- 按钮文本 -->
+          </div> <!-- 主体结束 -->
+          <div class="shortcut-hint">{{ getShortcutLabel('item-profile') }}</div> <!-- 快捷键提示文本 -->
+        </div> <!-- 包装层结束 -->
+      </el-button> <!-- 按钮结束 -->
       <el-button class="tool-btn" @click="handleBannedWords" :title="`禁词管理 (${getShortcutLabel('banned-words')})`"> <!-- 禁词管理按钮 -->
         <div class="btn-inner"> <!-- 按钮内部包装层 -->
           <div class="btn-main"> <!-- 按钮主体部分 -->
@@ -136,7 +145,7 @@ import BannedWordsDrawer from './BannedWordsDrawer.vue' // 导入禁词管理抽
 import ThemeSelector from '@renderer/components/ThemeSelector.vue' // 导入主题选择组件
 import { useRouter, useRoute } from 'vue-router' // 导入路由相关 API
 import SvgIcon from '@renderer/components/SvgIcon.vue' // 导入 SVG 图标组件
-import { Setting } from '@element-plus/icons-vue' // 导入 Element Plus 设置图标和刷新图标
+import { Setting, Box } from '@element-plus/icons-vue' // 导入 Element Plus 设置图标、Box 图标
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器状态存储
 import { useJailStore } from '@renderer/stores/jail' // 导入专注模式状态存储
 import { ElMessage } from 'element-plus' // 导入消息提示组件
@@ -193,6 +202,7 @@ const DEFAULT_SHORTCUTS = [ // 快捷键列表定义
   { id: 'relationship-map', key: 'Alt+X' }, // 关系图快捷键
   { id: 'events-sequence', key: 'Alt+E' }, // 事序图快捷键
   { id: 'organization', key: 'Alt+D' }, // 组织架构快捷键
+  { id: 'item-profile', key: 'Alt+I' }, // 道具档案快捷键
   { id: 'banned-words', key: 'Alt+C' }, // 禁词管理快捷键
   { id: 'paragraph-settings', key: 'Alt+R' } // 字数设置快捷键
 ] // 默认配置结束
@@ -204,7 +214,14 @@ const loadShortcuts = async () => { // 异步加载函数
   try { // 异常处理
     const savedShortcuts = await window.electronStore.get('shortcuts') // 从本地存储获取
     if (savedShortcuts && Array.isArray(savedShortcuts)) { // 校验数据格式
-      shortcuts.value = savedShortcuts // 应用保存的快捷键
+      // 以已保存的数据为基础，补充 DEFAULT_SHORTCUTS 中新增但尚未保存的条目
+      const merged = [...savedShortcuts]
+      DEFAULT_SHORTCUTS.forEach(def => {
+        if (!merged.find(m => m.id === def.id)) {
+          merged.push(def)
+        }
+      })
+      shortcuts.value = merged // 应用合并后的快捷键
     } else { // 无保存数据时
       shortcuts.value = DEFAULT_SHORTCUTS // 使用默认配置
     } // 判断结束
@@ -305,6 +322,10 @@ const handleOrganization = () => { // 组织架构处理函数
   openTool('/organization-list') // 调用通用逻辑打开组织架构列表
 } // 函数结束
 
+const handleItemProfile = () => { // 道具档案处理函数
+  openTool('/item-profile') // 调用通用逻辑打开道具档案
+} // 函数结束
+
 const handleBannedWords = () => { // 禁词管理处理函数
   if (bannedWordsRef.value?.visible) { // 如果组件已显示
     bannedWordsRef.value.close() // 执行关闭
@@ -323,6 +344,7 @@ const shortcutHandlers = { // 映射对象定义
   'relationship-map': handleRelationshipMap, // 关系图映射
   'events-sequence': handleEventsSequence, // 事序图映射
   'organization': handleOrganization, // 组织架构映射
+  'item-profile': handleItemProfile, // 道具档案映射
   'banned-words': handleBannedWords, // 禁词管理映射
   'paragraph-settings': handleParagraphSettings // 字数设置映射
 } // 映射结束
@@ -335,7 +357,8 @@ const shortcutRouteMap = { // 映射对象定义
   'character-profile': '/character-profile', // 人物谱路由映射
   'relationship-map': '/relationship-list', // 关系图路由映射
   'events-sequence': '/events-sequence', // 事序图路由映射
-  'organization': '/organization-list' // 组织架构路由映射
+  'organization': '/organization-list', // 组织架构路由映射
+  'item-profile': '/item-profile' // 道具档案路由映射
 } // 映射结束
 
 // 监听主进程发来的快捷键触发事件

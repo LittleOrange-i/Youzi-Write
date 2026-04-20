@@ -179,7 +179,40 @@ export function registerWorldbuildingHandlers(store) {
     }
   })
 
+  // 读取物品档案数据
+  ipcMain.handle('read-items', async (event, { bookName }) => {
+    const booksDir = store.get('booksDir')
+    const bookPath = join(booksDir, bookName)
+    const itemsPath = join(bookPath, 'items.json')
+    if (!fs.existsSync(itemsPath)) return []
+    try {
+      return JSON.parse(fs.readFileSync(itemsPath, 'utf-8'))
+    } catch {
+      return []
+    }
+  })
+
+  // 保存物品档案数据
+  ipcMain.handle('write-items', async (event, { bookName, data }) => {
+    const booksDir = store.get('booksDir')
+    const bookPath = join(booksDir, bookName)
+    const itemsPath = join(bookPath, 'items.json')
+
+    try {
+      // 确保目录存在
+      if (!fs.existsSync(bookPath)) {
+        fs.mkdirSync(bookPath, { recursive: true })
+      }
+
+      fs.writeFileSync(itemsPath, JSON.stringify(data, null, 2), 'utf-8')
+      return { success: true }
+    } catch (error) {
+      console.error('保存物品档案失败:', error)
+      return { success: false, message: error.message }
+    }
+  })
+
   if (is.dev) {
-    console.log('[worldbuilding] 时间线/人物谱/词条/事序图相关 IPC 处理器注册完成')
+    console.log('[worldbuilding] 时间线/人物谱/词条/事序图/物品档案相关 IPC 处理器注册完成')
   }
 }

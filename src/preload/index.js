@@ -256,6 +256,13 @@ if (process.contextIsolated) {
       deleteOrganization: ({ bookName, organizationName }) =>
         ipcRenderer.invoke('delete-organization', { bookName, organizationName }),
 
+      // --------- 物品档案相关 ---------
+      // 读取物品档案数据
+      readItems: (bookName) => ipcRenderer.invoke('read-items', { bookName }),
+      // 保存物品档案数据
+      writeItems: (bookName, data) =>
+        ipcRenderer.invoke('write-items', { bookName, data }),
+
       // --------- 禁词管理相关 ---------
       // 获取禁词列表
       getBannedWords: (bookName) => ipcRenderer.invoke('get-banned-words', bookName),
