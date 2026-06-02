@@ -38,3 +38,5 @@ lerna-debug.log*
 
 docs
 others
+
+pnpm-lock.yaml
