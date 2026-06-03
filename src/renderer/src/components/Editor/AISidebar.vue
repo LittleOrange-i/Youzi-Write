@@ -199,24 +199,12 @@
             </el-form-item>
 
             <el-form-item label="模型ID" required>
-              <el-select
-                v-if="availableModels.length > 0"
+              <el-autocomplete
                 v-model="modelForm.modelId"
-                placeholder="选择模型"
-                filterable
-                allow-create
-              >
-                <el-option
-                  v-for="model in availableModels"
-                  :key="model"
-                  :label="model"
-                  :value="model"
-                />
-              </el-select>
-              <el-input
-                v-else
-                v-model="modelForm.modelId"
-                placeholder="例如：gpt-4、qwen-max"
+                :fetch-suggestions="getModelIdSuggestions"
+                placeholder="请输入模型ID，例如：gpt-4、qwen-max"
+                trigger-on-focus="false"
+                clearable
               />
             </el-form-item>
           </el-form>
@@ -1177,6 +1165,16 @@ const isPersonNameType = computed(() => {
   return ['chinese_person', 'japanese_person', 'western_person'].includes(namingForm.value.nameType)
 })
 
+// 模型ID自动完成建议
+const getModelIdSuggestions = (queryString, cb) => {
+  const keyword = queryString.trim().toLowerCase()
+  const suggestions = availableModels.value
+    .filter((model) => !keyword || model.toLowerCase().includes(keyword))
+    .map((model) => ({ value: model }))
+
+  cb(suggestions)
+}
+
 // 监听表单关键字段变化，重置测试状态
 watch(
   () => [modelForm.value.endpoint, modelForm.value.modelId, modelForm.value.apiKey],
@@ -1372,12 +1370,13 @@ const handleTestModel = async () => {
       ElMessage.success(result.message || '测试成功！模型配置正确')
     } else {
       testPassed.value = false
+      console.error('模型测试失败:', result.error)
       ElMessage.error(`测试失败: ${result.error}`)
     }
   } catch (error) {
     testPassed.value = false
-    ElMessage.error(`测试失败: ${error.message}`)
     console.error('模型测试失败:', error)
+    ElMessage.error(`测试失败: ${error.message}`)
   } finally {
     isTesting.value = false
   }

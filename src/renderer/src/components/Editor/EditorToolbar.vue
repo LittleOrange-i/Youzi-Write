@@ -156,7 +156,7 @@ const randomNameRef = ref(null) // 定义随机起名组件引用
 const bannedWordsRef = ref(null) // 定义禁词管理组件引用
 const router = useRouter() // 获取路由实例
 const route = useRoute() // 获取当前路由信息
-const independentWindowMode = ref(false) // 定义独立窗口模式响应式变量
+const independentWindowMode = ref(true) // 定义独立窗口模式响应式变量，默认开启
 
 const emit = defineEmits([]) // 定义事件
 
