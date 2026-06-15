@@ -18,18 +18,24 @@ export function registerAiHandlers() {
       // 根据不同厂商构建不同的请求体
       switch (providerId) {
         case 'alibaba':
-          // 阿里云通义千问：使用 input.prompt
+          // 阿里云通义千问：使用 OpenAI 兼容模式（compatible-mode/v1）
           requestBody = {
             model: modelId,
-            input: {
-              prompt: '你好，请简单回复一个"测试成功"'
-            },
-            parameters: {
-              max_tokens: 10
-            }
+            messages: [
+              {
+                role: 'user',
+                content: '你好，请简单回复一个"测试成功"'
+              }
+            ],
+            max_tokens: 10
           }
           if (apiKey && apiKey.trim()) {
             headers['Authorization'] = `Bearer ${apiKey}`
+          }
+          // 兼容 base URL：如果 endpoint 以 /v1 结尾，自动拼接 /chat/completions
+          if (!endpoint.endsWith('/chat/completions')) {
+            const suffix = endpoint.endsWith('/') ? 'chat/completions' : '/chat/completions'
+            endpoint = endpoint + suffix
           }
           break
 
@@ -176,7 +182,10 @@ export function registerAiHandlers() {
   // AI 调用处理 - 用于改写、扩写、续写、润色、起名助手等功能
   ipcMain.handle(
     'call-ai',
-    async (_, { endpoint, apiKey, modelId, providerId, systemPrompt, userPrompt }) => {
+    async (
+      _,
+      { endpoint, apiKey, modelId, providerId, systemPrompt, userPrompt, enableThinking }
+    ) => {
       try {
         let requestBody = {}
         const headers = {
@@ -186,27 +195,33 @@ export function registerAiHandlers() {
         // 根据不同厂商构建不同的请求体
         switch (providerId) {
           case 'alibaba':
-            // 阿里云通义千问：使用 input.messages
+            // 阿里云通义千问：使用 OpenAI 兼容模式（compatible-mode/v1）
+            // 支持通过 enable_thinking 开启深度思考（如 qwen3 系列模型）
             requestBody = {
               model: modelId,
-              input: {
-                messages: [
-                  {
-                    role: 'system',
-                    content: systemPrompt
-                  },
-                  {
-                    role: 'user',
-                    content: userPrompt
-                  }
-                ]
-              },
-              parameters: {
-                result_format: 'message'
-              }
+              messages: [
+                {
+                  role: 'system',
+                  content: systemPrompt
+                },
+                {
+                  role: 'user',
+                  content: userPrompt
+                }
+              ],
+              max_tokens: 8000
+            }
+            // 深度思考：qwen3 系列模型支持 reasoning_content
+            if (enableThinking) {
+              requestBody.enable_thinking = true
             }
             if (apiKey && apiKey.trim()) {
               headers['Authorization'] = `Bearer ${apiKey}`
+            }
+            // 兼容 base URL：如果 endpoint 以 /v1 结尾，自动拼接 /chat/completions
+            if (!endpoint.endsWith('/chat/completions')) {
+              const suffix = endpoint.endsWith('/') ? 'chat/completions' : '/chat/completions'
+              endpoint = endpoint + suffix
             }
             break
 
@@ -313,10 +328,14 @@ export function registerAiHandlers() {
 
         // 根据不同厂商提取响应内容
         let content = ''
+        let reasoning = ''
 
         if (providerId === 'alibaba') {
-          // 阿里云通义千问
-          content = data.output?.choices?.[0]?.message?.content || data.output?.text || ''
+          // 阿里云通义千问（OpenAI 兼容模式）
+          const choice = data.choices?.[0]
+          const message = choice?.message
+          content = message?.content || data.output?.choices?.[0]?.message?.content || data.output?.text || ''
+          reasoning = message?.reasoning_content || ''
         } else if (providerId === 'google') {
           // Google Gemini
           content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
@@ -340,7 +359,8 @@ export function registerAiHandlers() {
 
         return {
           success: true,
-          content: content
+          content: content,
+          reasoning: reasoning
         }
       } catch (error) {
         return {

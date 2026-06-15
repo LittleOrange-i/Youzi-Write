@@ -207,6 +207,15 @@
                 clearable
               />
             </el-form-item>
+
+            <el-form-item v-if="selectedProvider === 'alibaba'" label="深度思考">
+              <el-switch
+                v-model="modelForm.enableThinking"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+              <span class="form-tip">仅 qwen3 系列等支持 reasoning 的模型有效</span>
+            </el-form-item>
           </el-form>
 
       <template #footer>
@@ -756,6 +765,18 @@
         <div class="question-content">{{ currentQuestion }}</div>
         <el-divider />
       </div>
+      <!-- 深度思考内容 -->
+      <div v-if="aiReasoning" class="thinking-section">
+        <div class="thinking-label">思考过程：</div>
+        <el-input
+          v-model="aiReasoning"
+          type="textarea"
+          :rows="6"
+          readonly
+          class="thinking-textarea"
+        />
+        <el-divider />
+      </div>
       <el-input
         v-model="aiResult"
         type="textarea"
@@ -807,6 +828,18 @@
               <div class="question-label">提问的问题：</div>
               <div class="question-content">{{ currentQuestion }}</div>
             </div>
+            <!-- 深度思考内容 -->
+            <div v-if="aiReasoning && !aiProcessing" class="thinking-section floating-thinking">
+              <div class="thinking-label">思考过程：</div>
+              <el-input
+                v-model="aiReasoning"
+                type="textarea"
+                :rows="5"
+                readonly
+                class="thinking-textarea"
+              />
+              <el-divider />
+            </div>
             <el-input
               v-model="aiResult"
               type="textarea"
@@ -831,6 +864,30 @@
           </div>
         </div>
       </Transition>
+
+      <!-- 重新生成：修改提示词对话框 -->
+      <el-dialog
+        v-model="regenerateDialogVisible"
+        title="重新生成"
+        width="600px"
+        :close-on-click-modal="false"
+        append-to-body
+      >
+        <div class="regen-dialog-body">
+          <div class="regen-dialog-tip">可在下方修改或补充提示词后重新生成</div>
+          <el-input
+            v-model="regeneratePrompt"
+            type="textarea"
+            :rows="10"
+            placeholder="请输入提示词..."
+            class="regen-prompt-textarea"
+          />
+        </div>
+        <template #footer>
+          <el-button @click="regenerateDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmRegenerate">开始生成</el-button>
+        </template>
+      </el-dialog>
     </Teleport>
   </div>
 </template>
@@ -886,8 +943,8 @@ const apiProviders = [
   {
     id: 'alibaba',
     name: '阿里云 (通义千问)',
-    endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-    models: ['qwen3-max','qwen-max', 'qwen-plus', 'qwen-turbo'],
+    endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: ['qwen3.7-max','qwen-max', 'qwen-plus', 'qwen-turbo'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: false,
@@ -1022,7 +1079,8 @@ const modelForm = ref({
   description: '',
   endpoint: '',
   apiKey: '',
-  modelId: ''
+  modelId: '',
+  enableThinking: false
 })
 
 // AI 操作弹窗状态
@@ -1099,6 +1157,8 @@ const qaForm = ref({
 // AI 处理状态和结果
 const aiProcessing = ref(false)
 const aiResult = ref('')
+// AI 深度思考内容（如 qwen3 系列模型的 reasoning_content）
+const aiReasoning = ref('')
 // 用于中断 AI 生成的标志
 const abortController = ref(null)
 // 保存 AI 提问的原始问题
@@ -1111,6 +1171,10 @@ const isDragging = ref(false)
 const dragOffset = ref({ x: 0, y: 0 }) // 记录拖动偏移量
 const lastOperation = ref(null) // 保存最后一次操作，用于重新生成
 const floatingZIndex = ref(500) // 固定层级
+
+// 重新生成对话框相关
+const regenerateDialogVisible = ref(false)
+const regeneratePrompt = ref('') // 编辑中的提示词
 
 // 初始化浮动窗口位置（居中显示）
 const initFloatingPosition = () => {
@@ -1269,7 +1333,8 @@ const handleAddModel = () => {
     description: '',
     endpoint: '',
     apiKey: '',
-    modelId: ''
+    modelId: '',
+    enableThinking: false
   }
   selectedProvider.value = ''
   availableModels.value = []
@@ -1281,7 +1346,10 @@ const handleAddModel = () => {
 // 处理编辑模型
 const handleEditModel = (model) => {
   editingModelId.value = model.id
-  modelForm.value = { ...model }
+  modelForm.value = {
+    ...model,
+    enableThinking: !!model.enableThinking
+  }
   selectedProvider.value = model.providerId || ''
   availableModels.value = []
   testPassed.value = true // 编辑模式默认已通过测试
@@ -1883,6 +1951,7 @@ const callAI = async (userPrompt) => {
       providerId: currentModel.providerId,
       systemPrompt: AI_SYSTEM_PROMPT,
       userPrompt: userPrompt,
+      enableThinking: !!currentModel.enableThinking,
       signal: abortController.value.signal
     })
 
@@ -1890,7 +1959,10 @@ const callAI = async (userPrompt) => {
       throw new Error(result.error || 'AI 调用失败')
     }
 
-    return result.content
+    return {
+      content: result.content,
+      reasoning: result.reasoning || ''
+    }
   } finally {
     // 清理 AbortController
     abortController.value = null
@@ -1945,7 +2017,8 @@ const executeRewrite = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     rewriteDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -1999,7 +2072,8 @@ const executeExpand = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     expandDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2050,7 +2124,8 @@ const executeContinue = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     continueDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2102,7 +2177,8 @@ const executePolish = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     polishDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2225,7 +2301,8 @@ const executeNaming = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     namingDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2270,7 +2347,8 @@ const executeQA = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     qaDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2419,18 +2497,37 @@ const toggleFloatingResult = () => {
   }
 }
 
-// 重新生成结果
-const regenerateResult = async () => {
+// 打开重新生成对话框，预填上次的提示词
+const regenerateResult = () => {
   if (!lastOperation.value) {
     ElMessage.warning('没有可重新生成的内容')
     return
   }
+  // 将上次的提示词填入编辑框
+  regeneratePrompt.value = lastOperation.value.prompt
+  regenerateDialogVisible.value = true
+}
 
+// 确认重新生成（使用编辑后的提示词）
+const confirmRegenerate = async () => {
+  const prompt = regeneratePrompt.value.trim()
+  if (!prompt) {
+    ElMessage.warning('提示词不能为空')
+    return
+  }
+
+  regenerateDialogVisible.value = false
   aiProcessing.value = true
   try {
     ElMessage.info('正在重新生成...')
-    const result = await callAI(lastOperation.value.prompt)
-    aiResult.value = result
+    const result = await callAI(prompt)
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
+    // 更新 lastOperation 中的提示词为本次使用的提示词
+    lastOperation.value = {
+      ...lastOperation.value,
+      prompt
+    }
     ElMessage.success('重新生成完成')
   } catch (error) {
     ElMessage.error(`重新生成失败: ${error.message}`)
@@ -2771,6 +2868,27 @@ const exportableModels = computed(() => {
   }
 }
 
+// 重新生成对话框样式
+.regen-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .regen-dialog-tip {
+    font-size: 13px;
+    color: var(--text-soft, #888);
+  }
+
+  .regen-prompt-textarea {
+    :deep(.el-textarea__inner) {
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.7;
+      resize: vertical;
+    }
+  }
+}
+
 // AI 结果弹窗中的问题显示样式
 .question-section {
   margin-bottom: 16px;
@@ -2793,6 +2911,47 @@ const exportableModels = computed(() => {
     white-space: pre-wrap;
     word-break: break-word;
   }
+}
+
+// AI 深度思考内容显示样式
+.thinking-section {
+  margin-bottom: 12px;
+
+  .thinking-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-base);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--el-color-warning);
+    }
+  }
+
+  .thinking-textarea {
+    :deep(.el-textarea__inner) {
+      background: var(--bg-mute);
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+// 模型表单提示
+.form-tip {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 
