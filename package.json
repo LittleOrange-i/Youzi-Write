@@ -50,6 +50,7 @@
     "echarts": "^6.0.0",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.6.2",
+    "env-paths": "^3.0.0",
     "element-plus": "^2.11.4",
     "lucide-vue-next": "^0.561.0",
     "perfect-freehand": "^1.2.2",
