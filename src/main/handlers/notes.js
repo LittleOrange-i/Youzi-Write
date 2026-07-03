@@ -5,6 +5,37 @@ import { is } from '@electron-toolkit/utils'
 import dayjs from 'dayjs'
 import { findBookPath } from './chapters.js'
 
+const NOTE_FILE_EXTENSIONS = ['.md', '.markdown', '.txt']
+const DEFAULT_NOTE_EXTENSION = '.md'
+
+function isSupportedNoteFile(fileName) {
+  return NOTE_FILE_EXTENSIONS.some((ext) => fileName.toLowerCase().endsWith(ext))
+}
+
+function stripNoteExtension(fileName) {
+  return fileName.replace(/\.(md|markdown|txt)$/i, '')
+}
+
+function resolveNotePath(notebookPath, noteName) {
+  for (const ext of NOTE_FILE_EXTENSIONS) {
+    const candidate = join(notebookPath, `${noteName}${ext}`)
+    if (fs.existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return null
+}
+
+function buildUniqueNoteName(notebookPath, baseName) {
+  let candidateName = baseName
+  let index = 1
+  while (resolveNotePath(notebookPath, candidateName)) {
+    candidateName = `${baseName}${index}`
+    index++
+  }
+  return candidateName
+}
+
 /**
  * 注册笔记本、笔记、回收站相关的 IPC 处理器
  * @param {import('electron-store').default} store - electron-store 实例
@@ -26,27 +57,44 @@ export function registerNotesHandlers(store, updateBookMetadata) {
         .filter((item) => {
           if (isRoot) return item.isDirectory() // 根层只返回文件夹（笔记本）
           if (item.isDirectory()) return true
-          // 只返回 .txt 文件作为笔记
-          return item.isFile() && item.name.endsWith('.txt')
+          return item.isFile() && isSupportedNoteFile(item.name)
         })
-        .map((item) => {
+        .reduce((acc, item) => {
           if (item.isDirectory()) {
-            return {
+            acc.push({
               id: item.name,
               name: item.name,
               type: 'folder',
               path: join(dir, item.name), // 唯一
               children: readNotesDir(join(dir, item.name))
-            }
+            })
           } else {
-            return {
-              id: item.name,
-              name: item.name.replace(/\.txt$/, ''),
+            const noteName = stripNoteExtension(item.name)
+            const existingIndex = acc.findIndex(
+              (child) => child.type === 'note' && child.name === noteName
+            )
+            const noteItem = {
+              id: noteName,
+              name: noteName,
               type: 'note',
               path: join(dir, item.name) // 唯一
             }
+            if (existingIndex === -1) {
+              acc.push(noteItem)
+            } else {
+              const existingItem = acc[existingIndex]
+              const existingExt = existingItem.path.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
+              const currentExt = item.name.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
+              if (
+                NOTE_FILE_EXTENSIONS.indexOf(currentExt) <
+                NOTE_FILE_EXTENSIONS.indexOf(existingExt)
+              ) {
+                acc[existingIndex] = noteItem
+              }
+            }
           }
-        })
+          return acc
+        }, [])
     }
     return readNotesDir(notesPath, true)
   })
@@ -100,22 +148,18 @@ export function registerNotesHandlers(store, updateBookMetadata) {
     if (!fs.existsSync(notebookPath)) {
       return { success: false, message: '笔记本不存在' }
     }
-    let baseName = noteName || '新建笔记'
-    let fileName = `${baseName}.txt`
-    let index = 1
-    while (fs.existsSync(join(notebookPath, fileName))) {
-      fileName = `${baseName}${index}.txt`
-      index++
-    }
-    fs.writeFileSync(join(notebookPath, fileName), '')
+    const baseName = noteName || '新建笔记'
+    const uniqueName = buildUniqueNoteName(notebookPath, baseName)
+    fs.writeFileSync(join(notebookPath, `${uniqueName}${DEFAULT_NOTE_EXTENSION}`), '', 'utf-8')
     return { success: true }
   })
 
   // 删除笔记
   ipcMain.handle('delete-note', async (event, { bookName, notebookName, noteName }) => {
     const booksDir = store.get('booksDir')
-    const notePath = join(booksDir, bookName, '笔记', notebookName, `${noteName}.txt`)
-    if (!fs.existsSync(notePath)) {
+    const notebookPath = join(booksDir, bookName, '笔记', notebookName)
+    const notePath = resolveNotePath(notebookPath, noteName)
+    if (!notePath || !fs.existsSync(notePath)) {
       return { success: false, message: '笔记不存在' }
     }
     fs.rmSync(notePath)
@@ -126,12 +170,13 @@ export function registerNotesHandlers(store, updateBookMetadata) {
   ipcMain.handle('rename-note', async (event, { bookName, notebookName, oldName, newName }) => {
     const booksDir = store.get('booksDir')
     const notebookPath = join(booksDir, bookName, '笔记', notebookName)
-    const oldPath = join(notebookPath, `${oldName}.txt`)
-    const newPath = join(notebookPath, `${newName}.txt`)
-    if (!fs.existsSync(oldPath)) {
+    const oldPath = resolveNotePath(notebookPath, oldName)
+    const duplicatedPath = resolveNotePath(notebookPath, newName)
+    const newPath = join(notebookPath, `${newName}${DEFAULT_NOTE_EXTENSION}`)
+    if (!oldPath || !fs.existsSync(oldPath)) {
       return { success: false, message: '原笔记不存在' }
     }
-    if (fs.existsSync(newPath)) {
+    if (duplicatedPath && duplicatedPath !== oldPath) {
       return { success: false, message: '新笔记名已存在' }
     }
     fs.renameSync(oldPath, newPath)
@@ -141,8 +186,9 @@ export function registerNotesHandlers(store, updateBookMetadata) {
   // 读取笔记内容
   ipcMain.handle('read-note', async (event, { bookName, notebookName, noteName }) => {
     const booksDir = store.get('booksDir')
-    const notePath = join(booksDir, bookName, '笔记', notebookName, `${noteName}.txt`)
-    if (!fs.existsSync(notePath)) {
+    const notebookPath = join(booksDir, bookName, '笔记', notebookName)
+    const notePath = resolveNotePath(notebookPath, noteName)
+    if (!notePath || !fs.existsSync(notePath)) {
       return { success: false, message: '笔记不存在' }
     }
     const content = fs.readFileSync(notePath, 'utf-8')
@@ -155,23 +201,23 @@ export function registerNotesHandlers(store, updateBookMetadata) {
     async (event, { bookName, notebookName, noteName, newName, content }) => {
       const booksDir = store.get('booksDir')
       const notebookPath = join(booksDir, bookName, '笔记', notebookName)
-      const oldPath = join(notebookPath, `${noteName}.txt`)
-      const newPath = join(notebookPath, `${newName || noteName}.txt`)
-      if (!fs.existsSync(oldPath)) {
+      const oldPath = resolveNotePath(notebookPath, noteName)
+      const targetName = newName || noteName
+      const duplicatePath = resolveNotePath(notebookPath, targetName)
+      const newPath = join(notebookPath, `${targetName}${DEFAULT_NOTE_EXTENSION}`)
+      if (!oldPath || !fs.existsSync(oldPath)) {
         return { success: false, message: '笔记不存在' }
       }
-      // 1. 先写内容到原文件
-      fs.writeFileSync(oldPath, content, 'utf-8')
-      // 2. 判断是否需要重命名
-      if (newName && newName !== noteName) {
-        if (fs.existsSync(newPath)) {
-          return { success: false, message: '笔记名已存在', name: noteName }
-        }
-        fs.renameSync(oldPath, newPath)
+      if (duplicatePath && duplicatePath !== oldPath) {
+        return { success: false, message: '笔记名已存在', name: noteName }
+      }
+      fs.writeFileSync(newPath, content, 'utf-8')
+      if (oldPath !== newPath && fs.existsSync(oldPath)) {
+        fs.rmSync(oldPath)
       }
       // 3. 更新书籍元数据（更新updatedAt字段）
-      await updateBookMetadata(bookName)
-      return { success: true, name: newName || noteName }
+      await updateBookMetadata(store, bookName)
+      return { success: true, name: targetName }
     }
   )
 

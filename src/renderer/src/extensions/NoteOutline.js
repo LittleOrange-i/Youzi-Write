@@ -2,6 +2,38 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
 
+function getOutlineInfo(node) {
+  if (!node) return null
+  if (node.type.name === 'heading') {
+    return {
+      level: Math.max(0, (node.attrs.level || 1) - 1),
+      kind: 'heading'
+    }
+  }
+  if (node.type.name === 'noteOutlineParagraph') {
+    return {
+      // 让 Markdown 标题天然处于更高层级，后续缩进段落归属到最近标题之下
+      level: 100 + (node.attrs.level || 0),
+      kind: 'note'
+    }
+  }
+  return null
+}
+
+function getTopLevelBlocks(doc) {
+  const blocks = []
+  let pos = 0
+  doc.forEach((node) => {
+    blocks.push({
+      node,
+      pos,
+      outline: getOutlineInfo(node)
+    })
+    pos += node.nodeSize
+  })
+  return blocks
+}
+
 // 笔记大纲段落节点，支持折叠、缩进和拖拽
 export const NoteOutlineParagraph = Node.create({
   name: 'noteOutlineParagraph',
@@ -47,19 +79,6 @@ export const NoteOutlineParagraph = Node.create({
           const level = parseInt(node.getAttribute('data-level') || '0', 10)
           const collapsed = node.hasAttribute('data-collapsed')
           return { level, collapsed }
-        }
-      },
-      {
-        // 也支持没有 data-note-outline 属性的 p 标签（兼容旧数据）
-        tag: 'p',
-        getAttrs: (node) => {
-          // 如果已经有 data-note-outline，会被上面的规则匹配
-          // 这里只处理没有 data-note-outline 的 p 标签
-          if (node.hasAttribute('data-note-outline')) {
-            return false // 让上面的规则处理
-          }
-          // 默认转换为 level 0 的 noteOutlineParagraph
-          return { level: 0, collapsed: false }
         }
       }
     ]
@@ -172,92 +191,59 @@ export const NoteOutlineParagraph = Node.create({
           decorations: (state) => {
             const decorations = []
             const { doc } = state
+            const topLevelBlocks = getTopLevelBlocks(doc)
 
-            doc.descendants((node, pos) => {
-              if (node.type.name === 'noteOutlineParagraph') {
-                // 检查是否有子段落（下一段落的层级大于当前）
-                const currentLevel = node.attrs.level || 0
-                let hasChildren = false
-                let nextPos = pos + node.nodeSize
+            for (let index = 0; index < topLevelBlocks.length; index++) {
+              const block = topLevelBlocks[index]
+              if (!block.outline) continue
 
-                while (nextPos < doc.content.size) {
-                  const nextNode = doc.nodeAt(nextPos)
-                  if (!nextNode) break
+              const { node, pos, outline } = block
+              const collapsed = node.attrs.collapsed || false
+              let boundaryIndex = topLevelBlocks.length
+              let hasChildren = false
 
-                  if (nextNode.type.name === 'noteOutlineParagraph') {
-                    const nextLevel = nextNode.attrs.level || 0
-                    if (nextLevel > currentLevel) {
-                      hasChildren = true
-                    } else {
-                      break
-                    }
-                  } else {
-                    break
-                  }
-
-                  nextPos += nextNode.nodeSize
+              for (let nextIndex = index + 1; nextIndex < topLevelBlocks.length; nextIndex++) {
+                const nextBlock = topLevelBlocks[nextIndex]
+                if (nextBlock.outline && nextBlock.outline.level <= outline.level) {
+                  boundaryIndex = nextIndex
+                  break
                 }
+                hasChildren = true
+              }
 
-                // 使用 Decoration.node 装饰段落节点，标记需要添加控制按钮
-                const collapsed = node.attrs.collapsed || false
-                const level = node.attrs.level || 0
+              const nodeDecoration = Decoration.node(pos, pos + node.nodeSize, {
+                class: 'note-outline-paragraph',
+                'data-note-outline-level': outline.level,
+                'data-note-outline-kind': outline.kind,
+                'data-note-outline-has-children': hasChildren ? 'true' : 'false',
+                'data-note-outline-collapsed': collapsed ? 'true' : 'false',
+                'data-note-outline-pos': pos
+              })
+              decorations.push(nodeDecoration)
 
-                // 使用 node 装饰来标记段落，然后通过插件在 DOM 更新后添加控制按钮
-                const nodeDecoration = Decoration.node(pos, pos + node.nodeSize, {
-                  class: 'note-outline-paragraph',
-                  'data-note-outline-level': level,
-                  'data-note-outline-has-children': hasChildren ? 'true' : 'false',
-                  'data-note-outline-collapsed': collapsed ? 'true' : 'false',
-                  'data-note-outline-pos': pos
-                })
+              if (hasChildren) {
+                const toggleBtn = document.createElement('button')
+                toggleBtn.className = `note-outline-toggle ProseMirror-widget ${collapsed ? 'collapsed' : 'expanded'}`
+                toggleBtn.setAttribute('data-pos', String(pos))
+                toggleBtn.setAttribute('data-collapsed', String(collapsed))
+                toggleBtn.setAttribute('contenteditable', 'false')
+                toggleBtn.setAttribute('title', collapsed ? '展开子段落' : '折叠子段落')
+                toggleBtn.innerHTML = ''
+                const toggleWidget = Decoration.widget(pos + 1, toggleBtn, { side: -1 })
+                decorations.push(toggleWidget)
+              }
 
-                decorations.push(nodeDecoration)
-
-                // 如果有子段落，添加折叠按钮 widget（使用 Decoration.widget 确保不会被移除）
-                if (hasChildren) {
-                  const toggleBtn = document.createElement('button')
-                  toggleBtn.className = `note-outline-toggle ProseMirror-widget ${collapsed ? 'collapsed' : 'expanded'}`
-                  toggleBtn.setAttribute('data-pos', String(pos))
-                  toggleBtn.setAttribute('data-collapsed', String(collapsed))
-                  toggleBtn.setAttribute('contenteditable', 'false')
-                  toggleBtn.setAttribute('title', collapsed ? '展开子段落' : '折叠子段落')
-                  // 使用空内容，箭头通过 CSS 的 ::before 伪元素绘制
-                  toggleBtn.innerHTML = ''
-                  // 将折叠按钮作为 widget 添加到段落开始位置（和拖拽锚点一样使用 pos + 1）
-                  // 拖拽锚点在 nodePos + 1，折叠按钮也在 pos + 1，但通过 CSS 定位在左侧
-                  const toggleWidget = Decoration.widget(pos + 1, toggleBtn, { side: -1 })
-                  decorations.push(toggleWidget)
-                }
-
-                // 如果折叠，隐藏子段落
-                if (collapsed && hasChildren) {
-                  let nextPos = pos + node.nodeSize
-                  while (nextPos < doc.content.size) {
-                    const nextNode = doc.nodeAt(nextPos)
-                    if (!nextNode) break
-
-                    if (nextNode.type.name === 'noteOutlineParagraph') {
-                      const nextLevel = nextNode.attrs.level || 0
-                      if (nextLevel > currentLevel) {
-                        const hideDecoration = Decoration.node(
-                          nextPos,
-                          nextPos + nextNode.nodeSize,
-                          {
-                            style: 'display: none;'
-                          }
-                        )
-                        decorations.push(hideDecoration)
-                        nextPos += nextNode.nodeSize
-                      } else {
-                        break
-                      }
-                    } else {
-                      break
-                    }
-                  }
+              if (collapsed && hasChildren) {
+                for (let nextIndex = index + 1; nextIndex < boundaryIndex; nextIndex++) {
+                  const hiddenBlock = topLevelBlocks[nextIndex]
+                  decorations.push(
+                    Decoration.node(hiddenBlock.pos, hiddenBlock.pos + hiddenBlock.node.nodeSize, {
+                      style: 'display: none;'
+                    })
+                  )
                 }
               }
-            })
+            }
 
             return DecorationSet.create(doc, decorations)
           },
@@ -282,7 +268,7 @@ export const NoteOutlineParagraph = Node.create({
                 if (!isNaN(pos)) {
                   const { state, dispatch } = view
                   const node = state.doc.nodeAt(pos)
-                  if (node && node.type.name === 'noteOutlineParagraph') {
+                  if (getOutlineInfo(node)) {
                     const tr = state.tr
                     tr.setNodeMarkup(pos, null, {
                       ...node.attrs,

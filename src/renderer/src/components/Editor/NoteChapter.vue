@@ -288,7 +288,12 @@ async function handleNoteClick(data, node) {
   if (data.type === 'note') {
     const currentFile = editorStore.file
     if (currentFile && currentFile.path === data.path) return
-    await editorStore.saveCurrentFileThroughHandler(false)
+    // 先尝试保存当前文件，失败不阻塞切换
+    try {
+      await editorStore.saveCurrentFileThroughHandler(false)
+    } catch {
+      // 保存失败不影响切换
+    }
     const parent = node.parent.data
     const res = await window.electron.readNote(props.bookName, parent.name, data.name)
     if (res.success) {
@@ -331,7 +336,12 @@ async function handleChapterClick(data, node) {
       })
     }
 
-    await editorStore.saveCurrentFileThroughHandler(false)
+    // 先尝试保存当前文件，失败不阻塞切换
+    try {
+      await editorStore.saveCurrentFileThroughHandler(false)
+    } catch {
+      // 保存失败不影响切换
+    }
     // 读取章节内容
     const res = await window.electron.readChapter(props.bookName, node.parent.data.name, data.name)
     if (res.success) {

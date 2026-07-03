@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import MarkdownIt from 'markdown-it'
 import { Editor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Document from '@tiptap/extension-document'
@@ -9,7 +10,7 @@ import { Extension } from '@tiptap/core'
 import { NoteOutlineParagraph } from '@renderer/extensions/NoteOutline'
 import { Plugin, PluginKey, NodeSelection } from 'prosemirror-state'
 import { Decoration, DecorationSet } from 'prosemirror-view'
-import { Fragment } from 'prosemirror-model'
+import { Fragment, DOMParser as PMDOMParser } from 'prosemirror-model'
 import { Extension as PMExtension } from '@tiptap/core'
 
 const props = defineProps({
@@ -42,12 +43,45 @@ const emit = defineEmits(['editor-created', 'content-updated'])
 
 // Tab 键处理已由 NoteOutlineParagraph 扩展提供（增加/减少缩进级别）
 
-// 将笔记的 HTML 内容转换为纯文本（用于字数统计）
-function htmlToPlainText(html) {
-  if (!html) return ''
+const markdown = new MarkdownIt({
+  html: false,
+  breaks: true,
+  linkify: true
+})
+
+const MARKDOWN_SYNTAX_RE =
+  /(^|\n)(#{1,6}\s+|>\s+|```|~~~|[-+*]\s+|\d+\.\s+|---+$|___+$|\*\*\*+$)|(\[[^\]]+\]\([^)]+\))|(`[^`]+`)|(\*\*[^*]+\*\*)|(~~[^~]+~~)|(^|\s)!\[[^\]]*\]\([^)]+\)/
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function escapeMarkdownText(text) {
+  return text.replace(/\\/g, '\\\\').replace(/([*_`~[\]<>])/g, '\\$1')
+}
+
+function htmlToPlainText(content) {
+  if (!content) return ''
+  if (isHtmlContent(content)) {
+    const div = document.createElement('div')
+    div.innerHTML = content
+    return div.textContent || div.innerText || ''
+  }
+  const html = looksLikeMarkdown(content)
+    ? normalizeMarkdownToNoteHtml(content)
+    : plainTextToNoteHtml(content)
   const div = document.createElement('div')
   div.innerHTML = html
   return div.textContent || div.innerText || ''
+}
+
+function looksLikeMarkdown(content) {
+  return MARKDOWN_SYNTAX_RE.test(content)
 }
 
 // 检查内容是否是 HTML 格式
@@ -56,36 +90,291 @@ function isHtmlContent(content) {
   return /<[a-z][\s\S]*>/i.test(content)
 }
 
+function createOutlineParagraphHtml(content, level = 0, collapsed = false) {
+  const collapsedAttr = collapsed ? ' data-collapsed="true"' : ''
+  return `<p data-note-outline="true" data-level="${Math.max(0, Math.min(level, 10))}"${collapsedAttr}>${content}</p>`
+}
+
+function plainTextToNoteHtml(content) {
+  const lines = String(content || '').replace(/\r\n/g, '\n').split('\n')
+  const html = lines
+    .map((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return createOutlineParagraphHtml('', 0)
+      const indentMatch = line.match(/^(\t| {2})*/)
+      const rawIndent = indentMatch ? indentMatch[0] : ''
+      const level = Math.floor(rawIndent.replace(/\t/g, '  ').length / 2)
+      return createOutlineParagraphHtml(escapeHtml(trimmed), level)
+    })
+    .join('')
+
+  return html || createOutlineParagraphHtml('', 0)
+}
+
+function getListItemInlineHtml(listItem) {
+  const clone = listItem.cloneNode(true)
+  clone.querySelectorAll(':scope > ul, :scope > ol').forEach((childList) => childList.remove())
+  const paragraphChildren = Array.from(clone.children).filter((child) => child.tagName === 'P')
+  if (paragraphChildren.length) {
+    return paragraphChildren.map((child) => child.innerHTML).join('<br>')
+  }
+  return clone.innerHTML.trim()
+}
+
+function convertListToOutlineHtml(listElement, level = 0) {
+  const blocks = []
+  Array.from(listElement.children).forEach((child) => {
+    if (child.tagName !== 'LI') return
+    const inlineHtml = getListItemInlineHtml(child)
+    blocks.push(createOutlineParagraphHtml(inlineHtml, level))
+    Array.from(child.children).forEach((nestedList) => {
+      if (nestedList.tagName === 'UL' || nestedList.tagName === 'OL') {
+        blocks.push(convertListToOutlineHtml(nestedList, level + 1))
+      }
+    })
+  })
+  return blocks.join('')
+}
+
+function normalizeRenderedNoteHtml(html) {
+  const container = document.createElement('div')
+  container.innerHTML = html || ''
+  const normalizedBlocks = []
+
+  Array.from(container.childNodes).forEach((node) => {
+    if (node.nodeType === globalThis.Node.TEXT_NODE) {
+      const text = node.textContent?.trim()
+      if (text) {
+        normalizedBlocks.push(createOutlineParagraphHtml(escapeHtml(text), 0))
+      }
+      return
+    }
+
+    if (!(node instanceof HTMLElement)) return
+
+    if (node.tagName === 'P') {
+      const level = Number(node.getAttribute('data-level') || 0)
+      const collapsed = node.hasAttribute('data-collapsed')
+      normalizedBlocks.push(createOutlineParagraphHtml(node.innerHTML, level, collapsed))
+      return
+    }
+
+    if (node.tagName === 'UL' || node.tagName === 'OL') {
+      normalizedBlocks.push(convertListToOutlineHtml(node, 0))
+      return
+    }
+
+    // 处理标题 H1-H6：提取内容为大纲段落
+    if (/^H[1-6]$/.test(node.tagName)) {
+      normalizedBlocks.push(createOutlineParagraphHtml(node.innerHTML, 0))
+      return
+    }
+
+    // 处理引用块 BLOCKQUOTE：递归提取内部内容
+    if (node.tagName === 'BLOCKQUOTE') {
+      // 将 blockquote 内部 HTML 重新走一遍 normalize，正确转换内部元素
+      const rendered = normalizeRenderedNoteHtml(node.innerHTML)
+      if (rendered) {
+        normalizedBlocks.push(rendered)
+      }
+      return
+    }
+
+    // 处理代码块 PRE：提取纯文本，逐行生成大纲段落
+    if (node.tagName === 'PRE') {
+      const text = node.textContent || ''
+      const lines = text.split('\n')
+      lines.forEach((line) => {
+        normalizedBlocks.push(createOutlineParagraphHtml(escapeHtml(line), 0))
+      })
+      return
+    }
+
+    // 处理水平线 HR：跳过
+    if (node.tagName === 'HR') {
+      return
+    }
+
+    // 处理表格 TABLE 及其他未知元素：提取纯文本内容
+    const textContent = node.textContent || ''
+    const textLines = textContent.split('\n').filter((l) => l.trim())
+    textLines.forEach((line) => {
+      normalizedBlocks.push(createOutlineParagraphHtml(escapeHtml(line.trim()), 0))
+    })
+  })
+
+  return normalizedBlocks.join('') || createOutlineParagraphHtml('', 0)
+}
+
+function normalizeMarkdownToNoteHtml(content) {
+  const renderedHtml = markdown.render(String(content || '').replace(/\r\n/g, '\n'))
+  return normalizeRenderedNoteHtml(renderedHtml)
+}
+
+function normalizeLegacyHtmlToNoteHtml(content) {
+  return normalizeRenderedNoteHtml(content)
+}
+
+function wrapMarkedText(text, marks = []) {
+  const sortedMarks = [...marks].sort((a, b) => {
+    const order = ['link', 'bold', 'italic', 'strike', 'code']
+    return order.indexOf(a.type.name) - order.indexOf(b.type.name)
+  })
+
+  let result = escapeMarkdownText(text)
+  for (const mark of sortedMarks) {
+    if (mark.type.name === 'link' && mark.attrs?.href) {
+      result = `[${result}](${mark.attrs.href})`
+    } else if (mark.type.name === 'bold') {
+      result = `**${result}**`
+    } else if (mark.type.name === 'italic') {
+      result = `*${result}*`
+    } else if (mark.type.name === 'strike') {
+      result = `~~${result}~~`
+    } else if (mark.type.name === 'code') {
+      result = `\`${text.replace(/`/g, '\\`')}\``
+    }
+  }
+  return result
+}
+
+function serializeInlineNode(node) {
+  if (node.type.name === 'text') {
+    return wrapMarkedText(node.text || '', node.marks)
+  }
+  if (node.type.name === 'hardBreak') {
+    return '  \n'
+  }
+  return ''
+}
+
+function serializeInlineContent(node) {
+  return node.content.content.map((child) => serializeInlineNode(child)).join('')
+}
+
+function serializeListNode(node, level = 0) {
+  const lines = []
+  node.content.content.forEach((child, index) => {
+    if (child.type.name !== 'listItem') return
+    const marker = node.type.name === 'orderedList' ? `${index + 1}. ` : '- '
+    let firstLineUsed = false
+
+    child.content.content.forEach((grandChild) => {
+      if (grandChild.type.name === 'paragraph') {
+        const line = `${'  '.repeat(level)}${firstLineUsed ? '  ' : marker}${serializeInlineContent(grandChild)}`.trimEnd()
+        lines.push(line || `${'  '.repeat(level)}${firstLineUsed ? '  ' : marker}`)
+        firstLineUsed = true
+      } else if (grandChild.type.name === 'bulletList' || grandChild.type.name === 'orderedList') {
+        lines.push(serializeListNode(grandChild, level + 1))
+      } else {
+        const block = serializeBlockNode(grandChild, level + 1)
+        if (block) lines.push(block)
+      }
+    })
+  })
+  return lines.join('\n')
+}
+
+function serializeBlockquote(node) {
+  const content = node.content.content
+    .map((child) => serializeBlockNode(child))
+    .filter(Boolean)
+    .join('\n\n')
+  return content
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+}
+
+function serializeBlockNode(node) {
+  if (!node) return ''
+
+  if (node.type.name === 'noteOutlineParagraph') {
+    const level = node.attrs.level || 0
+    const content = serializeInlineContent(node)
+    return `${'  '.repeat(level)}- ${content}`.trimEnd()
+  }
+
+  if (node.type.name === 'paragraph') {
+    return serializeInlineContent(node)
+  }
+
+  if (node.type.name === 'heading') {
+    return `${'#'.repeat(node.attrs.level || 1)} ${serializeInlineContent(node)}`.trimEnd()
+  }
+
+  if (node.type.name === 'codeBlock') {
+    const language = node.attrs.language || ''
+    return `\`\`\`${language}\n${node.textContent}\n\`\`\``
+  }
+
+  if (node.type.name === 'horizontalRule') {
+    return '---'
+  }
+
+  if (node.type.name === 'blockquote') {
+    return serializeBlockquote(node)
+  }
+
+  if (node.type.name === 'bulletList' || node.type.name === 'orderedList') {
+    return serializeListNode(node)
+  }
+
+  return ''
+}
+
+function editorDocToMarkdown(doc) {
+  const blocks = []
+  let previousWasOutline = false
+
+  doc.content.content.forEach((node) => {
+    const block = serializeBlockNode(node)
+    if (!block && node.type.name !== 'noteOutlineParagraph') return
+    const currentIsOutline = node.type.name === 'noteOutlineParagraph'
+
+    if (blocks.length && !previousWasOutline && !currentIsOutline && blocks[blocks.length - 1] !== '') {
+      blocks.push('')
+    } else if (blocks.length && previousWasOutline !== currentIsOutline && blocks[blocks.length - 1] !== '') {
+      blocks.push('')
+    }
+
+    blocks.push(block)
+    previousWasOutline = currentIsOutline
+  })
+
+  return blocks.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 // 获取笔记编辑器的扩展配置
 function getNoteExtensions() {
   // 笔记模式：手动配置，禁用依赖 paragraph 的扩展
   // 扩展顺序很重要：NoteOutlineParagraph 必须在 StarterKit 之前，这样 trailingNode 才能找到它
   return [
     Document.configure({
-      content: 'noteOutlineParagraph block*' // 使用 noteOutlineParagraph 替代 paragraph
+      content: 'block+' // 支持多种块节点（仅 noteOutlineParagraph 和 paragraph）
     }),
     NoteOutlineParagraph, // 必须在 StarterKit 之前定义，这样 trailingNode 才能找到它
     StarterKit.configure({
-      paragraph: false, // 禁用 paragraph
+      paragraph: true,
       document: false, // 禁用默认的 Document，使用上面自定义的
       heading: true,
-      blockquote: false, // 禁用 blockquote（依赖 paragraph）
+      blockquote: true,
       codeBlock: true,
       horizontalRule: true,
       hardBreak: true,
       dropcursor: true,
       gapcursor: true,
       history: true,
-      bulletList: false, // 禁用 bulletList（listItem 依赖 paragraph）
-      orderedList: false, // 禁用 orderedList（listItem 依赖 paragraph）
-      listItem: false, // 禁用 listItem（content 是 'paragraph block*'）
-      listKeymap: false, // 禁用 listKeymap
+      bulletList: true,
+      orderedList: true,
+      listItem: true,
+      listKeymap: true,
       trailingNode: {
-        node: 'noteOutlineParagraph', // 使用 noteOutlineParagraph 替代 paragraph
-        notAfter: ['noteOutlineParagraph'] // 在 noteOutlineParagraph 后不插入
+        node: 'paragraph',
+        notAfter: ['noteOutlineParagraph', 'paragraph']
       }
     }),
-    TextAlign.configure({ types: ['heading', 'noteOutlineParagraph'] }),
+    TextAlign.configure({ types: ['heading', 'noteOutlineParagraph', 'paragraph'] }),
     Highlight.configure({
       multicolor: true,
       HTMLAttributes: {
@@ -476,16 +765,35 @@ function createEditor() {
           const lineHeightPx = `${actualLineHeight}px`
           return `white-space: pre-wrap; ${fontFamilyStyle} font-size: ${props.menubarState.fontSize} !important; line-height: ${lineHeightPx} !important; ${gridStyles}`
         }
+      },
+      // 粘贴时自动解析 markdown 语法（如 # 标题、> 引用、- 列表、**粗体** 等）
+      handlePaste: (view, event) => {
+        const text = event.clipboardData.getData('text/plain')
+        if (!text || !looksLikeMarkdown(text)) {
+          return false
+        }
+        try {
+          const html = normalizeMarkdownToNoteHtml(text)
+          // 使用临时容器，parseSlice 会解析容器的子元素，避免外层 <div> 被误解析
+          const wrapper = document.createElement('div')
+          wrapper.innerHTML = html
+          const slice = PMDOMParser.fromSchema(view.state.schema).parseSlice(wrapper)
+          if (slice.content.size === 0) {
+            return false
+          }
+          view.dispatch(view.state.tr.replaceSelection(slice))
+          return true
+        } catch {
+          return false
+        }
       }
     },
   onUpdate: ({ editor }) => {
-      // 笔记模式：保存 HTML 格式
-      const content = editor.getHTML()
+      const content = getSaveContent(editor)
 
       // 如果正在进行输入法输入（composition），不更新字数统计
       if (!props.isComposing) {
-        // 字数统计始终使用纯文本
-        const textContent = htmlToPlainText(content)
+        const textContent = editor.getText({ blockSeparator: '\n' })
         props.editorStore.setContent(textContent)
       }
 
@@ -519,30 +827,11 @@ function setNoteContent(editor, content) {
   if (!content) { // 如果内容为空
     htmlContent = '<p data-note-outline data-level="0"></p>' // 设置默认的笔记大纲段落
   } else if (isHtmlContent(content)) { // 如果输入的是 HTML 格式
-    // 笔记模式：如果内容是 HTML，直接加载
-    htmlContent = content // 使用原始 HTML
-    // 确保 HTML 内容格式正确，必须包含 data-note-outline 属性
-    if (!htmlContent.includes('data-note-outline')) { // 如果缺失大纲属性
-      // 可能是旧的 HTML 格式，尝试批量转换 p 标签
-      htmlContent = htmlContent.replace(/<p([^>]*)>/gi, (match, attrs) => {
-        if (attrs.includes('data-note-outline')) return match // 已包含则跳过
-        return `<p data-note-outline data-level="0"${attrs}>` // 补齐属性
-      }) // 结束正则替换
-    } // 结束属性补齐
+    htmlContent = normalizeLegacyHtmlToNoteHtml(content)
   } else { // 如果输入的是纯文本格式
-    // 笔记模式：如果是纯文本，按行转换为笔记大纲格式
-    const lines = content.split('\n') // 按行拆分
-    htmlContent = lines
-      .map((line) => {
-        const trimmed = line.trim() // 去除两端空格
-        if (!trimmed) return '<p data-note-outline data-level="0"></p>' // 空行返回默认段落
-        // 检测缩进级别（Tab 或空格），用于自动设置层级
-        const indentMatch = line.match(/^(\t| {2,})*/) // 匹配前导空格或制表符
-        const level = indentMatch ? Math.floor(indentMatch[0].replace(/\t/g, '  ').length / 2) : 0 // 计算层级
-        return `<p data-note-outline data-level="${Math.min(level, 10)}">${trimmed}</p>` // 返回带层级的段落
-      })
-      .join('') // 合并 HTML
-    if (!htmlContent) htmlContent = '<p data-note-outline data-level="0"></p>' // 兜底处理
+    htmlContent = looksLikeMarkdown(content)
+      ? normalizeMarkdownToNoteHtml(content)
+      : plainTextToNoteHtml(content)
   }
 
   // 性能优化：如果新生成的 HTML 与当前编辑器内容一致，则跳过更新
@@ -569,7 +858,7 @@ function setNoteContent(editor, content) {
 // 获取笔记编辑器保存内容
 function getSaveContent(editor) {
   if (!editor) return ''
-  return editor.getHTML()
+  return editorDocToMarkdown(editor.state.doc)
 }
 
 // 暴露方法给父组件
