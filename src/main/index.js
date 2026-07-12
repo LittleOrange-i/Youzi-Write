@@ -154,6 +154,7 @@ ipcMain.handle('open-book-editor-window', async (event, { id, name }) => {
   bookEditorWindows.set(name, editorWindow)
 
   editorWindow.on('ready-to-show', () => {
+    editorWindow.maximize() // 新开的编辑器窗口默认最大化（铺满屏幕）
     editorWindow.show()
     windowShortcutStates.set(editorWindow.id, true) // 启用该窗口的快捷键
   })
@@ -171,8 +172,9 @@ ipcMain.handle('open-book-editor-window', async (event, { id, name }) => {
     editorWindow.webContents.send('window:unmaximize')
   })
 
-  // 监听窗口尺寸变化并保存
+  // 监听窗口尺寸变化并保存（最大化或全屏时不保存，避免记录异常尺寸）
   editorWindow.on('resize', () => {
+    if (editorWindow.isMaximized() || editorWindow.isFullScreen()) return
     const { width, height } = editorWindow.getBounds()
     store.set('window-bounds:editor', { width, height })
   })
