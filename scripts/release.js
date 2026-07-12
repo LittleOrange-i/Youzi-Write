@@ -176,7 +176,7 @@ function main() {
 
   const tagName = `v${newVersion}`
   if (tagExists(tagName)) {
-    console.error(`❌ 错误: tag ${tagName} 已存在，请更换版本号或先删除旧 tag  git push --delete origin ${tagName}`)
+    console.error(`❌ 错误: tag ${tagName} 已存在，请更换版本号或先删除旧 tag\n  git push --delete origin ${tagName} and git tag -d ${tagName}`)
     process.exit(1)
   }
 
