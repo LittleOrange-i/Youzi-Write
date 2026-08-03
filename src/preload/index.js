@@ -348,7 +348,11 @@ if (process.contextIsolated) {
       openToolWindow: (route, query) => ipcRenderer.invoke('window:open-tool', { route, query }),
 
       // 退出应用程序
-      quitApp: () => ipcRenderer.invoke('quit-app')
+      quitApp: () => ipcRenderer.invoke('quit-app'),
+
+      // --------- 通用 HTTP 代理（避开浏览器 CORS） ---------
+      // 在主进程发起 HTTP(S) 请求并返回 JSON 对象，避开浏览器同源限制
+      httpFetchJson: (targetUrl) => ipcRenderer.invoke('http:fetch-json', targetUrl)
     })
     contextBridge.exposeInMainWorld('api', api)
     // 存储

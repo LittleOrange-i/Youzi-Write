@@ -202,7 +202,7 @@
               <el-autocomplete
                 v-model="modelForm.modelId"
                 :fetch-suggestions="getModelIdSuggestions"
-                placeholder="请输入模型ID，例如：gpt-4、qwen-max"
+                placeholder="请输入模型ID，例如：gpt-5.5、qwen3.8-max"
                 trigger-on-focus="false"
                 clearable
               />
@@ -927,117 +927,129 @@ function formatTime(ms) {
   return `${minutes}分${seconds}秒`
 }
 
-// 各大厂商API配置预设（专注小说/文本生成）
+// 各大厂商API配置预设（专注小说/文本生成，仅收录纯文本模型）
 const apiProviders = [
   {
     id: 'zhipu',
     name: '智谱 AI (GLM)',
     endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    models: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'],
+    models: ['glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo', 'glm-4.7', 'glm-4.7-flash'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: true,
     novelAbility: '极强',
-    description: '中文叙事、情感描写优秀，glm-4-flash 免费且快速'
+    description: '中文叙事、情感描写优秀，glm-4.7-flash 免费且快速，GLM-5.2 支持 1M 上下文'
   },
   {
     id: 'alibaba',
     name: '阿里云 (通义千问)',
     endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    models: ['qwen3.7-max','qwen-max', 'qwen-plus', 'qwen-turbo'],
+    models: ['qwen3.8-max', 'qwen3.7-plus', 'qwen3.7-flash'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: false,
     novelAbility: '强',
-    description: '支持长上下文、角色设定、风格模仿'
+    description: '支持长上下文、角色设定、风格模仿，qwen3.7-plus 性价比高'
   },
   {
     id: 'deepseek',
     name: '深度求索 (DeepSeek)',
     endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    models: ['deepseek-r1', 'deepseek-v3'],
+    models: ['deepseek-v4-pro', 'deepseek-v4-flash'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '擅长网文风格、长文本生成，开源模型'
+    description: '擅长网文风格、长文本生成，V4-Flash 支持 1M 超长上下文'
   },
   {
     id: 'siliconflow',
     name: '硅基流动 (SiliconFlow)',
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
-    models: ['deepseek-ai/DeepSeek-R1-0528-Qwen3-8B', 'Qwen/Qwen3-8B', 'THUDM/glm-4-9b'],
+    models: [
+      'deepseek-ai/DeepSeek-V4-Pro',
+      'deepseek-ai/DeepSeek-V4-Flash',
+      'zai-org/GLM-5.2',
+      'moonshotai/Kimi-K2.7-Code',
+      'Qwen/Qwen3.6-35B-A3B',
+      'MiniMaxAI/MiniMax-M2.5'
+    ],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '聚合多个模型，免费额度高，支持 DeepSeek-R1'
+    description: '聚合多个开源模型，免费额度高，支持 DeepSeek-V4 / GLM-5.2 / Qwen3.6'
   },
   {
     id: 'baidu',
     name: '百度 (文心一言)',
-    endpoint: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-4.5',
-    models: ['ernie-4.5', 'ernie-speed', 'ernie-lite'],
+    endpoint: 'https://qianfan.baidubce.com/v2/chat/completions',
+    models: ['ernie-5.1', 'ernie-5.0', 'ernie-5.0-thinking-latest', 'ernie-4.5-turbo-128k'],
     requiresKey: true,
     supportsWebSearch: true,
-    isOpenAICompatible: false,
+    isOpenAICompatible: true,
     novelAbility: '中等',
-    description: '需先用 client_id + client_secret 换取 access_token，偏正式风格'
+    description: '千帆 V2 接口兼容 OpenAI，直接使用 API Key（Bearer）鉴权，偏正式风格'
   },
   {
     id: 'moonshot',
     name: '月之暗面 (Kimi)',
     endpoint: 'https://api.moonshot.cn/v1/chat/completions',
-    models: ['kimi-k2-0905-preview','moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    models: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '支持超长上下文（128k），适合长篇连载续写'
+    description: '支持 256k 超长上下文，适合长篇连载续写（moonshot-v1 系列已下线）'
   },
   {
     id: 'tencent',
     name: '腾讯混元',
     endpoint: 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions',
-    models: ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'],
+    models: ['hunyuan-a13b', 'hunyuan-role-latest', 'hunyuan-translation'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '中等',
-    description: '腾讯自研大模型'
+    description: '腾讯自研大模型，hunyuan-role-latest 适合角色扮演类写作'
   },
   {
     id: 'openai',
     name: 'OpenAI (GPT)',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'],
+    models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '顶级',
-    description: '情节、人物、节奏控制极佳，国内需代理'
+    description: '情节、人物、节奏控制极佳，gpt-5.5 支持 1M 上下文，国内需代理'
   },
   {
     id: 'google',
     name: 'Google Gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-    models: ['gemini-1.5-flash', 'gemini-1.5-pro'],
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent',
+    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     requiresKey: true,
     isOpenAICompatible: false,
     novelAbility: '强',
-    description: '支持 2M 上下文，适合长篇续写'
+    description: '支持超长上下文，适合长篇续写'
   },
   {
     id: 'anthropic',
     name: 'Anthropic (Claude)',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-opus', 'claude-3-haiku'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
     requiresKey: true,
     isOpenAICompatible: false,
     novelAbility: '最佳',
-    description: '文笔细腻、逻辑连贯'
+    description: '文笔细腻、逻辑连贯，claude-fable-5 专为长文创作优化'
   },
   {
     id: 'openrouter',
     name: 'OpenRouter (聚合平台)',
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    models: ['google/gemini-2.0-flash-exp:free', 'meta-llama/llama-3.1-8b-instruct:free'],
+    models: [
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'inclusionai/ling-3.0-flash:free',
+      'openai/gpt-oss-20b:free'
+    ],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '中等',

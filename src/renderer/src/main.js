@@ -13,6 +13,7 @@ import App from './App.vue'
 import { useThemeStore } from './stores/theme'
 import IconFont from './components/IconFont.vue'
 import SvgIcon from './components/SvgIcon.vue'
+import { loadCategoryIcons } from './constants/config'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -28,5 +29,8 @@ app.component('SvgIcon', SvgIcon)
 // 初始化主题
 const themeStore = useThemeStore()
 themeStore.initTheme()
+
+// 加载并缓存主分类图标（异步，不打断应用挂载）
+loadCategoryIcons()
 
 app.mount('#app')

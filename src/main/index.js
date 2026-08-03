@@ -82,6 +82,52 @@ const store = new Store({
   }
 })
 
+// ========== 通用 HTTP 代理（避开浏览器 CORS） ==========
+import https from 'https'
+import http from 'http'
+import { URL } from 'url'
+
+// 在主进程发起 HTTP(S) 请求并返回 JSON，避免渲染进程的 CORS 限制
+ipcMain.handle('http:fetch-json', async (event, targetUrl) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = new URL(targetUrl) // 解析目标 URL
+      const client = url.protocol === 'https:' ? https : http // 根据协议选择模块
+      const req = client.request(
+        {
+          method: 'GET',
+          hostname: url.hostname,
+          path: url.pathname + url.search,
+          port: url.port || (url.protocol === 'https:' ? 443 : 80),
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (YouziWrite; Electron)',
+            Referer: 'https://fanqienovel.com/',
+            Accept: 'application/json,text/plain,*/*'
+          }
+        },
+        (res) => {
+          let data = '' // 收集响应内容
+          res.on('data', (chunk) => { data += chunk }) // 累加数据块
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data)) // 解析 JSON 返回
+            } catch (e) {
+              reject(new Error('JSON 解析失败：' + e.message)) // 解析失败
+            }
+          })
+        }
+      )
+      req.on('error', (err) => reject(err)) // 请求错误
+      req.setTimeout(10000, () => {
+        req.destroy(new Error('请求超时')) // 10 秒超时
+      })
+      req.end() // 结束请求
+    } catch (e) {
+      reject(e) // 异常抛出
+    }
+  })
+})
+
 // ========== Store 基础操作 ==========
 
 ipcMain.handle('store:get', async (_, key) => {
