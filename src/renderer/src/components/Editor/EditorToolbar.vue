@@ -160,11 +160,13 @@ const independentWindowMode = ref(true) // 定义独立窗口模式响应式变�
 
 const emit = defineEmits([]) // 定义事件
 
-// 加载独立窗口模式配置
+// 加载独立窗口模式配置（未配置时保持默认开启）
 const loadWindowMode = async () => { // 异步加载函数
   try { // 异步加载配置
     const savedMode = await window.electronStore.get('independent-window-mode') // 从本地存储获取配置
-    independentWindowMode.value = !!savedMode // 应用保存的配置，默认为 false
+    if (savedMode !== undefined && savedMode !== null) {
+      independentWindowMode.value = !!savedMode // 仅当存在已保存配置时才覆盖默认值
+    }
   } catch (error) { // 捕获异常
     console.error('加载窗口模式失败:', error) // 打印错误日志
   } // 处理结束

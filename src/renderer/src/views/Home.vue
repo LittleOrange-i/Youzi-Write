@@ -663,9 +663,11 @@ onMounted(async () => {
   await loadShelfPasswordHint()
   // 加载快捷键设置
   await loadShortcuts()
-  // 加载独立窗口模式设置
+  // 加载独立窗口模式设置（未配置时保持默认开启）
   const savedMode = await window.electronStore?.get('independent-window-mode') // 从本地存储获取配置
-  independentWindowMode.value = !!savedMode // 应用保存的配置
+  if (savedMode !== undefined && savedMode !== null) {
+    independentWindowMode.value = !!savedMode // 仅当存在已保存配置时才覆盖默认值
+  }
   // 检查被占用的快捷键
   await checkOccupiedShortcuts()
 })
