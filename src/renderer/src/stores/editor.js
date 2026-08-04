@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getDefaultFormattingConfig } from '@renderer/utils/textFormatter'
 
 // 编辑器相关全局状态管理
 export const useEditorStore = defineStore('editor', () => {
@@ -209,6 +210,10 @@ export const useEditorStore = defineStore('editor', () => {
       const settings = await window.electronStore.get('editorSettings')
       if (settings) {
         editorSettings.value = { ...editorSettings.value, ...settings }
+      }
+      // 兜底：若未保存过排版规则（或数据缺失），使用默认配置，避免一键排版所有规则失效
+      if (!Array.isArray(editorSettings.value.formattingRules) || editorSettings.value.formattingRules.length === 0) {
+        editorSettings.value.formattingRules = getDefaultFormattingConfig()
       }
     } catch (error) {
       console.error('加载编辑器设置失败:', error)
