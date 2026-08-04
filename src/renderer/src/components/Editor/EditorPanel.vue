@@ -318,6 +318,7 @@
       :content-word-count="contentWordCount"
       :cursor-position="cursorPosition"
       :file-type="editorStore.file?.type"
+      :editor="editor"
       @update-chapter-word-count="(data) => emit('chapter-word-count-updated', data)"
     />
 

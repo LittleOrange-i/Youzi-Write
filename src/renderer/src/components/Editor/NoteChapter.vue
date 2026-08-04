@@ -406,6 +406,18 @@ async function createChapter(volumeId) {
   }
 }
 
+// 从章节名中解析编号（"第3章" -> 3，无数字编号的章节如"序章"返回极大值排最后）
+// 注意必须始终返回数字，否则排序比较会产生 NaN 导致顺序错乱
+function getChapterOrderValue(name) {
+  if (!name) return Number.MAX_SAFE_INTEGER
+  const match = String(name).replace(/\.txt$/, '').match(/^第(\d+)/)
+  if (match) {
+    return parseInt(match[1], 10)
+  }
+  // 无数字编号时统一排到数字章节之后，具体先后由主排序的名称兜底处理
+  return Number.MAX_SAFE_INTEGER
+}
+
 // 加载章节数据
 async function loadChapters(autoSelectLatest = false, targetVolumeId = null) {
   try {
@@ -415,14 +427,24 @@ async function loadChapters(autoSelectLatest = false, targetVolumeId = null) {
       chapters.reverse()
     }
 
-    // 根据章节时间排序状态对每个卷内的章节进行排序
+    // 根据排序状态对每个卷内的章节进行排序
+    // 文件创建时间（birthtime）在复制/导入/同步场景下不可靠，因此以章节编号为主排序依据，
+    // 升序=编号从小到大，降序=编号从大到小，符合"旧在前/新在前"的直觉且顺序稳定。
     for (const volume of chapters) {
       if (volume.children && volume.children.length > 0) {
         volume.children.sort((a, b) => {
-          const timeA = new Date(a.createdAt || 0).getTime()
-          const timeB = new Date(b.createdAt || 0).getTime()
-          // 默认降序（新的在前）
-          return chapterSortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+          const orderA = getChapterOrderValue(a.name)
+          const orderB = getChapterOrderValue(b.name)
+          const diff = orderA - orderB
+          if (diff !== 0) {
+            return chapterSortOrder.value === 'desc' ? -diff : diff
+          }
+          // 编号相同（如"第x章"无数字）时按创建时间兜底，再按名称稳定排序
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          const timeDiff = chapterSortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+          if (timeDiff !== 0) return timeDiff
+          return String(a.name).localeCompare(String(b.name), 'zh')
         })
       }
     }
