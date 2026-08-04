@@ -2202,6 +2202,12 @@ function applyCharacterHighlights() {
     const selectionFrom = state.selection.from
     const selectionTo = state.selection.to
 
+    // 若用户正在用鼠标框选文本（存在非空选区），本次跳过刷新。
+    // 否则每 2 秒的 view.dispatch 会打断框选，导致选中状态被取消。
+    if (selectionFrom !== selectionTo) {
+      return
+    }
+
     // 先清除之前的人物高亮（在同一事务中），但保留段落校验高亮
     const highlightType = schema.marks.highlight
     doc.descendants((node, pos) => {
@@ -2583,6 +2589,12 @@ function applyBannedWordsStrikes() {
     // 保存当前选择位置（使用数字位置）
     const selectionFrom = state.selection.from
     const selectionTo = state.selection.to
+
+    // 若用户正在用鼠标框选文本（存在非空选区），本次跳过刷新。
+    // 否则 view.dispatch 会打断框选，导致选中状态被取消。
+    if (selectionFrom !== selectionTo) {
+      return
+    }
 
     // 先清除之前的禁词划线（在同一事务中）
     const strikeType = schema.marks.strike
