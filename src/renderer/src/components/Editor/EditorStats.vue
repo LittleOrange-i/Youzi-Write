@@ -12,6 +12,8 @@
       <span class="stat-item">字数: {{ cursorPosition }}/{{ contentWordCount }} 字</span>
       <span class="stat-divider">|</span>
       <span class="stat-item">对白: {{ dialogueWordCount }} 字 ({{ dialogueRatio }}%)</span>
+      <span v-if="selectedWordCount > 0" class="stat-divider">|</span>
+      <span v-if="selectedWordCount > 0" class="stat-item">选中: {{ selectedWordCount }} 字</span>
     </div>
     <div class="editor-stats-right">
       <span class="current-time">{{ currentTime }}</span>
@@ -94,6 +96,9 @@ const currentTime = ref('')
 const dialogueWordCount = ref(0) // 对白高亮标记的字数（排除空白字符）
 const dialogueRatio = ref('0.0') // 对白字数占当前章节总字数的百分比（保留一位小数）
 
+// 框选字数统计（排除空格、换行、制表符等格式字符）
+const selectedWordCount = ref(0)
+
 // 计算对白字数：遍历编辑器文档，累加带 dialogue-highlight 标记的文本内容
 function calculateDialogueStats() {
   if (!props.editor || !props.editor.state) {
@@ -126,6 +131,21 @@ function calculateDialogueStats() {
   } else {
     dialogueRatio.value = ((count / total) * 100).toFixed(1)
   }
+}
+
+// 计算框选字数：取编辑器当前选区文本，排除格式字符后统计长度
+function calculateSelectionStats() {
+  if (!props.editor || !props.editor.state) {
+    selectedWordCount.value = 0
+    return
+  }
+  const { from, to } = props.editor.state.selection // 获取当前选区范围
+  if (from === to) { // 无选区（仅光标）时归零
+    selectedWordCount.value = 0
+    return
+  }
+  const selectedText = props.editor.state.doc.textBetween(from, to, '\n') // 取出选区文本
+  selectedWordCount.value = selectedText.replace(/[\s\n\r\t]/g, '').length // 排除格式字符后计数
 }
 
 // 定时器
@@ -401,8 +421,11 @@ watch(
     if (!ed) return
     // 内容变化时（包含对白高亮重算）重新统计对白字数
     ed.on('update', calculateDialogueStats)
+    // 选区变化时（框选/取消框选）实时统计选中字数
+    ed.on('selectionUpdate', calculateSelectionStats)
     // 编辑器就绪后先算一次
     calculateDialogueStats()
+    calculateSelectionStats()
   },
   { immediate: true }
 )
@@ -544,6 +567,7 @@ onBeforeUnmount(async () => {
   // 解绑编辑器更新事件，避免内存泄漏
   if (props.editor && props.editor.off) {
     props.editor.off('update', calculateDialogueStats)
+    props.editor.off('selectionUpdate', calculateSelectionStats)
   }
 })
 
