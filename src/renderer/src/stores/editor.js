@@ -211,9 +211,18 @@ export const useEditorStore = defineStore('editor', () => {
       if (settings) {
         editorSettings.value = { ...editorSettings.value, ...settings }
       }
-      // 兜底：若未保存过排版规则（或数据缺失），使用默认配置，避免一键排版所有规则失效
-      if (!Array.isArray(editorSettings.value.formattingRules) || editorSettings.value.formattingRules.length === 0) {
-        editorSettings.value.formattingRules = getDefaultFormattingConfig()
+      // 合并排版规则：以最新默认规则（全量）为基础，套用已保存的启用状态
+      // 这样可以保证新增规则（如「全角句号后自动换行」）对老用户也可见，且默认关闭
+      const defaults = getDefaultFormattingConfig()
+      const savedRules = editorSettings.value.formattingRules
+      if (Array.isArray(savedRules) && savedRules.length > 0) {
+        const savedMap = new Map(savedRules.map((r) => [r.id, r]))
+        editorSettings.value.formattingRules = defaults.map((def) => {
+          const saved = savedMap.get(def.id)
+          return saved ? { ...def, enabled: saved.enabled } : def
+        })
+      } else {
+        editorSettings.value.formattingRules = defaults
       }
     } catch (error) {
       console.error('加载编辑器设置失败:', error)
