@@ -318,6 +318,7 @@
       :content-word-count="contentWordCount"
       :cursor-position="cursorPosition"
       :file-type="editorStore.file?.type"
+      :editor="editor"
       @update-chapter-word-count="(data) => emit('chapter-word-count-updated', data)"
     />
 
@@ -2179,6 +2180,8 @@ function clearCharacterHighlights() {
     if (tr.steps.length > 0) {
       const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
       tr.setSelection(newSelection)
+      // 清除装饰性高亮不进入撤销历史，避免干扰撤销/重做
+      tr.setMeta('addToHistory', false)
       view.dispatch(tr)
     }
   })
@@ -2198,6 +2201,12 @@ function applyCharacterHighlights() {
     // 保存当前选择位置（使用数字位置）
     const selectionFrom = state.selection.from
     const selectionTo = state.selection.to
+
+    // 若用户正在用鼠标框选文本（存在非空选区），本次跳过刷新。
+    // 否则每 2 秒的 view.dispatch 会打断框选，导致选中状态被取消。
+    if (selectionFrom !== selectionTo) {
+      return
+    }
 
     // 先清除之前的人物高亮（在同一事务中），但保留段落校验高亮
     const highlightType = schema.marks.highlight
@@ -2271,6 +2280,12 @@ function applyCharacterHighlights() {
     // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
     const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
     tr.setSelection(newSelection)
+
+    // 关键修复：将本次高亮刷新标记为“不进入撤销历史”
+    // 否则每 2 秒的人物高亮定时器会向撤销栈压入一个新事务，
+    // 导致用户编辑后空闲超过 2 秒时，Ctrl+Z / Ctrl+Y 撤销/重做的
+    // 是装饰性高亮而非真实内容编辑，表现为“2 秒后撤销失效”
+    tr.setMeta('addToHistory', false)
 
     // 应用事务，但不改变焦点
     if (tr.steps.length > 0) {
@@ -2547,6 +2562,8 @@ function clearBannedWordsStrikes() {
     if (tr.steps.length > 0) {
       const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
       tr.setSelection(newSelection)
+      // 清除装饰性划线不进入撤销历史，避免干扰撤销/重做
+      tr.setMeta('addToHistory', false)
       view.dispatch(tr)
     }
   })
@@ -2572,6 +2589,12 @@ function applyBannedWordsStrikes() {
     // 保存当前选择位置（使用数字位置）
     const selectionFrom = state.selection.from
     const selectionTo = state.selection.to
+
+    // 若用户正在用鼠标框选文本（存在非空选区），本次跳过刷新。
+    // 否则 view.dispatch 会打断框选，导致选中状态被取消。
+    if (selectionFrom !== selectionTo) {
+      return
+    }
 
     // 先清除之前的禁词划线（在同一事务中）
     const strikeType = schema.marks.strike
@@ -2636,6 +2659,10 @@ function applyBannedWordsStrikes() {
     // 恢复选择位置（使用 TextSelection.create 创建新的选择对象）
     const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
     tr.setSelection(newSelection)
+
+    // 关键修复：禁词提示每 2 秒刷新一次，同样需排除出撤销历史，
+    // 避免污染用户的撤销/重做栈（否则 2 秒后 Ctrl+Z 变得无效）
+    tr.setMeta('addToHistory', false)
 
     // 应用事务，但不改变焦点
     if (tr.steps.length > 0) {
@@ -2771,6 +2798,8 @@ function clearDialogueHighlights() {
     if (tr.steps.length > 0) {
       const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
       tr.setSelection(newSelection)
+      // 装饰性对白高亮同样不进入撤销历史，避免干扰用户的撤销/重做
+      tr.setMeta('addToHistory', false)
       view.dispatch(tr)
     }
   })
@@ -2886,6 +2915,8 @@ function applyDialogueHighlights() {
     if (tr.steps.length > 0) {
       const newSelection = TextSelection.create(tr.doc, selectionFrom, selectionTo)
       tr.setSelection(newSelection)
+      // 装饰性对白高亮同样不进入撤销历史，避免干扰用户的撤销/重做
+      tr.setMeta('addToHistory', false)
       view.dispatch(tr)
     }
   })

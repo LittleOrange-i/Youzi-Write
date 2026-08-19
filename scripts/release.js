@@ -176,7 +176,7 @@ function main() {
 
   const tagName = `v${newVersion}`
   if (tagExists(tagName)) {
-    console.error(`❌ 错误: tag ${tagName} 已存在，请更换版本号或先删除旧 tag`)
+    console.error(`❌ 错误: tag ${tagName} 已存在，请更换版本号或先删除旧 tag\n  git push --delete origin ${tagName} and git tag -d ${tagName}`)
     process.exit(1)
   }
 
@@ -233,11 +233,11 @@ function main() {
   // 推送代码和 tag
   console.log('📤 推送代码和 tag 到远程仓库...')
   try {
-    execSync(`git push base ${branch}`, {
+    execSync(`git push origin ${branch}`, {
       cwd: rootDir,
       stdio: 'inherit'
     })
-    execSync(`git push base ${tagName}`, {
+    execSync(`git push origin ${tagName}`, {
       cwd: rootDir,
       stdio: 'inherit'
     })

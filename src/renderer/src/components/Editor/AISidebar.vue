@@ -199,25 +199,22 @@
             </el-form-item>
 
             <el-form-item label="模型ID" required>
-              <el-select
-                v-if="availableModels.length > 0"
+              <el-autocomplete
                 v-model="modelForm.modelId"
-                placeholder="选择模型"
-                filterable
-                allow-create
-              >
-                <el-option
-                  v-for="model in availableModels"
-                  :key="model"
-                  :label="model"
-                  :value="model"
-                />
-              </el-select>
-              <el-input
-                v-else
-                v-model="modelForm.modelId"
-                placeholder="例如：gpt-4、qwen-max"
+                :fetch-suggestions="getModelIdSuggestions"
+                placeholder="请输入模型ID，例如：gpt-5.5、qwen3.8-max"
+                trigger-on-focus="false"
+                clearable
               />
+            </el-form-item>
+
+            <el-form-item v-if="selectedProvider === 'alibaba'" label="深度思考">
+              <el-switch
+                v-model="modelForm.enableThinking"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+              <span class="form-tip">仅 qwen3 系列等支持 reasoning 的模型有效</span>
             </el-form-item>
           </el-form>
 
@@ -768,6 +765,18 @@
         <div class="question-content">{{ currentQuestion }}</div>
         <el-divider />
       </div>
+      <!-- 深度思考内容 -->
+      <div v-if="aiReasoning" class="thinking-section">
+        <div class="thinking-label">思考过程：</div>
+        <el-input
+          v-model="aiReasoning"
+          type="textarea"
+          :rows="6"
+          readonly
+          class="thinking-textarea"
+        />
+        <el-divider />
+      </div>
       <el-input
         v-model="aiResult"
         type="textarea"
@@ -819,6 +828,18 @@
               <div class="question-label">提问的问题：</div>
               <div class="question-content">{{ currentQuestion }}</div>
             </div>
+            <!-- 深度思考内容 -->
+            <div v-if="aiReasoning && !aiProcessing" class="thinking-section floating-thinking">
+              <div class="thinking-label">思考过程：</div>
+              <el-input
+                v-model="aiReasoning"
+                type="textarea"
+                :rows="5"
+                readonly
+                class="thinking-textarea"
+              />
+              <el-divider />
+            </div>
             <el-input
               v-model="aiResult"
               type="textarea"
@@ -843,6 +864,30 @@
           </div>
         </div>
       </Transition>
+
+      <!-- 重新生成：修改提示词对话框 -->
+      <el-dialog
+        v-model="regenerateDialogVisible"
+        title="重新生成"
+        width="600px"
+        :close-on-click-modal="false"
+        append-to-body
+      >
+        <div class="regen-dialog-body">
+          <div class="regen-dialog-tip">可在下方修改或补充提示词后重新生成</div>
+          <el-input
+            v-model="regeneratePrompt"
+            type="textarea"
+            :rows="10"
+            placeholder="请输入提示词..."
+            class="regen-prompt-textarea"
+          />
+        </div>
+        <template #footer>
+          <el-button @click="regenerateDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmRegenerate">开始生成</el-button>
+        </template>
+      </el-dialog>
     </Teleport>
   </div>
 </template>
@@ -882,117 +927,129 @@ function formatTime(ms) {
   return `${minutes}分${seconds}秒`
 }
 
-// 各大厂商API配置预设（专注小说/文本生成）
+// 各大厂商API配置预设（专注小说/文本生成，仅收录纯文本模型）
 const apiProviders = [
   {
     id: 'zhipu',
     name: '智谱 AI (GLM)',
     endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    models: ['glm-4-flash', 'glm-4-plus', 'glm-4-air'],
+    models: ['glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo', 'glm-4.7', 'glm-4.7-flash'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: true,
     novelAbility: '极强',
-    description: '中文叙事、情感描写优秀，glm-4-flash 免费且快速'
+    description: '中文叙事、情感描写优秀，glm-4.7-flash 免费且快速，GLM-5.2 支持 1M 上下文'
   },
   {
     id: 'alibaba',
     name: '阿里云 (通义千问)',
-    endpoint: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
-    models: ['qwen3-max','qwen-max', 'qwen-plus', 'qwen-turbo'],
+    endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    models: ['qwen3.8-max', 'qwen3.7-plus', 'qwen3.7-flash'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: false,
     novelAbility: '强',
-    description: '支持长上下文、角色设定、风格模仿'
+    description: '支持长上下文、角色设定、风格模仿，qwen3.7-plus 性价比高'
   },
   {
     id: 'deepseek',
     name: '深度求索 (DeepSeek)',
     endpoint: 'https://api.deepseek.com/v1/chat/completions',
-    models: ['deepseek-r1', 'deepseek-v3'],
+    models: ['deepseek-v4-pro', 'deepseek-v4-flash'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '擅长网文风格、长文本生成，开源模型'
+    description: '擅长网文风格、长文本生成，V4-Flash 支持 1M 超长上下文'
   },
   {
     id: 'siliconflow',
     name: '硅基流动 (SiliconFlow)',
     endpoint: 'https://api.siliconflow.cn/v1/chat/completions',
-    models: ['deepseek-ai/DeepSeek-R1-0528-Qwen3-8B', 'Qwen/Qwen3-8B', 'THUDM/glm-4-9b'],
+    models: [
+      'deepseek-ai/DeepSeek-V4-Pro',
+      'deepseek-ai/DeepSeek-V4-Flash',
+      'zai-org/GLM-5.2',
+      'moonshotai/Kimi-K2.7-Code',
+      'Qwen/Qwen3.6-35B-A3B',
+      'MiniMaxAI/MiniMax-M2.5'
+    ],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '聚合多个模型，免费额度高，支持 DeepSeek-R1'
+    description: '聚合多个开源模型，免费额度高，支持 DeepSeek-V4 / GLM-5.2 / Qwen3.6'
   },
   {
     id: 'baidu',
     name: '百度 (文心一言)',
-    endpoint: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-4.5',
-    models: ['ernie-4.5', 'ernie-speed', 'ernie-lite'],
+    endpoint: 'https://qianfan.baidubce.com/v2/chat/completions',
+    models: ['ernie-5.1', 'ernie-5.0', 'ernie-5.0-thinking-latest', 'ernie-4.5-turbo-128k'],
     requiresKey: true,
     supportsWebSearch: true,
-    isOpenAICompatible: false,
+    isOpenAICompatible: true,
     novelAbility: '中等',
-    description: '需先用 client_id + client_secret 换取 access_token，偏正式风格'
+    description: '千帆 V2 接口兼容 OpenAI，直接使用 API Key（Bearer）鉴权，偏正式风格'
   },
   {
     id: 'moonshot',
     name: '月之暗面 (Kimi)',
     endpoint: 'https://api.moonshot.cn/v1/chat/completions',
-    models: ['kimi-k2-0905-preview','moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    models: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6'],
     requiresKey: true,
     supportsWebSearch: true,
     isOpenAICompatible: true,
     novelAbility: '强',
-    description: '支持超长上下文（128k），适合长篇连载续写'
+    description: '支持 256k 超长上下文，适合长篇连载续写（moonshot-v1 系列已下线）'
   },
   {
     id: 'tencent',
     name: '腾讯混元',
     endpoint: 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions',
-    models: ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'],
+    models: ['hunyuan-a13b', 'hunyuan-role-latest', 'hunyuan-translation'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '中等',
-    description: '腾讯自研大模型'
+    description: '腾讯自研大模型，hunyuan-role-latest 适合角色扮演类写作'
   },
   {
     id: 'openai',
     name: 'OpenAI (GPT)',
     endpoint: 'https://api.openai.com/v1/chat/completions',
-    models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4o-mini'],
+    models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini'],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '顶级',
-    description: '情节、人物、节奏控制极佳，国内需代理'
+    description: '情节、人物、节奏控制极佳，gpt-5.5 支持 1M 上下文，国内需代理'
   },
   {
     id: 'google',
     name: 'Google Gemini',
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-    models: ['gemini-1.5-flash', 'gemini-1.5-pro'],
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent',
+    models: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     requiresKey: true,
     isOpenAICompatible: false,
     novelAbility: '强',
-    description: '支持 2M 上下文，适合长篇续写'
+    description: '支持超长上下文，适合长篇续写'
   },
   {
     id: 'anthropic',
     name: 'Anthropic (Claude)',
     endpoint: 'https://api.anthropic.com/v1/messages',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-opus', 'claude-3-haiku'],
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
     requiresKey: true,
     isOpenAICompatible: false,
     novelAbility: '最佳',
-    description: '文笔细腻、逻辑连贯'
+    description: '文笔细腻、逻辑连贯，claude-fable-5 专为长文创作优化'
   },
   {
     id: 'openrouter',
     name: 'OpenRouter (聚合平台)',
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    models: ['google/gemini-2.0-flash-exp:free', 'meta-llama/llama-3.1-8b-instruct:free'],
+    models: [
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'inclusionai/ling-3.0-flash:free',
+      'openai/gpt-oss-20b:free'
+    ],
     requiresKey: true,
     isOpenAICompatible: true,
     novelAbility: '中等',
@@ -1034,7 +1091,8 @@ const modelForm = ref({
   description: '',
   endpoint: '',
   apiKey: '',
-  modelId: ''
+  modelId: '',
+  enableThinking: false
 })
 
 // AI 操作弹窗状态
@@ -1111,6 +1169,8 @@ const qaForm = ref({
 // AI 处理状态和结果
 const aiProcessing = ref(false)
 const aiResult = ref('')
+// AI 深度思考内容（如 qwen3 系列模型的 reasoning_content）
+const aiReasoning = ref('')
 // 用于中断 AI 生成的标志
 const abortController = ref(null)
 // 保存 AI 提问的原始问题
@@ -1123,6 +1183,10 @@ const isDragging = ref(false)
 const dragOffset = ref({ x: 0, y: 0 }) // 记录拖动偏移量
 const lastOperation = ref(null) // 保存最后一次操作，用于重新生成
 const floatingZIndex = ref(500) // 固定层级
+
+// 重新生成对话框相关
+const regenerateDialogVisible = ref(false)
+const regeneratePrompt = ref('') // 编辑中的提示词
 
 // 初始化浮动窗口位置（居中显示）
 const initFloatingPosition = () => {
@@ -1176,6 +1240,16 @@ const canTest = computed(() => {
 const isPersonNameType = computed(() => {
   return ['chinese_person', 'japanese_person', 'western_person'].includes(namingForm.value.nameType)
 })
+
+// 模型ID自动完成建议
+const getModelIdSuggestions = (queryString, cb) => {
+  const keyword = queryString.trim().toLowerCase()
+  const suggestions = availableModels.value
+    .filter((model) => !keyword || model.toLowerCase().includes(keyword))
+    .map((model) => ({ value: model }))
+
+  cb(suggestions)
+}
 
 // 监听表单关键字段变化，重置测试状态
 watch(
@@ -1271,7 +1345,8 @@ const handleAddModel = () => {
     description: '',
     endpoint: '',
     apiKey: '',
-    modelId: ''
+    modelId: '',
+    enableThinking: false
   }
   selectedProvider.value = ''
   availableModels.value = []
@@ -1283,7 +1358,10 @@ const handleAddModel = () => {
 // 处理编辑模型
 const handleEditModel = (model) => {
   editingModelId.value = model.id
-  modelForm.value = { ...model }
+  modelForm.value = {
+    ...model,
+    enableThinking: !!model.enableThinking
+  }
   selectedProvider.value = model.providerId || ''
   availableModels.value = []
   testPassed.value = true // 编辑模式默认已通过测试
@@ -1372,12 +1450,13 @@ const handleTestModel = async () => {
       ElMessage.success(result.message || '测试成功！模型配置正确')
     } else {
       testPassed.value = false
+      console.error('模型测试失败:', result.error)
       ElMessage.error(`测试失败: ${result.error}`)
     }
   } catch (error) {
     testPassed.value = false
-    ElMessage.error(`测试失败: ${error.message}`)
     console.error('模型测试失败:', error)
+    ElMessage.error(`测试失败: ${error.message}`)
   } finally {
     isTesting.value = false
   }
@@ -1884,6 +1963,7 @@ const callAI = async (userPrompt) => {
       providerId: currentModel.providerId,
       systemPrompt: AI_SYSTEM_PROMPT,
       userPrompt: userPrompt,
+      enableThinking: !!currentModel.enableThinking,
       signal: abortController.value.signal
     })
 
@@ -1891,7 +1971,10 @@ const callAI = async (userPrompt) => {
       throw new Error(result.error || 'AI 调用失败')
     }
 
-    return result.content
+    return {
+      content: result.content,
+      reasoning: result.reasoning || ''
+    }
   } finally {
     // 清理 AbortController
     abortController.value = null
@@ -1946,7 +2029,8 @@ const executeRewrite = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     rewriteDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2000,7 +2084,8 @@ const executeExpand = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     expandDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2051,7 +2136,8 @@ const executeContinue = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     continueDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2103,7 +2189,8 @@ const executePolish = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     polishDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2226,7 +2313,8 @@ const executeNaming = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     namingDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2271,7 +2359,8 @@ const executeQA = async () => {
       return
     }
     
-    aiResult.value = result
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
     qaDialogVisible.value = false
     
     // 保存当前操作信息，用于重新生成
@@ -2420,18 +2509,37 @@ const toggleFloatingResult = () => {
   }
 }
 
-// 重新生成结果
-const regenerateResult = async () => {
+// 打开重新生成对话框，预填上次的提示词
+const regenerateResult = () => {
   if (!lastOperation.value) {
     ElMessage.warning('没有可重新生成的内容')
     return
   }
+  // 将上次的提示词填入编辑框
+  regeneratePrompt.value = lastOperation.value.prompt
+  regenerateDialogVisible.value = true
+}
 
+// 确认重新生成（使用编辑后的提示词）
+const confirmRegenerate = async () => {
+  const prompt = regeneratePrompt.value.trim()
+  if (!prompt) {
+    ElMessage.warning('提示词不能为空')
+    return
+  }
+
+  regenerateDialogVisible.value = false
   aiProcessing.value = true
   try {
     ElMessage.info('正在重新生成...')
-    const result = await callAI(lastOperation.value.prompt)
-    aiResult.value = result
+    const result = await callAI(prompt)
+    aiResult.value = result.content
+    aiReasoning.value = result.reasoning || ''
+    // 更新 lastOperation 中的提示词为本次使用的提示词
+    lastOperation.value = {
+      ...lastOperation.value,
+      prompt
+    }
     ElMessage.success('重新生成完成')
   } catch (error) {
     ElMessage.error(`重新生成失败: ${error.message}`)
@@ -2772,6 +2880,27 @@ const exportableModels = computed(() => {
   }
 }
 
+// 重新生成对话框样式
+.regen-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  .regen-dialog-tip {
+    font-size: 13px;
+    color: var(--text-soft, #888);
+  }
+
+  .regen-prompt-textarea {
+    :deep(.el-textarea__inner) {
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.7;
+      resize: vertical;
+    }
+  }
+}
+
 // AI 结果弹窗中的问题显示样式
 .question-section {
   margin-bottom: 16px;
@@ -2794,6 +2923,47 @@ const exportableModels = computed(() => {
     white-space: pre-wrap;
     word-break: break-word;
   }
+}
+
+// AI 深度思考内容显示样式
+.thinking-section {
+  margin-bottom: 12px;
+
+  .thinking-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-base);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--el-color-warning);
+    }
+  }
+
+  .thinking-textarea {
+    :deep(.el-textarea__inner) {
+      background: var(--bg-mute);
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+  }
+}
+
+// 模型表单提示
+.form-tip {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 

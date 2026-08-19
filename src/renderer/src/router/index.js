@@ -69,6 +69,11 @@ const routes = [
     component: () => import('@renderer/views/OrganizationDesign.vue')
   },
   {
+    path: '/item-profile',
+    name: 'ItemProfile',
+    component: () => import('@renderer/views/ItemProfile.vue')
+  },
+  {
     path: '/keyboard-monitor',
     name: 'KeyboardMonitor',
     component: () => import('@renderer/components/KeyboardMonitor.vue')

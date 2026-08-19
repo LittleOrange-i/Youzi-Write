@@ -1,6 +1,15 @@
 {
   "name": "Youzi-Write",
-  "version": "3.6.2",
+  "version": "2.0.6",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "vue-demi"
+    ]
+  },
   "productName": "柚子写作",
   "description": "桌面小说写作软件，专为小说创作者设计",
   "main": "./out/main/index.js",
@@ -41,6 +50,8 @@
     "echarts": "^6.0.0",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.6.2",
+    "env-paths": "^3.0.0",
+    "markdown-it": "^14.3.0",
     "element-plus": "^2.11.4",
     "lucide-vue-next": "^0.561.0",
     "perfect-freehand": "^1.2.2",

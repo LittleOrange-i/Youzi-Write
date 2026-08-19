@@ -4,32 +4,52 @@ const BOOK_TYPES = [ // 书籍类型常量数组
     label: '男频', // 分类显示名称
     value: 'nan_group', // 分类组标识符
     children: [ // 男频下的具体分类
-      { label: '玄幻', value: 'nan/xuanhuan' }, // 玄幻分类
-      { label: '仙侠', value: 'nan/xianxia' }, // 仙侠分类
-      { label: '都市异能', value: 'nan/dushi_yineng' }, // 都市异能分类
-      { label: '历史架空', value: 'nan/lishi_jiakong' }, // 历史架空分类
-      { label: '科幻硬核', value: 'nan/kehuan_yinghe' }, // 科幻硬核分类
-      { label: '军事争霸', value: 'nan/junshi_zhengba' }, // 军事争霸分类
-      { label: '游戏电竞', value: 'nan/youxi_dianjing' }, // 游戏电竞分类
-      { label: '高武世界', value: 'nan/gaowu' }, // 高武世界分类
-      { label: '修真升级流', value: 'nan/xiuzhen_shengji' }, // 修真升级流分类
-      { label: '系统爽文', value: 'nan/xitong_shuangwen' } // 系统爽文分类
+      { label: '西方奇幻', value: 'nan/xifang_qihuan' }, // 西方奇幻分类
+      { label: '东方仙侠', value: 'nan/dongfang_xianxia' }, // 东方仙侠分类
+      { label: '科幻末世', value: 'nan/kehuan_moshi' }, // 科幻末世分类
+      { label: '男频衍生', value: 'nan/yansheng' }, // 男频衍生分类
+      { label: '都市高武', value: 'nan/dushi_gaowu' }, // 都市高武分类
+      { label: '悬疑灵异', value: 'nan/xuanyi_lingyi' }, // 悬疑灵异分类
+      { label: '悬疑脑洞', value: 'nan/xuanyi_naodong' }, // 悬疑脑洞分类
+      { label: '抗战谍战', value: 'nan/kangzhan_diezhan' }, // 抗战谍战分类
+      { label: '历史古代', value: 'nan/lishi_gudai' }, // 历史古代分类
+      { label: '历史脑洞', value: 'nan/lishi_naodong' }, // 历史脑洞分类
+      { label: '都市种田', value: 'nan/dushi_zhongtian' }, // 都市种田分类
+      { label: '都市脑洞', value: 'nan/dushi_naodong' }, // 都市脑洞分类
+      { label: '都市日常', value: 'nan/dushi_richang' }, // 都市日常分类
+      { label: '玄幻脑洞', value: 'nan/xuanhuan_naodong' }, // 玄幻脑洞分类
+      { label: '战神赘婿', value: 'nan/zhanshen_zhuiixu' }, // 战神赘婿分类
+      { label: '动漫衍生', value: 'nan/dongman_yansheng' }, // 动漫衍生分类
+      { label: '游戏体育', value: 'nan/youxi_tiyu' }, // 游戏体育分类
+      { label: '传统玄幻', value: 'nan/chuantong_xuanhuan' }, // 传统玄幻分类
+      { label: '都市修真', value: 'nan/dushi_xiuzhen' } // 都市修真分类
     ] // 结束男频分类列表
   }, // 结束男频组
   { // 女频分类组
     label: '女频', // 分类显示名称
     value: 'nv_group', // 分类组标识符
     children: [ // 女频下的具体分类
-      { label: '言情', value: 'nv/yanqing' }, // 言情分类
-      { label: '古代言情', value: 'nv/gudai_yanqing' }, // 古代言情分类
-      { label: '现代言情', value: 'nv/xiandai_yanqing' }, // 现代言情分类
+      { label: '女频悬疑', value: 'nv/xuanyi' }, // 女频悬疑分类
+      { label: '古风世情', value: 'nv/gufeng_shiqing' }, // 古风世情分类
+      { label: '科幻末世', value: 'nv/kehuan_moshi' }, // 科幻末世分类
+      { label: '女频衍生', value: 'nv/yansheng' }, // 女频衍生分类
+      { label: '民国言情', value: 'nv/minguo_yanqing' }, // 民国言情分类
+      { label: '悬疑脑洞', value: 'nv/xuanyi_naodong' }, // 悬疑脑洞分类
+      { label: '青春甜宠', value: 'nv/qingchun_tianchong' }, // 青春甜宠分类
+      { label: '双男主', value: 'nv/shuang_nanzhu' }, // 双男主分类
+      { label: '古言脑洞', value: 'nv/guyan_naodong' }, // 古言脑洞分类
+      { label: '现言脑洞', value: 'nv/xianyan_naodong' }, // 现言脑洞分类
+      { label: '玄幻言情', value: 'nv/xuanhuan_yanqing' }, // 玄幻言情分类
       { label: '宫斗宅斗', value: 'nv/gongdou_zhaidou' }, // 宫斗宅斗分类
-      { label: '穿书快穿', value: 'nv/chuanshu_kuaichuan' }, // 穿书快穿分类
-      { label: '耽美BL', value: 'nv/danmei' }, // 耽美BL分类
-      { label: '无CP成长', value: 'nv/wucp_chengzhang' }, // 无CP成长分类
-      { label: '职场现实', value: 'nv/zhichang_xianshi' }, // 职场现实分类
-      { label: '悬疑探案', value: 'nv/xuanyi_tanan' }, // 悬疑探案分类
-      { label: '仙侠言情', value: 'nv/xianxia_yanqing' } // 仙侠言情分类
+      { label: '豪门总裁', value: 'nv/haomen_zongcai' }, // 豪门总裁分类
+      { label: '动漫衍生', value: 'nv/dongman_yansheng' }, // 动漫衍生分类
+      { label: '星光璀璨', value: 'nv/xingguang_cuican' }, // 星光璀璨分类
+      { label: '游戏体育', value: 'nv/youxi_tiyu' }, // 游戏体育分类
+      { label: '职场婚恋', value: 'nv/zhichang_hunlian' }, // 职场婚恋分类
+      { label: '双女主', value: 'nv/shuang_nvZhu' }, // 双女主分类
+      { label: '年代', value: 'nv/niandai' }, // 年代分类
+      { label: '种田', value: 'nv/zhongtian' }, // 种田分类
+      { label: '快穿', value: 'nv/kuaichuan' } // 快穿分类
     ] // 结束女频分类列表
   }, // 结束女频组
   { // 通用分类组
@@ -51,6 +71,119 @@ const BOOK_TYPES = [ // 书籍类型常量数组
     ] // 结束通用分类列表
   } // 结束通用组
 ] // 结束书籍类型常量数组
+
+// 获取主分类图标相关配置
+const CATEGORY_API_BASE = 'https://fanqienovel.com/api/author/book/category_list/v0/' // 番茄小说主分类接口基础地址
+const CATEGORY_ICON_CACHE_KEY = 'bookCategoryIcons' // localStorage 缓存键名
+const CATEGORY_ICON_CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 缓存有效期：7天（毫秒）
+
+// 根据性别参数请求接口，返回 { 分类名: cover_uri } 映射（仅主分类）
+async function fetchCategoryIconMap(gender) { // gender：1 男频，0 女频
+  const url = `${CATEGORY_API_BASE}?aid=2503&app_name=muye_novel&gender=${gender}` // 拼接带性别参数的接口地址
+  let json // 接口返回的 JSON
+  // 优先通过主进程请求，避开渲染进程的 CORS 限制（dev/prod 均适用）
+  if (typeof window !== 'undefined' && window.electron && typeof window.electron.httpFetchJson === 'function') { // 暴露了 IPC 代理时
+    json = await window.electron.httpFetchJson(url) // 在主进程请求并解析为对象
+  } else { // 兜底：渲染进程直接 fetch
+    const res = await fetch(url) // 发起请求
+    if (!res.ok) { // 请求失败时抛出错误
+      throw new Error(`获取分类图标失败：${res.status}`)
+    }
+    json = await res.json() // 解析 JSON
+  }
+  const map = {} // 分类名->图标地址 的映射对象
+  if (json && Array.isArray(json.data)) { // 校验返回数据结构
+    for (const item of json.data) { // 遍历分类列表
+      if (item.label === '主分类' && item.name && item.cover_uri) { // 仅取主分类且有图标地址的项
+        map[item.name] = item.cover_uri // 以分类名为键存入图标地址
+      }
+    }
+  }
+  return map // 返回映射
+}
+
+// 将图标地址写入 BOOK_TYPES 中对应的分类项（按 name 匹配），gender 决定更新哪个分组
+function applyIconsToBookTypes(iconMap) { // iconMap：分类名->图标地址 映射
+  const commonDefaultIcon = iconMap['西方奇幻'] || '' // 通用组默认图标取男频西方奇幻
+  for (const group of BOOK_TYPES) { // 遍历顶层分组（男频/女频/通用）
+    if (!group.children) continue // 跳过无子项的组
+    const isCommon = group.label === '通用' // 是否为通用分组
+    for (const child of group.children) { // 遍历子分类
+      if (iconMap[child.label]) { // 若映射中存在该分类名的图标
+        child.icon = iconMap[child.label] // 写入 icon 字段
+      } else if (isCommon && commonDefaultIcon) { // 通用组无自身图标时默认使用男频西方奇幻图标
+        child.icon = commonDefaultIcon // 写入默认图标
+      }
+    }
+  }
+}
+
+// 通用组默认采用的男频分类名（取其图标作为通用组各类型的默认图标）
+const COMMON_DEFAULT_MALE_LABEL = '西方奇幻' // 男频西方奇幻
+
+// 将图标映射应用到指定的分类树（深响应副本），返回写入的项数
+function applyIconsToTarget(target, iconMap) { // target：分类树数组；iconMap：分类名->图标地址
+  let count = 0 // 计数
+  // 取男频西方奇幻的图标地址，作为通用组各类型的默认图标
+  const commonDefaultIcon = iconMap[COMMON_DEFAULT_MALE_LABEL] || '' // 通用组默认图标（男频西方奇幻）
+  for (const group of target) { // 遍历分组
+    if (!group.children) continue // 跳过无子项的组
+    const isCommon = group.label === '通用' // 是否为通用分组
+    for (const child of group.children) { // 遍历子分类
+      if (iconMap[child.label]) { // 命中映射
+        child.icon = iconMap[child.label] // 写入 icon
+        count++ // 计数
+      } else if (isCommon && commonDefaultIcon) { // 通用组无自身图标时，默认使用男频西方奇幻图标
+        child.icon = commonDefaultIcon // 写入默认图标
+      }
+    }
+  }
+  return count // 返回写入数量
+}
+
+// 从 localStorage 读取缓存，返回 { map, expire } 或 null
+function readIconCache() { // 读取本地图标缓存
+  try { // 容错处理
+    const raw = localStorage.getItem(CATEGORY_ICON_CACHE_KEY) // 读取缓存字符串
+    if (!raw) return null // 无缓存直接返回
+    return JSON.parse(raw) // 解析并返回缓存对象
+  } catch (e) { // 解析异常
+    return null // 异常时视为无缓存
+  }
+}
+
+// 写入缓存到 localStorage
+function writeIconCache(map) { // 将图标映射写入本地缓存
+  const payload = { map, expire: Date.now() + CATEGORY_ICON_CACHE_TTL } // 组装带过期时间的缓存体
+  localStorage.setItem(CATEGORY_ICON_CACHE_KEY, JSON.stringify(payload)) // 持久化到 localStorage
+}
+
+// 加载分类图标：优先使用本地缓存，缓存失效或不存在时重新请求并写入 BOOK_TYPES
+export async function loadCategoryIcons(target) { // 对外暴露的加载入口；target：可选，写入的分类树（默认 BOOK_TYPES）
+  const cache = readIconCache() // 读取缓存
+  const valid = cache && cache.map && cache.expire > Date.now() // 判断缓存是否有效
+  if (valid) { // 缓存有效时直接使用
+    if (target) applyIconsToTarget(target, cache.map) // 写入指定目标
+    else applyIconsToBookTypes(cache.map) // 否则写入默认 BOOK_TYPES
+    return // 结束，避免重复请求
+  }
+  try { // 请求阶段容错
+    const [maleMap, femaleMap] = await Promise.all([ // 并发请求男频、女频
+      fetchCategoryIconMap(1), // 男频
+      fetchCategoryIconMap(0) // 女频
+    ]) // 合并两频映射
+    const merged = Object.assign({}, maleMap, femaleMap) // 合并为完整映射
+    if (target) applyIconsToTarget(target, merged) // 写入指定目标
+    else applyIconsToBookTypes(merged) // 否则写入默认 BOOK_TYPES
+    writeIconCache(merged) // 缓存到本地
+  } catch (e) { // 请求失败时
+    if (cache && cache.map) { // 若旧缓存存在则降级使用
+      if (target) applyIconsToTarget(target, cache.map) // 写入指定目标
+      else applyIconsToBookTypes(cache.map) // 写入默认 BOOK_TYPES
+    }
+    console.warn('分类图标加载失败，使用无图标状态：', e) // 输出警告
+  }
+}
 
 // 百家姓（单姓，部分示例，建议全量）
 const CHINESE_SURNAMES = [

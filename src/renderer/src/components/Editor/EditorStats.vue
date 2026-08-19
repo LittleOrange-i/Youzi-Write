@@ -10,6 +10,10 @@
       <span class="stat-item">空闲: {{ formatDuration(typingStats.idleDuration) }}</span>
       <span class="stat-divider">|</span>
       <span class="stat-item">字数: {{ cursorPosition }}/{{ contentWordCount }} 字</span>
+      <span class="stat-divider">|</span>
+      <span class="stat-item">对白: {{ dialogueWordCount }} 字 ({{ dialogueRatio }}%)</span>
+      <span v-if="selectedWordCount > 0" class="stat-divider">|</span>
+      <span v-if="selectedWordCount > 0" class="stat-item">选中: {{ selectedWordCount }} 字</span>
     </div>
     <div class="editor-stats-right">
       <span class="current-time">{{ currentTime }}</span>
@@ -37,6 +41,10 @@ const props = defineProps({
   },
   fileType: {
     type: String,
+    default: null
+  },
+  editor: {
+    type: Object,
     default: null
   }
 })
@@ -83,6 +91,62 @@ const lastFilePath = ref(null)
 
 // 当前实时时间
 const currentTime = ref('')
+
+// 对白（对话）字数及占比统计
+const dialogueWordCount = ref(0) // 对白高亮标记的字数（排除空白字符）
+const dialogueRatio = ref('0.0') // 对白字数占当前章节总字数的百分比（保留一位小数）
+
+// 框选字数统计（排除空格、换行、制表符等格式字符）
+const selectedWordCount = ref(0)
+
+// 计算对白字数：遍历编辑器文档，累加带 dialogue-highlight 标记的文本内容
+function calculateDialogueStats() {
+  if (!props.editor || !props.editor.state) {
+    dialogueWordCount.value = 0
+    dialogueRatio.value = '0.0'
+    return
+  }
+
+  let count = 0
+  const { doc } = props.editor.state
+  // 遍历所有文本节点，统计带对白高亮标记的字符数
+  doc.descendants((node) => {
+    if (node.isText && node.marks && node.marks.length > 0) {
+      const isDialogue = node.marks.some(
+        (mark) => mark.type.name === 'highlight' && mark.attrs?.class === 'dialogue-highlight'
+      )
+      if (isDialogue) {
+        // 排除空格、换行、制表符等格式字符
+        count += node.text.replace(/[\s\n\r\t]/g, '').length
+      }
+    }
+  })
+
+  dialogueWordCount.value = count
+
+  // 计算占比（保留一位小数），总字数为 0 时记为 0.0%
+  const total = props.contentWordCount || 0
+  if (total === 0) {
+    dialogueRatio.value = '0.0'
+  } else {
+    dialogueRatio.value = ((count / total) * 100).toFixed(1)
+  }
+}
+
+// 计算框选字数：取编辑器当前选区文本，排除格式字符后统计长度
+function calculateSelectionStats() {
+  if (!props.editor || !props.editor.state) {
+    selectedWordCount.value = 0
+    return
+  }
+  const { from, to } = props.editor.state.selection // 获取当前选区范围
+  if (from === to) { // 无选区（仅光标）时归零
+    selectedWordCount.value = 0
+    return
+  }
+  const selectedText = props.editor.state.doc.textBetween(from, to, '\n') // 取出选区文本
+  selectedWordCount.value = selectedText.replace(/[\s\n\r\t]/g, '').length // 排除格式字符后计数
+}
 
 // 定时器
 let timeUpdateTimer = null
@@ -345,7 +409,25 @@ watch(
         wordCount: newVal
       })
     }
+    // 章节总字数变化会影响对白占比，重新计算
+    calculateDialogueStats()
   }
+)
+
+// 监听编辑器实例变化，绑定更新事件以实时统计对白字数
+watch(
+  () => props.editor,
+  (ed) => {
+    if (!ed) return
+    // 内容变化时（包含对白高亮重算）重新统计对白字数
+    ed.on('update', calculateDialogueStats)
+    // 选区变化时（框选/取消框选）实时统计选中字数
+    ed.on('selectionUpdate', calculateSelectionStats)
+    // 编辑器就绪后先算一次
+    calculateDialogueStats()
+    calculateSelectionStats()
+  },
+  { immediate: true }
 )
 
 // 监听文件变化 (不重置统计，支持跨章节累加)
@@ -480,6 +562,12 @@ onBeforeUnmount(async () => {
   if (idleCheckTimer) {
     clearInterval(idleCheckTimer)
     idleCheckTimer = null
+  }
+
+  // 解绑编辑器更新事件，避免内存泄漏
+  if (props.editor && props.editor.off) {
+    props.editor.off('update', calculateDialogueStats)
+    props.editor.off('selectionUpdate', calculateSelectionStats)
   }
 })
 

@@ -426,7 +426,7 @@ const bookDir = ref('')
 const showHelpDialog = ref(false)
 const showSponsorDialog = ref(false)
 const themeStore = useThemeStore()
-const independentWindowMode = ref(false) // 独立窗口模式状态
+const independentWindowMode = ref(true) // 独立窗口模式状态，默认开启
 const qqGroupQrcode = new URL('../../../../static/qq_chart.jpg', import.meta.url).href
 const rewardQrcode = new URL('../../../../static/wx_reward_qrcode.jpg', import.meta.url).href
 const contactEmail = '3026408975@qq.com'
@@ -495,6 +495,13 @@ const DEFAULT_SHORTCUTS = [
     description: '打开组织架构图',
     key: 'Alt+D',
     defaultKey: 'Alt+D'
+  },
+  {
+    id: 'item-profile',
+    name: '道具档案',
+    description: '打开道具/法宝/装备物品档案',
+    key: 'Alt+I',
+    defaultKey: 'Alt+I'
   },
   {
     id: 'ai-result',
@@ -656,9 +663,11 @@ onMounted(async () => {
   await loadShelfPasswordHint()
   // 加载快捷键设置
   await loadShortcuts()
-  // 加载独立窗口模式设置
+  // 加载独立窗口模式设置（未配置时保持默认开启）
   const savedMode = await window.electronStore?.get('independent-window-mode') // 从本地存储获取配置
-  independentWindowMode.value = !!savedMode // 应用保存的配置
+  if (savedMode !== undefined && savedMode !== null) {
+    independentWindowMode.value = !!savedMode // 仅当存在已保存配置时才覆盖默认值
+  }
   // 检查被占用的快捷键
   await checkOccupiedShortcuts()
 })
@@ -725,7 +734,8 @@ async function loadShortcuts() {
   try {
     const savedShortcuts = await window.electronStore?.get('shortcuts')
     if (savedShortcuts) {
-      shortcuts.value = savedShortcuts.map(saved => {
+      // 将已保存的条目合并（保留用户自定义键值）
+      const merged = savedShortcuts.map(saved => {
         const defaultShortcut = DEFAULT_SHORTCUTS.find(d => d.id === saved.id)
         return {
           ...defaultShortcut,
@@ -735,6 +745,13 @@ async function loadShortcuts() {
           occupied: false // 初始化被占用状态,每次加载时都重置
         }
       })
+      // 补充 DEFAULT_SHORTCUTS 中新增但尚未保存的条目（版本升级时自动追加新快捷键）
+      DEFAULT_SHORTCUTS.forEach(def => {
+        if (!merged.find(m => m.id === def.id)) {
+          merged.push({ ...def, conflict: false, conflictWith: '', occupied: false })
+        }
+      })
+      shortcuts.value = merged
     } else {
       // 如果没有保存的快捷键,使用默认值
       shortcuts.value = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS))

@@ -76,6 +76,9 @@
           <el-tooltip content="正文设置" placement="bottom" :show-after="2000">
             <el-icon @click.stop="openChapterSettings"><Setting /></el-icon>
           </el-tooltip>
+          <el-tooltip content="导入小说（txt）" placement="bottom" :show-after="2000">
+            <el-icon @click.stop="openImportNovel"><Upload /></el-icon>
+          </el-tooltip>
         </div>
       </div>
       <div v-show="chaptersExpanded" class="section-content chapter-tree-container">
@@ -169,11 +172,135 @@
         <el-button @click="sortDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 导入小说对话框 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="导入小说（txt）"
+      width="460px"
+      :close-on-click-modal="false"
+    >
+      <div class="import-novel-form">
+        <div class="import-row">
+          <span class="import-label">目标卷</span>
+          <el-select v-model="importVolume" placeholder="选择卷" style="flex: 1">
+            <el-option
+              v-for="v in volumeOptions"
+              :key="v.id"
+              :label="v.name"
+              :value="v.id"
+            />
+          </el-select>
+        </div>
+        <div class="import-row">
+          <span class="import-label">文件编码</span>
+          <el-select v-model="importEncoding" style="flex: 1">
+            <el-option label="自动探测" value="auto" />
+            <el-option label="UTF-8" value="utf-8" />
+            <el-option label="GBK / GB18030" value="gbk" />
+          </el-select>
+        </div>
+        <div class="import-row">
+          <span class="import-label">小说文件</span>
+          <el-input v-model="importFilePath" readonly placeholder="请选择 txt 文件" style="flex: 1">
+            <template #append>
+              <el-button @click="selectNovelFile">选择</el-button>
+            </template>
+          </el-input>
+        </div>
+        <p class="import-tip">
+          将按"第x章/回/集"等标题自动拆分为章节，并追加到该卷现有最新章节之后。
+        </p>
+      </div>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!importFilePath" :loading="importing" @click="confirmImportNovel">
+          导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导入预览/冲突确认对话框 -->
+    <el-dialog
+      v-model="conflictDialogVisible"
+      title="导入预览确认"
+      width="620px"
+      :close-on-click-modal="false"
+      @closed="resetImportForm"
+    >
+      <div class="preview-summary">
+        共识别到 <strong>{{ importPreviewList.length }}</strong> 章
+        <span v-if="previewConflictCount > 0" class="summary-conflict">，其中 {{ previewConflictCount }} 章存在冲突</span>
+        <span v-if="previewEmptyCount > 0" class="summary-empty">，{{ previewEmptyCount }} 章正文为空</span>
+        <span v-if="previewMergedCount > 0" class="summary-merged">，已智能合并 {{ previewMergedCount }} 处连续重复章节</span>
+      </div>
+      <div class="preview-batch-actions">
+        <span>批量处理：</span>
+        <el-button
+          size="small"
+          :type="isAllResolvedAs('skip') ? 'primary' : ''"
+          @click="batchSetResolution('skip')"
+        >
+          冲突/空章全部跳过
+        </el-button>
+        <el-button
+          size="small"
+          :type="isAllResolvedAs('overwrite') ? 'primary' : ''"
+          @click="batchSetResolution('overwrite')"
+        >
+          冲突/空章全部覆盖
+        </el-button>
+      </div>
+      <div class="preview-list">
+        <div
+          v-for="(item, idx) in importPreviewList"
+          :key="item.chapterName"
+          class="preview-item"
+          :class="{ conflict: item.conflict, empty: item.isEmptyBody, merged: item.mergedCount > 1 }"
+        >
+          <div class="preview-main">
+            <span class="preview-index">{{ idx + 1 }}</span>
+            <div class="preview-info">
+              <div class="preview-name">{{ item.chapterName }}</div>
+              <div class="preview-meta">
+                <span>原文：{{ item.rawTitle }}</span>
+                <span>{{ item.wordCount || 0 }} 字</span>
+                <span v-if="item.mergedCount > 1" class="tag merged-tag">已合并 {{ item.mergedCount }} 段</span>
+                <span v-if="item.isEmptyBody" class="tag empty-tag">空正文</span>
+                <span v-if="item.conflict" class="tag conflict-tag">冲突</span>
+              </div>
+              <div v-if="item.conflict" class="preview-reason">与目标卷中已有章节同名</div>
+            </div>
+          </div>
+          <el-radio-group
+            v-if="item.conflict || item.isEmptyBody"
+            v-model="conflictResolutions[item.chapterName]"
+            size="small"
+          >
+            <el-radio-button value="skip">跳过</el-radio-button>
+            <el-radio-button value="overwrite">覆盖</el-radio-button>
+          </el-radio-group>
+          <span v-else class="preview-new-tag">新建</span>
+          <span
+            v-if="item.conflict || item.isEmptyBody"
+            class="preview-resolution-hint"
+          >
+            已选：{{ conflictResolutions[item.chapterName] === 'overwrite' ? '覆盖' : '跳过' }}
+          </span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="conflictDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="resolving" @click="confirmImportWithResolutions">
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import {
   ArrowRight,
   DocumentAdd,
@@ -181,7 +308,8 @@ import {
   Sort,
   Setting,
   Edit,
-  Delete
+  Delete,
+  Upload
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useEditorStore } from '@renderer/stores/editor'
@@ -243,6 +371,33 @@ const chapterSettings = ref({
   targetWords: 2000
 })
 
+// 导入小说相关
+const importDialogVisible = ref(false)
+const importing = ref(false)
+const importVolume = ref('')
+const importEncoding = ref('auto')
+const importFilePath = ref('')
+
+// 冲突确认相关
+const conflictDialogVisible = ref(false)
+const resolving = ref(false)
+const conflictList = ref([])
+const conflictResolutions = ref({})
+const pendingImportParams = ref(null)
+const importPreviewList = ref([])
+
+// 当前书的卷选项（来自已加载的章节树）
+const volumeOptions = computed(() =>
+  (chaptersTree.value || []).map((v) => ({ id: v.id, name: v.name }))
+)
+
+// 导入预览统计
+const previewConflictCount = computed(() => importPreviewList.value.filter((c) => c.conflict).length)
+const previewEmptyCount = computed(() => importPreviewList.value.filter((c) => c.isEmptyBody).length)
+const previewMergedCount = computed(
+  () => importPreviewList.value.reduce((sum, c) => sum + (c.mergedCount > 1 ? 1 : 0), 0)
+)
+
 // 确保 chapterSettings 始终是一个响应式对象,避免传递 null 或 undefined
 watch(chapterSettings, (newVal) => {
   if (!newVal || typeof newVal !== 'object') {
@@ -288,7 +443,12 @@ async function handleNoteClick(data, node) {
   if (data.type === 'note') {
     const currentFile = editorStore.file
     if (currentFile && currentFile.path === data.path) return
-    await editorStore.saveCurrentFileThroughHandler(false)
+    // 先尝试保存当前文件，失败不阻塞切换
+    try {
+      await editorStore.saveCurrentFileThroughHandler(false)
+    } catch {
+      // 保存失败不影响切换
+    }
     const parent = node.parent.data
     const res = await window.electron.readNote(props.bookName, parent.name, data.name)
     if (res.success) {
@@ -331,7 +491,12 @@ async function handleChapterClick(data, node) {
       })
     }
 
-    await editorStore.saveCurrentFileThroughHandler(false)
+    // 先尝试保存当前文件，失败不阻塞切换
+    try {
+      await editorStore.saveCurrentFileThroughHandler(false)
+    } catch {
+      // 保存失败不影响切换
+    }
     // 读取章节内容
     const res = await window.electron.readChapter(props.bookName, node.parent.data.name, data.name)
     if (res.success) {
@@ -396,6 +561,181 @@ async function createChapter(volumeId) {
   }
 }
 
+// 打开导入小说对话框
+function openImportNovel() {
+  // 默认选中第一个卷
+  if (!importVolume.value && volumeOptions.value.length > 0) {
+    importVolume.value = volumeOptions.value[0].id
+  }
+  importDialogVisible.value = true
+}
+
+// 选择小说 txt 文件
+async function selectNovelFile() {
+  try {
+    const result = await window.electron.showOpenDialog({
+      title: '选择小说 txt 文件',
+      properties: ['openFile'],
+      filters: [{ name: '文本文件', extensions: ['txt'] }, { name: '所有文件', extensions: ['*'] }]
+    })
+    if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+      importFilePath.value = result.filePaths[0]
+    }
+  } catch {
+    ElMessage.error('选择文件失败')
+  }
+}
+
+// 确认导入：先分析，再打开预览/冲突确认框，用户确认后才写入
+async function confirmImportNovel() {
+  if (!importFilePath.value) {
+    ElMessage.warning('请先选择小说文件')
+    return
+  }
+  importing.value = true
+  try {
+    const analyze = await window.electron.analyzeImportNovel({
+      bookName: props.bookName,
+      filePath: importFilePath.value,
+      volumeId: importVolume.value || undefined,
+      encoding: importEncoding.value === 'auto' ? undefined : importEncoding.value
+    })
+    if (!analyze.success) {
+      ElMessage.error(analyze.message || '分析失败')
+      return
+    }
+    if (analyze.chapters.length === 0) {
+      ElMessage.warning('未识别到可导入的章节')
+      return
+    }
+
+    // 保存导入参数与预览数据
+    pendingImportParams.value = {
+      bookName: props.bookName,
+      filePath: importFilePath.value,
+      volumeId: importVolume.value || undefined,
+      encoding: importEncoding.value === 'auto' ? undefined : importEncoding.value
+    }
+    importPreviewList.value = analyze.chapters
+
+    // 初始化默认处理策略：空正文/冲突默认跳过，其他新建
+    const resolutions = {}
+    analyze.chapters.forEach((c) => {
+      if (c.conflict || c.isEmptyBody) {
+        resolutions[c.chapterName] = 'skip'
+      }
+    })
+    conflictResolutions.value = resolutions
+
+    importDialogVisible.value = false
+    conflictDialogVisible.value = true
+  } catch (err) {
+    console.error('[导入] 分析小说失败:', err)
+    ElMessage.error(`导入失败：${err?.message || '未知错误'}`)
+  } finally {
+    importing.value = false
+  }
+}
+
+// 判断所有冲突/空章是否已统一设置为某种处理策略（用于批量按钮高亮）
+function isAllResolvedAs(type) {
+  const targets = importPreviewList.value.filter((c) => c.conflict || c.isEmptyBody)
+  if (targets.length === 0) return false
+  return targets.every((c) => conflictResolutions.value[c.chapterName] === type)
+}
+
+// 批量设置冲突/重复项的处理方式
+function batchSetResolution(type) {
+  // 仅对"冲突章"或"空正文章"生效；其余为新建，不需要处理策略
+  const targets = importPreviewList.value.filter((c) => c.conflict || c.isEmptyBody)
+  if (targets.length === 0) {
+    ElMessage.info('当前没有冲突章节或空正文章，无需批量处理')
+    return
+  }
+  const next = { ...conflictResolutions.value }
+  targets.forEach((c) => {
+    next[c.chapterName] = type
+  })
+  conflictResolutions.value = next
+  const label = type === 'skip' ? '跳过' : '覆盖'
+  ElMessage.success(`已将 ${targets.length} 个冲突/空章设为「${label}」`)
+}
+
+// 执行真正的导入写入
+async function executeImport(params, resolutions) {
+  // 关键：Vue 的 reactive 代理对象无法被 IPC 的 structuredClone 克隆，
+  // 必须用 JSON 序列化转成纯普通对象，否则会抛 "An object could not be cloned"
+  const plainParams = JSON.parse(JSON.stringify(params || {}))
+  const plainResolutions = JSON.parse(JSON.stringify(resolutions || {}))
+  const result = await window.electron.importNovel({ ...plainParams, resolutions: plainResolutions })
+  if (result.success) {
+    const parts = []
+    if (result.createdCount) parts.push(`新建 ${result.createdCount} 章`)
+    if (result.overwrittenCount) parts.push(`覆盖 ${result.overwrittenCount} 章`)
+    if (result.skippedCount) parts.push(`跳过 ${result.skippedCount} 章`)
+    ElMessage.success(parts.length ? `导入完成：${parts.join('，')}` : '导入完成')
+    conflictDialogVisible.value = false
+    importDialogVisible.value = false
+    importPreviewList.value = []
+    // 重新加载章节数据，并选中最新导入的章节
+    await loadChapters()
+    const vol = (chaptersTree.value || []).find(
+      (v) => v.id === (params.volumeId || result.volumeName)
+    )
+    const targetVolume = vol || (chaptersTree.value || [])[0]
+    if (targetVolume && targetVolume.children && targetVolume.children.length > 0) {
+      // 取编号最大的章节（即最新导入的）
+      const latest = [...targetVolume.children]
+        .sort((a, b) => getChapterOrderValue(a.name) - getChapterOrderValue(b.name))
+        .pop()
+      if (latest) {
+        const fakeNode = { data: latest, parent: { data: targetVolume } }
+        await handleChapterClick(latest, fakeNode)
+        currentChapterNodeKey.value = latest.path
+      }
+    }
+  } else {
+    ElMessage.error(result.message || '导入失败')
+  }
+}
+
+// 预览对话框中确认导入
+async function confirmImportWithResolutions() {
+  if (!pendingImportParams.value) return
+  resolving.value = true
+  try {
+    await executeImport(pendingImportParams.value, conflictResolutions.value)
+  } catch (err) {
+    console.error('[导入] 执行导入失败:', err)
+    ElMessage.error(`导入失败：${err?.message || '未知错误'}`)
+  } finally {
+    resolving.value = false
+  }
+}
+
+// 重置导入表单（在预览对话框关闭时调用，统一清理导入状态）
+function resetImportForm() {
+  importFilePath.value = ''
+  importEncoding.value = 'auto'
+  pendingImportParams.value = null
+  conflictList.value = []
+  conflictResolutions.value = {}
+  importPreviewList.value = []
+  // 保留已选卷，方便连续导入
+}
+
+// 从章节名中解析编号（"第3章" -> 3，无数字编号的章节如"序章"返回极大值排最后）
+// 注意必须始终返回数字，否则排序比较会产生 NaN 导致顺序错乱
+function getChapterOrderValue(name) {
+  if (!name) return Number.MAX_SAFE_INTEGER
+  const match = String(name).replace(/\.txt$/, '').match(/^第(\d+)/)
+  if (match) {
+    return parseInt(match[1], 10)
+  }
+  // 无数字编号时统一排到数字章节之后，具体先后由主排序的名称兜底处理
+  return Number.MAX_SAFE_INTEGER
+}
+
 // 加载章节数据
 async function loadChapters(autoSelectLatest = false, targetVolumeId = null) {
   try {
@@ -405,14 +745,24 @@ async function loadChapters(autoSelectLatest = false, targetVolumeId = null) {
       chapters.reverse()
     }
 
-    // 根据章节时间排序状态对每个卷内的章节进行排序
+    // 根据排序状态对每个卷内的章节进行排序
+    // 文件创建时间（birthtime）在复制/导入/同步场景下不可靠，因此以章节编号为主排序依据，
+    // 升序=编号从小到大，降序=编号从大到小，符合"旧在前/新在前"的直觉且顺序稳定。
     for (const volume of chapters) {
       if (volume.children && volume.children.length > 0) {
         volume.children.sort((a, b) => {
-          const timeA = new Date(a.createdAt || 0).getTime()
-          const timeB = new Date(b.createdAt || 0).getTime()
-          // 默认降序（新的在前）
-          return chapterSortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+          const orderA = getChapterOrderValue(a.name)
+          const orderB = getChapterOrderValue(b.name)
+          const diff = orderA - orderB
+          if (diff !== 0) {
+            return chapterSortOrder.value === 'desc' ? -diff : diff
+          }
+          // 编号相同（如"第x章"无数字）时按创建时间兜底，再按名称稳定排序
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          const timeDiff = chapterSortOrder.value === 'desc' ? timeB - timeA : timeA - timeB
+          if (timeDiff !== 0) return timeDiff
+          return String(a.name).localeCompare(String(b.name), 'zh')
         })
       }
     }
@@ -1169,5 +1519,175 @@ async function handleSettingsChanged(newSettings) {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-base);
+}
+
+/* 导入小说对话框样式 */
+.import-novel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.import-label {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--text-base);
+  text-align: right;
+}
+
+.import-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+  line-height: 1.6;
+}
+
+/* 导入预览/冲突确认对话框样式 */
+.preview-summary {
+  font-size: 13px;
+  color: var(--text-base);
+  margin-bottom: 12px;
+}
+
+.preview-summary .summary-conflict {
+  color: var(--el-color-danger);
+}
+
+.preview-summary .summary-empty {
+  color: var(--el-color-warning);
+}
+
+.preview-summary .summary-merged {
+  color: var(--el-color-success);
+}
+
+.preview-batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-base);
+}
+
+.preview-list {
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-soft);
+}
+
+.preview-item.conflict {
+  border-left: 3px solid var(--el-color-danger);
+}
+
+.preview-item.empty {
+  border-left: 3px solid var(--el-color-warning);
+}
+
+.preview-item.merged {
+  border-left: 3px solid var(--el-color-success);
+}
+
+.preview-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.preview-index {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+  line-height: 20px;
+}
+
+.preview-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-meta {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+}
+
+.preview-reason {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-color-danger);
+}
+
+.preview-new-tag {
+  font-size: 12px;
+  color: var(--el-color-success);
+}
+
+.preview-resolution-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.tag.merged-tag {
+  color: var(--el-color-success);
+  background-color: var(--el-color-success-light-9);
+}
+
+.tag.empty-tag {
+  color: var(--el-color-warning);
+  background-color: var(--el-color-warning-light-9);
+}
+
+.tag.conflict-tag {
+  color: var(--el-color-danger);
+  background-color: var(--el-color-danger-light-9);
 }
 </style>

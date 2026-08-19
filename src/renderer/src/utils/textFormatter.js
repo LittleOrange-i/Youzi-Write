@@ -152,6 +152,64 @@ const fixQuotes = (lines) => {
   return replaceHalfWidthQuotes(lines)
 }
 
+// 将“对白高亮”中启用的符号转换为 起始符号 -> 结束符号 的映射
+// 仅使用用户实际启用（enabled）的对白符号来判定“对话范围”，避免误判
+function buildDialogueMap(dialogueSymbols) {
+  const map = {}
+  if (Array.isArray(dialogueSymbols)) {
+    for (const symbol of dialogueSymbols) {
+      if (symbol && symbol.enabled && symbol.start && symbol.end) {
+        // 同一个起始符号只记录第一个对应的结束符号
+        if (map[symbol.start] === undefined) {
+          map[symbol.start] = symbol.end
+        }
+      }
+    }
+  }
+  return map
+}
+
+// 全角句号后自动换行（对话内的句号除外）
+// context.dialogueSymbols：来自对白高亮设置中启用的符号列表
+const newlineAfterFullWidthPeriod = (lines, context) => {
+  // 优先使用用户配置的对白符号；无配置时退化为常见中文引号，避免完全失效
+  const dialogueMap = buildDialogueMap(context && context.dialogueSymbols)
+  const fallbackMap = { '“': '”', '‘': '’', '『': '』', '「': '」' }
+  const openToClose = Object.keys(dialogueMap).length > 0 ? dialogueMap : fallbackMap
+
+  // 对话栈提升到跨行级别：一段跨多行的对话，其打开状态需在行与行之间延续，
+  // 避免对话内换行导致后续行被误判为普通段落（从而把结尾引号甩到新行）。
+  let stack = [] // 记录当前打开的对话结束符，支持嵌套
+
+  return lines.map(line => {
+    let result = ''
+
+    for (const char of line) {
+      result += char
+
+      const close = openToClose[char]
+      if (close !== undefined) {
+        // 遇到对话起始符号：若栈顶已是同一符号（如半角引号自闭合），则视为结束并出栈
+        if (stack.length > 0 && stack[stack.length - 1] === close) {
+          stack.pop()
+        } else {
+          stack.push(close)
+        }
+      } else if (stack.length > 0 && char === stack[stack.length - 1]) {
+        // 遇到与栈顶匹配的结束符号，出栈（退出对话范围）
+        stack.pop()
+      }
+
+      // 遇到全角句号且当前不在任何对话范围内，则在句号后插入换行
+      if (char === '。' && stack.length === 0) {
+        result += '\n'
+      }
+    }
+    // 注意：不在此处重置 stack，使未闭合的对话状态延续到下一行
+    return result
+  })
+}
+
 // 4. 段落格式
 const indentParagraphs = (lines) => {
   return lines.map(line => {
@@ -187,13 +245,15 @@ export const formattingRules = [
   { id: 'replaceHalfWidthPeriod', label: '将半角句号替换为全角句号（. → 。）', handler: replaceHalfWidthPeriod, default: true },
   { id: 'replaceHalfWidthQuotes', label: '将半角引号替换为全角引号（"" → “”）', handler: replaceHalfWidthQuotes, default: true },
   { id: 'fixQuotes', label: '引号修正（"aaa" → “aaa”）', handler: fixQuotes, default: true },
+  { id: 'newlineAfterFullWidthPeriod', label: '全角句号后自动换行（对话中的句号除外）', handler: newlineAfterFullWidthPeriod, default: true },
 
   // 段落格式
   // { id: 'indentParagraphs', label: '段首缩进 2 个空白字符', handler: indentParagraphs, default: false }
 ]
 
 // 核心处理函数
-export function formatText(text, activeRules) {
+// context：额外上下文，例如 { dialogueSymbols }（来自对白高亮中启用的符号）
+export function formatText(text, activeRules, context = {}) {
   if (!text) return ''
   
   let lines = text.split('\n')
@@ -208,7 +268,7 @@ export function formatText(text, activeRules) {
       if (ruleConfig.enabled) {
         const ruleDef = formattingRules.find(r => r.id === ruleConfig.id)
         if (ruleDef) {
-          lines = ruleDef.handler(lines)
+          lines = ruleDef.handler(lines, context)
         }
       }
     }

@@ -210,7 +210,7 @@ import { DocumentCopy, Search, Tickets, Edit, Delete, FullScreen, Menu } from '@
 import { ElMessage, ElMessageBox } from 'element-plus' // 导入 Element Plus 组件
 import dayjs from 'dayjs' // 导入时间处理库
 import { useEditorStore } from '@renderer/stores/editor' // 导入编辑器 store
-import { formatText } from '@renderer/utils/textFormatter' // 导入文本排版工具
+import { formatText, getDefaultFormattingConfig } from '@renderer/utils/textFormatter' // 导入文本排版工具
 
 const props = defineProps({ // 定义组件属性
   editor: { // 编辑器实例
@@ -543,9 +543,12 @@ function handleFormatContent() {
     const text = props.editor.getText()
 
     // 执行排版处理
-    // 使用 store 中的规则配置
-    const rules = editorStore.editorSettings.formattingRules
-    const formattedText = formatText(text, rules)
+    // 使用 store 中的规则配置；若规则缺失（如首次未保存设置），回退到默认配置，避免排版全部失效
+    const savedRules = editorStore.editorSettings.formattingRules
+    const rules = Array.isArray(savedRules) && savedRules.length > 0 ? savedRules : getDefaultFormattingConfig()
+    // 传递对白高亮中启用的符号，供「全角句号后自动换行」规则判定对话范围
+    const dialogueSymbols = editorStore.editorSettings.dialogueHighlight?.symbols || []
+    const formattedText = formatText(text, rules, { dialogueSymbols })
 
     // 将排版后的文本设置回编辑器
     // 章节编辑器使用纯文本格式，需要通过 HTML 转换

@@ -231,11 +231,22 @@
 
 ### 安装依赖
 ```bash
+pnpm install @electron/get
 pnpm install
+
 ```
 ### 安装失败尝试删除
 ```bash
 rm -rf node_modules && pnpm store prune
+
+Windows
+Remove-Item node_modules -Recurse -Force
+Remove-Item pnpm-lock.yaml -Force
+
+
+切换源 
+pnpm config set registry https://registry.npmmirror.com
+
 ```
 
 ### 开发模式

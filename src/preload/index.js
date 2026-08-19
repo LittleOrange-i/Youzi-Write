@@ -64,6 +64,10 @@ if (process.contextIsolated) {
       // 创建章节
       createChapter: (bookName, volumeId) =>
         ipcRenderer.invoke('create-chapter', { bookName, volumeId }),
+      // 导入 txt 小说
+      importNovel: (params) => ipcRenderer.invoke('import-novel', params),
+      // 分析 txt 小说导入（检测冲突，不写入）
+      analyzeImportNovel: (params) => ipcRenderer.invoke('analyze-import-novel', params),
       // 加载章节数据
       loadChapters: (bookName) => ipcRenderer.invoke('load-chapters', bookName),
 
@@ -256,6 +260,13 @@ if (process.contextIsolated) {
       deleteOrganization: ({ bookName, organizationName }) =>
         ipcRenderer.invoke('delete-organization', { bookName, organizationName }),
 
+      // --------- 物品档案相关 ---------
+      // 读取物品档案数据
+      readItems: (bookName) => ipcRenderer.invoke('read-items', { bookName }),
+      // 保存物品档案数据
+      writeItems: (bookName, data) =>
+        ipcRenderer.invoke('write-items', { bookName, data }),
+
       // --------- 禁词管理相关 ---------
       // 获取禁词列表
       getBannedWords: (bookName) => ipcRenderer.invoke('get-banned-words', bookName),
@@ -341,7 +352,11 @@ if (process.contextIsolated) {
       openToolWindow: (route, query) => ipcRenderer.invoke('window:open-tool', { route, query }),
 
       // 退出应用程序
-      quitApp: () => ipcRenderer.invoke('quit-app')
+      quitApp: () => ipcRenderer.invoke('quit-app'),
+
+      // --------- 通用 HTTP 代理（避开浏览器 CORS） ---------
+      // 在主进程发起 HTTP(S) 请求并返回 JSON 对象，避开浏览器同源限制
+      httpFetchJson: (targetUrl) => ipcRenderer.invoke('http:fetch-json', targetUrl)
     })
     contextBridge.exposeInMainWorld('api', api)
     // 存储

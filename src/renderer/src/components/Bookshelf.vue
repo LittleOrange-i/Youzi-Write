@@ -187,11 +187,25 @@
             <el-form-item prop="type" label="作品分类"> <!-- 作品分类表单项 -->
               <el-cascader
                 v-model="form.type"
-                :options="BOOK_TYPES"
+                :options="bookTypesOptions"
                 :props="{ expandTrigger: 'hover', emitPath: false }"
                 placeholder="请选择类型"
                 class="w-full"
-              /> <!-- 作品分类级联选择器 -->
+              > <!-- 作品分类级联选择器 -->
+                <template #default="{ data }"> <!-- 自定义选项渲染，显示分类图标 -->
+                  <span class="flex items-center gap-2 min-w-[120px]"> <!-- 图标与文字横向容器，预留最小宽度 -->
+                    <span class="w-5 h-5 flex-shrink-0 flex items-center justify-center"> <!-- 图标占位区，固定 20x20 防止跳动 -->
+                      <img
+                        v-if="data.icon"
+                        :src="data.icon"
+                        class="w-5 h-5 rounded object-cover"
+                        alt=""
+                      /> <!-- 分类图标 -->
+                    </span>
+                    <span>{{ data.label }}</span> <!-- 分类名称 -->
+                  </span>
+                </template>
+              </el-cascader>
             </el-form-item>
 
             <el-form-item label="作品标签"> <!-- 作品标签表单项 -->
@@ -429,7 +443,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, h } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, h } from 'vue'
 import Book from './Book.vue'
 import WordCountChart from './WordCountChart.vue'
 import ThemeSelector from './ThemeSelector.vue'
@@ -437,7 +451,7 @@ import UpdateDialog from './UpdateDialog.vue'
 import updateIcon from '../../../../static/update.png'
 import { Plus, Refresh, Upload, Download, Check, ArrowDown } from '@element-plus/icons-vue' // 导入图标组件
 import { useMainStore } from '@renderer/stores'
-import { BOOK_TYPES } from '@renderer/constants/config'
+import { BOOK_TYPES, loadCategoryIcons } from '@renderer/constants/config'
 import { readBooksDir, createBook, deleteBook, updateBook } from '@renderer/service/books'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -499,6 +513,8 @@ const form = ref({
   confirmPassword: '', // 确认密码
   coverUrl: '' // 书籍封面URL
 })
+// 书籍类型选项（深响应副本，用于绑定图标等动态属性）
+const bookTypesOptions = reactive(structuredClone(BOOK_TYPES)) // 用 reactive 深响应化拷贝，便于新增/修改子项属性
 // 标签墙数据，从本地存储读取
 const tagWall = ref(JSON.parse(localStorage.getItem('tagWall') || '[]')) // 标签墙
 const newTag = ref('') // 新输入的标签内容
@@ -1194,6 +1210,8 @@ onMounted(() => {
   readBooksDir()
   refreshChart()
   checkUpdate()
+  // 加载并缓存分类图标（写入当前组件的响应式副本）
+  loadCategoryIcons(bookTypesOptions)
 })
 
 onBeforeUnmount(() => {

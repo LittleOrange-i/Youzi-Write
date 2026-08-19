@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { getDefaultFormattingConfig } from '@renderer/utils/textFormatter'
 
 // 编辑器相关全局状态管理
 export const useEditorStore = defineStore('editor', () => {
@@ -209,6 +210,19 @@ export const useEditorStore = defineStore('editor', () => {
       const settings = await window.electronStore.get('editorSettings')
       if (settings) {
         editorSettings.value = { ...editorSettings.value, ...settings }
+      }
+      // 合并排版规则：以最新默认规则（全量）为基础，套用已保存的启用状态
+      // 这样可以保证新增规则（如「全角句号后自动换行」）对老用户也可见，且默认关闭
+      const defaults = getDefaultFormattingConfig()
+      const savedRules = editorSettings.value.formattingRules
+      if (Array.isArray(savedRules) && savedRules.length > 0) {
+        const savedMap = new Map(savedRules.map((r) => [r.id, r]))
+        editorSettings.value.formattingRules = defaults.map((def) => {
+          const saved = savedMap.get(def.id)
+          return saved ? { ...def, enabled: saved.enabled } : def
+        })
+      } else {
+        editorSettings.value.formattingRules = defaults
       }
     } catch (error) {
       console.error('加载编辑器设置失败:', error)
