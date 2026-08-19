@@ -1,7 +1,14 @@
 import { ipcMain } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import { TextDecoder } from 'node:util'
 import { is } from '@electron-toolkit/utils'
+import {
+  readStats,
+  saveStats,
+  countChapterWords,
+  updateBookMetadata
+} from './stats.js'
 
 // ========== 书籍路径辅助函数 ==========
 
@@ -328,6 +335,362 @@ export function registerChaptersHandlers(store, readStats) {
     fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8')
 
     return { success: true, chapterName, filePath }
+  })
+
+  // 解码缓冲区为文本（UTF-8 严格失败则回退 GBK，或按指定编码）
+  function decodeBuffer(buffer, encoding) {
+    if (encoding === 'utf-8' || encoding === 'utf8') {
+      return new TextDecoder('utf-8', { fatal: false }).decode(buffer)
+    }
+    if (encoding === 'gbk' || encoding === 'gb18030') {
+      return new TextDecoder('gbk', { fatal: false }).decode(buffer)
+    }
+    // 自动探测：先尝试 UTF-8（严格），失败回退 GBK
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+    } catch {
+      return new TextDecoder('gbk', { fatal: false }).decode(buffer)
+    }
+  }
+
+  // 将 txt 内容按"第x章/回/集/节/部/卷"切分为章节段（每段含标题行与正文）
+  function splitNovelSegments(content) {
+    const segRegex = /(?=^[ \t]*第.+?[章回集节部卷])/gm
+    const raw = content.split(segRegex).filter((s) => s.trim().length > 0)
+    const chapterTitleRegex = /^第.+?[章回集节部卷]/
+    return raw
+      .map((seg) => {
+        const lines = seg.split('\n')
+        let titleLine = ''
+        let titleIdx = 0
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim()) {
+            titleLine = lines[i].trim()
+            titleIdx = i
+            break
+          }
+        }
+        const body = lines
+          .slice(titleIdx + 1)
+          .join('\n')
+          .trim()
+        return { titleLine, body }
+      })
+      // 丢弃不以"第x章"等章节标题开头的段（如文件开头的书名、作者、分隔线等）
+      .filter((seg) => chapterTitleRegex.test(seg.titleLine))
+  }
+
+  // 归一化章节标题，用于判断"同名"（忽略多空格、全半角等微小差异）
+  function normalizeChapterTitle(title) {
+    if (!title) return ''
+    return title
+      .replace(/[\s　]+/g, ' ')
+      .replace(/[“”""]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .trim()
+  }
+
+  // 合并连续同名章节（txt 中常见"第1章 标题"重复出现，或章前重复目录）
+  function mergeDuplicateSegments(segments) {
+    const merged = []
+    for (const seg of segments) {
+      const last = merged[merged.length - 1]
+      if (last && normalizeChapterTitle(last.titleLine) === normalizeChapterTitle(seg.titleLine)) {
+        // 同名重复标题：以"较晚出现"的段为准（往后识别，不往前），
+        // 避免把目录/导航区的重复标题当成有效章节，影响第1章及后续解析。
+        // 规则：
+        //   - 当前段有正文 -> 直接以当前段覆盖上一段（丢弃前面可能带错误内容的段）
+        //   - 当前段为空、上一段有正文 -> 保留上一段（不覆盖）
+        //   - 两段都为空 -> 以当前段覆盖（等价，无影响）
+        if (seg.body.trim()) {
+          merged[merged.length - 1] = { titleLine: seg.titleLine, body: seg.body }
+        } else if (!last.body.trim()) {
+          merged[merged.length - 1] = { titleLine: seg.titleLine, body: seg.body }
+        }
+        // 其余情况（前实后空）保留上一段，不做改动
+      } else {
+        merged.push({ titleLine: seg.titleLine, body: seg.body })
+      }
+    }
+    return merged
+  }
+
+  // 分析导入：解析 txt、计算目标文件名、检测同名/同编号冲突（不写入）
+  ipcMain.handle('analyze-import-novel', async (event, { bookName, filePath, volumeId, encoding }) => {
+    try {
+      if (!bookName || !filePath) {
+        return { success: false, message: '参数错误：缺少书名或文件路径' }
+      }
+
+      const booksDir = store.get('booksDir')
+      const bookPath = join(booksDir, bookName)
+      const volumeRoot = join(bookPath, '正文')
+      if (!fs.existsSync(volumeRoot)) {
+        return { success: false, message: '该书尚未初始化正文目录' }
+      }
+
+      // 确定目标卷：未指定则取第一个卷目录
+      let targetVolumeName = volumeId
+      if (!targetVolumeName) {
+        const volumes = fs
+          .readdirSync(volumeRoot, { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => d.name)
+        if (volumes.length === 0) {
+          return { success: false, message: '未找到任何卷，无法导入' }
+        }
+        targetVolumeName = volumes[0]
+      }
+
+      const volumePath = join(volumeRoot, targetVolumeName)
+      if (!fs.existsSync(volumePath)) {
+        return { success: false, message: `目标卷不存在：${targetVolumeName}` }
+      }
+
+      // 读取并解码
+      const buffer = fs.readFileSync(filePath)
+      const content = decodeBuffer(buffer, encoding)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+
+      let segments = splitNovelSegments(content)
+      if (segments.length === 0) {
+        return { success: false, message: '未识别到任何"第x章"标题，无法拆分导入' }
+      }
+
+      // 智能合并：连续同名章节合并为一章，避免同名文件互相覆盖
+      segments = mergeDuplicateSegments(segments)
+
+      // 目标卷已有的章节文件名（不含 .txt），用于冲突检测
+      const existingFiles = fs
+        .readdirSync(volumePath, { withFileTypes: true })
+        .filter((f) => f.isFile() && f.name.endsWith('.txt'))
+        .map((f) => f.name.replace(/\.txt$/, ''))
+
+      const existingNumbers = existingFiles
+        .map((n) => parseChapterName(n)?.number || 0)
+        .filter((n) => n > 0)
+      // 追加起点：现有最大编号 + 1（空卷时从 1 开始）
+      const baseNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1
+
+      const chapterSettings = store.get(`chapterSettings:${bookName}`) || {
+        chapterFormat: 'number',
+        suffixType: '章',
+        targetWords: 2000
+      }
+
+      // 记录已生成的文件名，用于检测 txt 内部重复（合并后）
+      const seenNames = new Set()
+      const chapters = []
+      const conflicts = []
+
+      segments.forEach((seg, index) => {
+        const parsed = parseChapterName(seg.titleLine)
+        // 写入编号：从现有最大编号之后按顺序递增，保留 txt 原文顺序
+        const writeNumber = baseNumber + index
+        // 文件名保留原标题描述（如"第11章 初入江湖"），修复"章节名未填充"
+        const prefix = generateChapterName(writeNumber, chapterSettings)
+        const description = parsed?.description || ''
+        const chapterName = description ? `${prefix} ${description}` : prefix
+
+        // 冲突判定：与目标卷已有章节同名，或合并后仍出现的内部重复
+        const conflictWithExisting = existingFiles.includes(chapterName)
+        const conflictWithSelf = seenNames.has(chapterName)
+        seenNames.add(chapterName)
+
+        const conflict = conflictWithExisting || conflictWithSelf
+        if (conflict) {
+          conflicts.push({
+            chapterName,
+            rawTitle: seg.titleLine,
+            reason: conflictWithExisting ? '目标卷已存在同名章节' : '导入文本中存在重复章节名'
+          })
+        }
+
+        chapters.push({
+          chapterName,
+          rawTitle: seg.titleLine,
+          bodyLength: (seg.body || '').length,
+          wordCount: (seg.body || '').length, // 预览用字数（汉字按字符计，与后续统计略有差异）
+          isEmptyBody: !(seg.body || '').trim(),
+          mergedCount: seg.mergeCount || 1,
+          mergedTitles: seg.mergedTitles || [],
+          conflict
+        })
+      })
+
+      return {
+        success: true,
+        volumeName: targetVolumeName,
+        chapters,
+        conflicts,
+        hasConflict: conflicts.length > 0
+      }
+    } catch (error) {
+      console.error('分析导入失败:', error)
+      return { success: false, message: error.message || '分析失败' }
+    }
+  })
+
+  // 执行导入：根据 resolutions 写入章节（overwrite=覆盖，skip=跳过，缺省=新建）
+  ipcMain.handle('import-novel', async (event, { bookName, filePath, volumeId, encoding, resolutions }) => {
+    try {
+      if (!bookName || !filePath) {
+        return { success: false, message: '参数错误：缺少书名或文件路径' }
+      }
+
+      const booksDir = store.get('booksDir')
+      const bookPath = join(booksDir, bookName)
+      const volumeRoot = join(bookPath, '正文')
+      if (!fs.existsSync(volumeRoot)) {
+        return { success: false, message: '该书尚未初始化正文目录' }
+      }
+
+      let targetVolumeName = volumeId
+      if (!targetVolumeName) {
+        const volumes = fs
+          .readdirSync(volumeRoot, { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => d.name)
+        if (volumes.length === 0) {
+          return { success: false, message: '未找到任何卷，无法导入' }
+        }
+        targetVolumeName = volumes[0]
+      }
+
+      const volumePath = join(volumeRoot, targetVolumeName)
+      if (!fs.existsSync(volumePath)) {
+        return { success: false, message: `目标卷不存在：${targetVolumeName}` }
+      }
+
+      const buffer = fs.readFileSync(filePath)
+      const content = decodeBuffer(buffer, encoding)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+
+      let segments = splitNovelSegments(content)
+      if (segments.length === 0) {
+        return { success: false, message: '未识别到任何"第x章"标题，无法拆分导入' }
+      }
+
+      // 与 analyze 阶段保持一致：合并连续同名章节
+      segments = mergeDuplicateSegments(segments)
+
+      const existingFiles = fs
+        .readdirSync(volumePath, { withFileTypes: true })
+        .filter((f) => f.isFile() && f.name.endsWith('.txt'))
+        .map((f) => f.name.replace(/\.txt$/, ''))
+
+      const existingNumbers = existingFiles
+        .map((n) => parseChapterName(n)?.number || 0)
+        .filter((n) => n > 0)
+      const baseNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1
+
+      const chapterSettings = store.get(`chapterSettings:${bookName}`) || {
+        chapterFormat: 'number',
+        suffixType: '章',
+        targetWords: 2000
+      }
+
+      const metaPath = join(volumePath, '.chapter_meta.json')
+      let metaData = {}
+      if (fs.existsSync(metaPath)) {
+        try {
+          metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+        } catch {
+          metaData = {}
+        }
+      }
+
+      const createdChapters = []
+      const skippedChapters = []
+      const overwrittenChapters = []
+      const seenNames = new Set()
+
+      segments.forEach((seg, index) => {
+        const parsed = parseChapterName(seg.titleLine)
+        const writeNumber = baseNumber + index
+        const prefix = generateChapterName(writeNumber, chapterSettings)
+        const description = parsed?.description || ''
+        const chapterName = description ? `${prefix} ${description}` : prefix
+
+        // 重复名二次兜底（理论上 analyze 已覆盖）
+        const isDuplicate = seenNames.has(chapterName)
+        seenNames.add(chapterName)
+
+        // 空正文默认跳过，避免生成 0 字章节；用户明确覆盖时除外
+        const isEmpty = !(seg.body || '').trim()
+        const userResolution = resolutions?.[chapterName]
+        let resolution = userResolution || 'new'
+        if (isDuplicate && !userResolution) {
+          resolution = 'skip'
+        }
+        if (isEmpty && !userResolution) {
+          resolution = 'skip'
+        }
+
+        if (resolution === 'skip') {
+          skippedChapters.push(chapterName)
+          return
+        }
+
+        const chapterFilePath = join(volumePath, `${chapterName}.txt`)
+        const existed = fs.existsSync(chapterFilePath)
+        fs.writeFileSync(chapterFilePath, seg.body || '', 'utf-8')
+        metaData[chapterName] = { createdAt: new Date().toISOString() }
+
+        if (existed || resolution === 'overwrite') {
+          overwrittenChapters.push(chapterName)
+        } else {
+          createdChapters.push(chapterName)
+        }
+      })
+
+      fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf-8')
+
+      // 刷新字数统计：导入的章节未经过 save-chapter，word_stats.json 中无记录，
+      // 会导致章节树字数显示为 0。此处按文件内容重算并写入统计与书籍总字数。
+      try {
+        const stats = readStats(store)
+        if (!stats.chapterStats) stats.chapterStats = {}
+        const today = new Date().toISOString().split('T')[0]
+        const writtenChapters = [...createdChapters, ...overwrittenChapters]
+        for (const name of writtenChapters) {
+          const chapterPath = join(volumePath, `${name}.txt`)
+          let content = ''
+          try {
+            content = fs.readFileSync(chapterPath, 'utf-8')
+          } catch {
+            content = ''
+          }
+          const wordCount = countChapterWords(content)
+          stats.chapterStats[`${bookName}/${targetVolumeName}/${name}`] = {
+            totalWords: wordCount,
+            lastUpdate: today,
+            wordChange: 0,
+            lastContentLength: wordCount
+          }
+        }
+        saveStats(store, stats)
+        await updateBookMetadata(store, bookName)
+      } catch (statsError) {
+        console.warn('导入后刷新字数统计失败（不影响章节写入）:', statsError.message)
+      }
+
+      return {
+        success: true,
+        volumeName: targetVolumeName,
+        createdCount: createdChapters.length,
+        overwrittenCount: overwrittenChapters.length,
+        skippedCount: skippedChapters.length,
+        createdChapters,
+        overwrittenChapters,
+        skippedChapters
+      }
+    } catch (error) {
+      console.error('导入小说失败:', error)
+      return { success: false, message: error.message || '导入失败' }
+    }
   })
 
   // 加载章节数据

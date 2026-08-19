@@ -64,6 +64,10 @@ if (process.contextIsolated) {
       // 创建章节
       createChapter: (bookName, volumeId) =>
         ipcRenderer.invoke('create-chapter', { bookName, volumeId }),
+      // 导入 txt 小说
+      importNovel: (params) => ipcRenderer.invoke('import-novel', params),
+      // 分析 txt 小说导入（检测冲突，不写入）
+      analyzeImportNovel: (params) => ipcRenderer.invoke('analyze-import-novel', params),
       // 加载章节数据
       loadChapters: (bookName) => ipcRenderer.invoke('load-chapters', bookName),
 

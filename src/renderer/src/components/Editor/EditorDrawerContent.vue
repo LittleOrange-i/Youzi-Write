@@ -395,8 +395,8 @@ function removeCustomColor(index) { // 定义删除颜色函数
 
 // 重置设置
 function resetGridSettings() { // 定义重置设置函数
-  gridLines.value.enabled = false // 禁用
-  gridLines.value.stickToBottom = false // 不紧贴底部
+  gridLines.value.enabled = true // 启用
+  gridLines.value.stickToBottom = true // 紧贴底部
   gridLines.value.boldSize = false // 不加粗
   gridLines.value.lineType = 'single-solid' // 默认类型
   gridLines.value.lineColor = '#e0e0e0' // 默认颜色
@@ -414,8 +414,8 @@ onMounted(() => { // 挂载钩子
   // 初始化时确保配置存在
   if (!editorStore.editorSettings.gridLines) { // 如果配置不存在
     editorStore.editorSettings.gridLines = { // 设置默认配置
-      enabled: false, // 默认不启用
-      stickToBottom: false, // 默认不紧贴
+      enabled: true, // 默认启用单行实线
+      stickToBottom: true, // 默认紧贴文本底部
       boldSize: false, // 默认不加粗
       lineType: 'single-solid', // 默认实线
       lineColor: '#e0e0e0', // 默认浅灰
