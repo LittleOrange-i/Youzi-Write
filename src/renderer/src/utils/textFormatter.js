@@ -177,9 +177,12 @@ const newlineAfterFullWidthPeriod = (lines, context) => {
   const fallbackMap = { '“': '”', '‘': '’', '『': '』', '「': '」' }
   const openToClose = Object.keys(dialogueMap).length > 0 ? dialogueMap : fallbackMap
 
+  // 对话栈提升到跨行级别：一段跨多行的对话，其打开状态需在行与行之间延续，
+  // 避免对话内换行导致后续行被误判为普通段落（从而把结尾引号甩到新行）。
+  let stack = [] // 记录当前打开的对话结束符，支持嵌套
+
   return lines.map(line => {
     let result = ''
-    const stack = [] // 记录当前打开的对话结束符，支持嵌套
 
     for (const char of line) {
       result += char
@@ -202,6 +205,7 @@ const newlineAfterFullWidthPeriod = (lines, context) => {
         result += '\n'
       }
     }
+    // 注意：不在此处重置 stack，使未闭合的对话状态延续到下一行
     return result
   })
 }
